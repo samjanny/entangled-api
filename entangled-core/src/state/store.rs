@@ -47,7 +47,8 @@ impl Default for StorageCap {
     /// (`sum(max_size)` across all entries). 64 KiB is below the absolute
     /// upper bound of 32 entries × 4096 bytes = 128 KiB, so this default is
     /// restrictive relative to the maximum policy-allowed total. A caller
-    /// that needs more headroom constructs the store via [`Self::with_cap`].
+    /// that needs more headroom constructs the store via
+    /// [`StateStore::with_cap`].
     fn default() -> Self {
         Self {
             bytes_per_publisher: 64 * 1024,

@@ -4,7 +4,7 @@
 //! schema is closed: exactly two top-level fields, `fields` and
 //! `request_state`. `build_submit_body` composes the body from the
 //! caller-supplied user input plus the publisher-scoped request state held
-//! by [`StateStore`](super::store::StateStore).
+//! by [`StateStore`].
 //!
 //! Validation is deliberately separate (`validation::submit`) so that a
 //! caller can build, inspect, and rebuild without first hitting an error.
