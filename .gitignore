@@ -1,9 +1,6 @@
 # Cargo build artifacts
 /target/
 
-# Library workspace: Cargo.lock is not tracked
-Cargo.lock
-
 # IDE / editor scratch
 .idea/
 .vscode/
