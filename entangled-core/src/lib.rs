@@ -4,6 +4,7 @@
 pub mod canon;
 pub mod crypto;
 pub mod document;
+pub mod state;
 pub mod tor;
 pub mod types;
 pub mod validation;

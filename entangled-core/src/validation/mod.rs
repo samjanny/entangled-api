@@ -13,9 +13,11 @@ pub mod input;
 pub mod kind;
 pub mod limits;
 pub mod parse;
+pub mod policy_check;
 pub mod schema;
 pub mod state;
 pub mod strings;
+pub mod submit;
 
 pub use diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel, Severity};
 pub use input::{check_input, InputKind};
