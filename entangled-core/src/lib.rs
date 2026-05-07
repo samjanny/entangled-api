@@ -3,5 +3,6 @@
 
 pub mod canon;
 pub mod crypto;
+pub mod document;
 pub mod types;
 pub mod validation;

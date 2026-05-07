@@ -8,8 +8,11 @@
 
 use serde_json::Value;
 
+use crate::types::canary::Canary;
 use crate::types::document::{ContentDocument, Document, TransactionDocument};
-use crate::types::manifest::Manifest;
+use crate::types::manifest::{Manifest, NavEntry};
+use crate::types::meta::Meta;
+use crate::types::state::{StatePolicyEntry, StateUpdateOp};
 
 use super::blocks::validate_blocks;
 use super::diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel};
@@ -23,6 +26,7 @@ use super::limits::{
 use super::parse::parse_with_limits;
 use super::state::{validate_state_policy, validate_state_updates_standalone};
 use super::strings::no_control_chars;
+use crate::types::blocks::Block;
 
 // -----------------------------------------------------------------------------
 // Public top-level pipelines (Stages 2–5)
@@ -99,30 +103,55 @@ pub fn parse_and_validate_transaction(bytes: &[u8]) -> Result<TransactionDocumen
 // -----------------------------------------------------------------------------
 
 pub fn validate_manifest(manifest: &Manifest) -> Result<(), Diagnostic> {
-    if !MIN_REFRESH_INTERVAL_RANGE.contains(&manifest.min_refresh_interval) {
+    validate_manifest_fields(
+        manifest.min_refresh_interval,
+        &manifest.navigation,
+        &manifest.state_policy,
+        &manifest.canary,
+    )
+}
+
+pub fn validate_content(doc: &ContentDocument) -> Result<(), Diagnostic> {
+    validate_content_fields(&doc.meta, &doc.blocks)
+}
+
+pub fn validate_transaction(doc: &TransactionDocument) -> Result<(), Diagnostic> {
+    validate_transaction_fields(&doc.blocks, &doc.state_updates)
+}
+
+/// Stage 5 checks shared between [`validate_manifest`] and
+/// [`crate::document::unsigned::UnsignedManifest`]: range, length, and syntax
+/// of the post-deserialize fields that do not depend on the signature.
+pub(crate) fn validate_manifest_fields(
+    min_refresh_interval: u32,
+    navigation: &[NavEntry],
+    state_policy: &[StatePolicyEntry],
+    canary: &Canary,
+) -> Result<(), Diagnostic> {
+    if !MIN_REFRESH_INTERVAL_RANGE.contains(&min_refresh_interval) {
         return Err(Diagnostic::new(
             DiagnosticCode::ESchemaFieldRange,
             DocumentKindLabel::Manifest,
             format!(
                 "min_refresh_interval {} out of range {}..={}",
-                manifest.min_refresh_interval,
+                min_refresh_interval,
                 MIN_REFRESH_INTERVAL_RANGE.start(),
                 MIN_REFRESH_INTERVAL_RANGE.end()
             ),
         ));
     }
 
-    if manifest.navigation.len() > MAX_NAVIGATION_ENTRIES {
+    if navigation.len() > MAX_NAVIGATION_ENTRIES {
         return Err(Diagnostic::new(
             DiagnosticCode::ESchemaFieldLength,
             DocumentKindLabel::Manifest,
             format!(
                 "navigation has {} entries, max is {MAX_NAVIGATION_ENTRIES}",
-                manifest.navigation.len()
+                navigation.len()
             ),
         ));
     }
-    for nav in &manifest.navigation {
+    for nav in navigation {
         if nav.label.len() > NAVIGATION_LABEL_MAX_BYTES {
             return Err(Diagnostic::new(
                 DiagnosticCode::ESchemaFieldLength,
@@ -142,11 +171,10 @@ pub fn validate_manifest(manifest: &Manifest) -> Result<(), Diagnostic> {
         }
     }
 
-    validate_state_policy(&manifest.state_policy)?;
+    validate_state_policy(state_policy)?;
 
     // Canary structural string limits. Interval bounds and `issued_at` future
     // checks are Stage 8 (later phase).
-    let canary = &manifest.canary;
     if canary.statement.len() > CANARY_STATEMENT_MAX_BYTES {
         return Err(Diagnostic::new(
             DiagnosticCode::ESchemaFieldLength,
@@ -157,7 +185,6 @@ pub fn validate_manifest(manifest: &Manifest) -> Result<(), Diagnostic> {
             ),
         ));
     }
-    // §08: statement permits LF; other control chars rejected.
     if !no_control_chars(&canary.statement, true) {
         return Err(Diagnostic::new(
             DiagnosticCode::ESchemaFieldSyntax,
@@ -176,7 +203,6 @@ pub fn validate_manifest(manifest: &Manifest) -> Result<(), Diagnostic> {
                 ),
             ));
         }
-        // §08: freshness_proof MUST NOT contain control characters.
         if !no_control_chars(fp, false) {
             return Err(Diagnostic::new(
                 DiagnosticCode::ESchemaFieldSyntax,
@@ -189,18 +215,18 @@ pub fn validate_manifest(manifest: &Manifest) -> Result<(), Diagnostic> {
     Ok(())
 }
 
-pub fn validate_content(doc: &ContentDocument) -> Result<(), Diagnostic> {
-    if doc.meta.title.len() > META_TITLE_MAX_BYTES {
+pub(crate) fn validate_content_fields(meta: &Meta, blocks: &[Block]) -> Result<(), Diagnostic> {
+    if meta.title.len() > META_TITLE_MAX_BYTES {
         return Err(Diagnostic::new(
             DiagnosticCode::ESchemaFieldLength,
             DocumentKindLabel::Content,
             format!(
                 "meta.title of {} bytes exceeds cap of {META_TITLE_MAX_BYTES}",
-                doc.meta.title.len()
+                meta.title.len()
             ),
         ));
     }
-    if !no_control_chars(&doc.meta.title, false) {
+    if !no_control_chars(&meta.title, false) {
         return Err(Diagnostic::new(
             DiagnosticCode::ESchemaFieldSyntax,
             DocumentKindLabel::Content,
@@ -208,41 +234,44 @@ pub fn validate_content(doc: &ContentDocument) -> Result<(), Diagnostic> {
         ));
     }
 
-    if doc.blocks.len() > MAX_BLOCKS_CONTENT {
+    if blocks.len() > MAX_BLOCKS_CONTENT {
         return Err(Diagnostic::new(
             DiagnosticCode::ESchemaFieldLength,
             DocumentKindLabel::Content,
             format!(
                 "content blocks has {} entries, max is {MAX_BLOCKS_CONTENT}",
-                doc.blocks.len()
+                blocks.len()
             ),
         ));
     }
 
-    validate_blocks(&doc.blocks, DocumentKind::Content)
+    validate_blocks(blocks, DocumentKind::Content)
 }
 
-pub fn validate_transaction(doc: &TransactionDocument) -> Result<(), Diagnostic> {
-    if doc.blocks.is_empty() {
+pub(crate) fn validate_transaction_fields(
+    blocks: &[Block],
+    state_updates: &[StateUpdateOp],
+) -> Result<(), Diagnostic> {
+    if blocks.is_empty() {
         return Err(Diagnostic::new(
             DiagnosticCode::ESchemaRequiredField,
             DocumentKindLabel::Transaction,
             "transaction must contain at least one block",
         ));
     }
-    if doc.blocks.len() > MAX_BLOCKS_TRANSACTION {
+    if blocks.len() > MAX_BLOCKS_TRANSACTION {
         return Err(Diagnostic::new(
             DiagnosticCode::ESchemaFieldLength,
             DocumentKindLabel::Transaction,
             format!(
                 "transaction blocks has {} entries, max is {MAX_BLOCKS_TRANSACTION}",
-                doc.blocks.len()
+                blocks.len()
             ),
         ));
     }
 
-    validate_blocks(&doc.blocks, DocumentKind::Transaction)?;
-    validate_state_updates_standalone(&doc.state_updates)?;
+    validate_blocks(blocks, DocumentKind::Transaction)?;
+    validate_state_updates_standalone(state_updates)?;
     Ok(())
 }
 
