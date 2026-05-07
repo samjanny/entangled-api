@@ -13,16 +13,22 @@ use thiserror::Error;
 
 use crate::types::{OriginPubkey, PublisherPubkey, RuntimePubkey, Signature};
 
+/// Errors produced by Ed25519 verification.
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum CryptoError {
+    /// The 32-byte public key did not decode to a valid Ed25519 point.
     #[error("invalid Ed25519 public key encoding")]
     InvalidPublicKey,
+    /// Strict signature verification failed (forged, tampered, or
+    /// wrong-key signature).
     #[error("Ed25519 signature verification failed")]
     VerificationFailed,
 }
 
+/// An Ed25519 signing key (private key + cached verifying key).
 pub struct SigningKey(ed25519_dalek::SigningKey);
 
+/// An Ed25519 verifying key (public key) suitable for `verify_strict`.
 pub struct VerifyingKey(ed25519_dalek::VerifyingKey);
 
 impl SigningKey {
@@ -45,6 +51,7 @@ impl SigningKey {
         Self(ed25519_dalek::SigningKey::from_bytes(seed))
     }
 
+    /// Return the [`VerifyingKey`] (public key) for this signing key.
     pub fn verifying_key(&self) -> VerifyingKey {
         VerifyingKey(self.0.verifying_key())
     }
@@ -57,14 +64,30 @@ impl SigningKey {
 }
 
 impl VerifyingKey {
+    /// Parse a [`PublisherPubkey`] into a [`VerifyingKey`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CryptoError::InvalidPublicKey`] if the 32 bytes do not
+    /// decode to a valid Ed25519 point.
     pub fn from_publisher_pubkey(pk: &PublisherPubkey) -> Result<Self, CryptoError> {
         Self::from_pubkey_bytes(pk.as_bytes())
     }
 
+    /// Parse an [`OriginPubkey`] into a [`VerifyingKey`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CryptoError::InvalidPublicKey`] on a malformed key.
     pub fn from_origin_pubkey(pk: &OriginPubkey) -> Result<Self, CryptoError> {
         Self::from_pubkey_bytes(pk.as_bytes())
     }
 
+    /// Parse a [`RuntimePubkey`] into a [`VerifyingKey`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CryptoError::InvalidPublicKey`] on a malformed key.
     pub fn from_runtime_pubkey(pk: &RuntimePubkey) -> Result<Self, CryptoError> {
         Self::from_pubkey_bytes(pk.as_bytes())
     }
@@ -87,14 +110,17 @@ impl VerifyingKey {
             .map_err(|_| CryptoError::VerificationFailed)
     }
 
+    /// Encode the underlying 32 bytes as a [`PublisherPubkey`].
     pub fn to_publisher_pubkey(&self) -> PublisherPubkey {
         PublisherPubkey::from_bytes(self.0.to_bytes())
     }
 
+    /// Encode the underlying 32 bytes as an [`OriginPubkey`].
     pub fn to_origin_pubkey(&self) -> OriginPubkey {
         OriginPubkey::from_bytes(self.0.to_bytes())
     }
 
+    /// Encode the underlying 32 bytes as a [`RuntimePubkey`].
     pub fn to_runtime_pubkey(&self) -> RuntimePubkey {
         RuntimePubkey::from_bytes(self.0.to_bytes())
     }

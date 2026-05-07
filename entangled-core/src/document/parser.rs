@@ -119,6 +119,17 @@ pub fn parse_and_verify_content(
     Ok(content)
 }
 
+/// Parse, validate, and verify a transaction document against the supplied
+/// runtime pubkey.
+///
+/// The runtime pubkey must come from a previously verified manifest's
+/// `canary.runtime_pubkey`; the parser does not retrieve the manifest.
+///
+/// # Errors
+///
+/// Returns the first [`Diagnostic`] produced by Stage 2-6 validation:
+/// `E_INPUT_*`, `E_PARSE_*`, `E_KIND_*`, `E_SCHEMA_*`, `E_SIG_INVALID_KEY`,
+/// or `E_SIG_VERIFICATION` (see [`crate::validation::DiagnosticCode`]).
 pub fn parse_and_verify_transaction(
     raw: &[u8],
     runtime_pubkey: &RuntimePubkey,

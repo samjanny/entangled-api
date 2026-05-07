@@ -1,8 +1,12 @@
 //! Validation pipeline for Entangled v1.0 documents.
 //!
-//! Stages 2 through 5 of the §10 validation pipeline are implemented here.
-//! Stage 1 (transport), Stage 6 (signature), and later stages will be
-//! delivered in subsequent phases.
+//! Stages 2 through 5 of the §10 validation pipeline are implemented here,
+//! plus the off-pipeline canary state machine (Stage 8), policy-aware state
+//! checks (§07), submit body validation (§09), and the clock-skew helper
+//! (§10).
+//!
+//! Stage 1 (transport) and the user-facing trust-state machine (Stage 7)
+//! are out of scope for this crate.
 
 pub mod blocks;
 pub mod canary;

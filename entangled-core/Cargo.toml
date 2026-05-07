@@ -2,8 +2,22 @@
 name = "entangled-core"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.85"
 license = "MIT OR Apache-2.0"
-description = "Entangled v1.0 protocol library — types, validation, signing, verification (WIP)"
+description = "Entangled v1.0 protocol — types, validation, canonicalization, signing, and verification."
+repository = "https://github.com/samjanny/entangled-api"
+homepage = "https://github.com/samjanny/entangled"
+documentation = "https://docs.rs/entangled-core"
+readme = "README.md"
+keywords = ["entangled", "tor", "ed25519", "publishing", "bip39"]
+categories = ["cryptography", "encoding", "parser-implementations"]
+include = [
+    "src/**/*",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE-MIT",
+    "LICENSE-APACHE",
+]
 
 [features]
 test-utils = []

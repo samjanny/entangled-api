@@ -24,18 +24,27 @@ use thiserror::Error;
 
 use crate::validation::diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel};
 
+/// Errors produced by Tor v3 onion-address decoding and strict verification.
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum TorError {
+    /// Address is not exactly 62 ASCII characters.
     #[error("address must be 62 characters total (56 base32 + .onion)")]
     WrongLength,
+    /// Address is missing the `.onion` suffix.
     #[error("address must end with .onion suffix")]
     MissingOnionSuffix,
+    /// Address body uses uppercase letters; v3 addresses are normatively
+    /// lowercase.
     #[error("address must be lowercase base32 (RFC 4648)")]
     NotLowercase,
+    /// Address body contains characters outside the RFC 4648 base32
+    /// alphabet.
     #[error("address contains invalid base32 characters")]
     InvalidBase32,
+    /// Embedded version byte is not `0x03`.
     #[error("address version byte must be 0x03 (Tor v3), got {0:#04x}")]
     WrongVersion(u8),
+    /// SHA3-256 checksum did not match the embedded prefix.
     #[error("checksum verification failed")]
     BadChecksum,
 }

@@ -20,14 +20,23 @@ use crate::types::{OriginPubkey, PublisherPubkey, RuntimePubkey, Signature};
 
 use super::ed25519::{CryptoError, SigningKey, VerifyingKey};
 
+/// Errors that can occur during high-level sign/verify.
 #[derive(Debug, Error)]
 pub enum SigningError {
+    /// The signed payload could not be canonicalized.
     #[error("canonicalization failed: {0}")]
     Canon(#[from] CanonError),
+    /// An Ed25519 verification or key-decoding step failed.
     #[error("crypto operation failed: {0}")]
     Crypto(#[from] CryptoError),
 }
 
+/// Sign a manifest payload (the manifest body without `sig`) under the
+/// publisher key.
+///
+/// # Errors
+///
+/// Forwards any [`CanonError`] from canonicalization.
 pub fn sign_manifest_payload(
     payload: &Value,
     publisher_key: &SigningKey,
@@ -36,6 +45,12 @@ pub fn sign_manifest_payload(
     Ok(publisher_key.sign(&input))
 }
 
+/// Verify a manifest signature against the publisher pubkey.
+///
+/// # Errors
+///
+/// Forwards any [`CanonError`] from canonicalization, and any
+/// [`CryptoError`] from key parsing or strict verification.
 pub fn verify_manifest_payload(
     payload: &Value,
     sig: &Signature,
@@ -47,6 +62,12 @@ pub fn verify_manifest_payload(
     Ok(())
 }
 
+/// Sign a content payload (the content body without `sig`) under the runtime
+/// key.
+///
+/// # Errors
+///
+/// Forwards any [`CanonError`] from canonicalization.
 pub fn sign_content_payload(
     payload: &Value,
     runtime_key: &SigningKey,
@@ -55,6 +76,11 @@ pub fn sign_content_payload(
     Ok(runtime_key.sign(&input))
 }
 
+/// Verify a content signature against the runtime pubkey.
+///
+/// # Errors
+///
+/// Forwards any [`CanonError`] and any [`CryptoError`].
 pub fn verify_content_payload(
     payload: &Value,
     sig: &Signature,
@@ -66,6 +92,12 @@ pub fn verify_content_payload(
     Ok(())
 }
 
+/// Sign a transaction payload (the transaction body without `sig`) under the
+/// origin key.
+///
+/// # Errors
+///
+/// Forwards any [`CanonError`] from canonicalization.
 pub fn sign_transaction_payload(
     payload: &Value,
     origin_key: &SigningKey,
@@ -74,6 +106,11 @@ pub fn sign_transaction_payload(
     Ok(origin_key.sign(&input))
 }
 
+/// Verify a transaction signature against the origin pubkey.
+///
+/// # Errors
+///
+/// Forwards any [`CanonError`] and any [`CryptoError`].
 pub fn verify_transaction_payload(
     payload: &Value,
     sig: &Signature,

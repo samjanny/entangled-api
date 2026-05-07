@@ -8,8 +8,11 @@ use super::diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel};
 /// is the on-the-wire diagnostic field).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DocumentKind {
+    /// `kind: "manifest"`.
     Manifest,
+    /// `kind: "content"`.
     Content,
+    /// `kind: "transaction"`.
     Transaction,
 }
 

@@ -25,7 +25,10 @@ use super::store::StateStore;
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SubmitBody {
+    /// User-input form values keyed by field name (slug syntax enforced at
+    /// validation, not by the type).
     pub fields: BTreeMap<String, String>,
+    /// Request-mode state items being transmitted with the submit.
     pub request_state: Vec<RequestStateItem>,
 }
 
@@ -34,8 +37,11 @@ pub struct SubmitBody {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RequestStateItem {
+    /// Namespace slug.
     pub namespace: Slug,
+    /// Key slug within the namespace.
     pub key: Slug,
+    /// Stored value at the time of submit.
     pub value: String,
 }
 

@@ -20,10 +20,16 @@ use crate::validation::diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabe
 /// (§07 "Mode change").
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StateEntry {
+    /// Stored value as it was committed.
     pub value: String,
+    /// Mode resolved from the manifest's `state_policy` at commit time.
     pub mode: StateMode,
+    /// Wall-clock time at which this entry expires.
     pub expires_at: EntangledTimestamp,
+    /// Wall-clock time at which the user gave consent for this entry.
     pub consent_at: EntangledTimestamp,
+    /// Whether the user opted to remember this consent for future writes
+    /// to the same `(publisher, namespace, key)` triple.
     pub remembered_consent: bool,
 }
 
@@ -31,13 +37,16 @@ pub struct StateEntry {
 /// UX; it only commits or refuses based on this input.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ConsentDecision {
+    /// Whether the user accepted the proposed write.
     pub accepted: bool,
+    /// Whether to mark the resulting entry as having remembered consent.
     pub remembered: bool,
 }
 
 /// Per-publisher byte cap enforced before each set. §07 "Storage limits".
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct StorageCap {
+    /// Maximum total bytes across all entries belonging to one publisher.
     pub bytes_per_publisher: usize,
 }
 
@@ -60,7 +69,12 @@ impl Default for StorageCap {
 /// `Ok(Rejected)` because a refused consent is not a protocol error.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SetOutcome {
-    Committed { remembered: bool },
+    /// Set was committed.
+    Committed {
+        /// Whether the consent was recorded as "remembered".
+        remembered: bool,
+    },
+    /// User declined to consent; nothing was written.
     Rejected,
 }
 
@@ -81,6 +95,13 @@ impl StoreKey {
     }
 }
 
+/// In-memory client-side state store.
+///
+/// Holds per-publisher entries with lazy expiration and a byte cap. A
+/// "stateless" variant (constructed via [`StateStore::new_stateless`]) is
+/// behaviorally identical for the purposes of this crate; the flag is
+/// surfaced via [`StateStore::is_stateless`] so a higher-level UI can refuse
+/// writes if the user opted out of state entirely.
 pub struct StateStore {
     inner: HashMap<StoreKey, StateEntry>,
     cap: StorageCap,
@@ -94,6 +115,7 @@ impl Default for StateStore {
 }
 
 impl StateStore {
+    /// Build an empty stateful store with the default storage cap.
     pub fn new() -> Self {
         Self {
             inner: HashMap::new(),
@@ -102,6 +124,9 @@ impl StateStore {
         }
     }
 
+    /// Build an empty store flagged as stateless (the UI surface uses this
+    /// flag to refuse writes from publishers that demand request-mode
+    /// state).
     pub fn new_stateless() -> Self {
         Self {
             inner: HashMap::new(),
@@ -110,6 +135,7 @@ impl StateStore {
         }
     }
 
+    /// Build an empty stateful store with a custom per-publisher byte cap.
     pub fn with_cap(cap: StorageCap) -> Self {
         Self {
             inner: HashMap::new(),
@@ -118,10 +144,12 @@ impl StateStore {
         }
     }
 
+    /// Whether the store is flagged as stateless.
     pub fn is_stateless(&self) -> bool {
         self.stateless
     }
 
+    /// The configured storage cap.
     pub fn cap(&self) -> StorageCap {
         self.cap
     }

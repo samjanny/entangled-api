@@ -55,6 +55,13 @@ pub fn validate_blocks(blocks: &[Block], doc_kind: DocumentKind) -> Result<(), D
     Ok(())
 }
 
+/// Validate a single block under the containing document kind.
+///
+/// # Errors
+///
+/// Returns the first applicable Stage 5 diagnostic
+/// (`E_SCHEMA_BLOCK_NOT_PERMITTED`, `E_SCHEMA_FIELD_LENGTH`,
+/// `E_SCHEMA_FIELD_RANGE`, `E_SCHEMA_FIELD_SYNTAX`).
 pub fn validate_block(block: &Block, doc_kind: DocumentKind) -> Result<(), Diagnostic> {
     // Permission gate per §03.
     if matches!(block, Block::SubmitForm { .. }) && doc_kind == DocumentKind::Transaction {
@@ -303,6 +310,12 @@ fn validate_submit_form(
     validate_form_fields(fields)
 }
 
+/// Validate the `fields` array of a `submit_form` block: per-field syntax
+/// plus uniqueness of `name`.
+///
+/// # Errors
+///
+/// Returns the first applicable Stage 5 diagnostic.
 pub fn validate_form_fields(fields: &[FormField]) -> Result<(), Diagnostic> {
     let mut seen_names: HashSet<&crate::types::slug::Slug> = HashSet::with_capacity(fields.len());
     for f in fields {

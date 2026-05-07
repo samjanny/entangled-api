@@ -12,16 +12,24 @@ use crate::canon::CanonError;
 use crate::crypto::{CryptoError, SigningError};
 use crate::validation::{Diagnostic, DiagnosticCode, DocumentKindLabel};
 
+/// Aggregated error type for the high-level `document` API.
 #[derive(Debug, Error)]
 pub enum DocumentError {
+    /// A validation pipeline stage rejected the document.
     #[error("validation failed: {0}")]
     Validation(Diagnostic),
+    /// JCS canonicalization rejected the payload.
     #[error("canonicalization failed: {0}")]
     Canon(#[from] CanonError),
+    /// A high-level sign/verify helper failed (flattened into Canon/Crypto on
+    /// `From`).
     #[error("signing failed: {0}")]
     Signing(SigningError),
+    /// The Ed25519 layer rejected a key or a signature.
     #[error("crypto failed: {0}")]
     Crypto(#[from] CryptoError),
+    /// `serde_json` serialization failed (unreachable through the public API
+    /// under the closed schema).
     #[error("serialization failed: {0}")]
     Serialization(serde_json::Error),
 }

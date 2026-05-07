@@ -1,3 +1,6 @@
+//! `EntangledPath`: absolute, normalized path with whitelisted characters
+//! (§02).
+
 use std::fmt;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -5,24 +8,36 @@ use thiserror::Error;
 
 const PATH_MAX_LEN: usize = 256;
 
+/// An absolute, normalized Entangled path (§02).
+///
+/// Syntax: starts with `/`, length 1..=256 bytes, characters drawn from
+/// `[A-Za-z0-9._~/-]`, no consecutive `/`, no `.` or `..` segments. The root
+/// path `"/"` is the only single-character form.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct EntangledPath(String);
 
+/// Reasons a string fails to parse as an [`EntangledPath`].
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum PathError {
+    /// Path is empty or does not start with `/`.
     #[error("path must not be empty and must begin with '/'")]
     NotAbsolute,
+    /// Path exceeds 256 bytes.
     #[error("path exceeds maximum length of {PATH_MAX_LEN} bytes")]
     TooLong,
+    /// Path contains a character outside `[A-Za-z0-9._~/-]`.
     #[error("path contains invalid character (allowed: [A-Za-z0-9._~/-])")]
     InvalidChar,
+    /// Path contains two adjacent `/` characters.
     #[error("path contains consecutive '/' characters")]
     ConsecutiveSlash,
+    /// A path segment equals `.` or `..`.
     #[error("path contains '.' or '..' segment")]
     DotSegment,
 }
 
 impl EntangledPath {
+    /// Borrow the underlying string (always starts with `/`).
     pub fn as_str(&self) -> &str {
         &self.0
     }

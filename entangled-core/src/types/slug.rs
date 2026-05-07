@@ -1,3 +1,6 @@
+//! `Slug`: lowercase alphanumeric identifier used for namespaces, keys,
+//! language tags, form field names, and select-option values (§02).
+
 use std::fmt;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -5,22 +8,34 @@ use thiserror::Error;
 
 const SLUG_MAX_LEN: usize = 64;
 
+/// A lowercase alphanumeric identifier used for namespaces, keys, language
+/// tags, form field names, and select-option values.
+///
+/// Syntax: `[a-z0-9][a-z0-9_-]{0,63}` (1..=64 bytes, ASCII only). The first
+/// character must be `[a-z0-9]`; subsequent characters may also include `_`
+/// and `-`. See §02 for the field-level grammar.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Slug(String);
 
+/// Reasons a string fails to parse as a [`Slug`].
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum SlugError {
+    /// Empty input. Slugs must contain at least one character.
     #[error("slug must not be empty")]
     Empty,
+    /// Input exceeds the 64-byte maximum.
     #[error("slug exceeds maximum length of {SLUG_MAX_LEN} bytes")]
     TooLong,
+    /// First character is not in `[a-z0-9]`.
     #[error("slug must start with [a-z0-9]")]
     InvalidFirstChar,
+    /// A non-first character is not in `[a-z0-9_-]`.
     #[error("slug contains invalid character (allowed: [a-z0-9_-])")]
     InvalidChar,
 }
 
 impl Slug {
+    /// Borrow the underlying string.
     pub fn as_str(&self) -> &str {
         &self.0
     }

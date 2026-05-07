@@ -1,6 +1,9 @@
 # Cargo build artifacts
 /target/
 
+# Conformance corpus (distributed separately, not vendored)
+entangled-core/tests/conformance/corpus/
+
 # IDE / editor scratch
 .idea/
 .vscode/

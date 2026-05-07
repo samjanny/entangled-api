@@ -51,34 +51,54 @@ const MANIFEST_KIND: &str = "manifest";
 const CONTENT_KIND: &str = "content";
 const TRANSACTION_KIND: &str = "transaction";
 
+/// Unsigned counterpart of [`crate::types::Manifest`] (every field except
+/// `sig`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct UnsignedManifest {
+    /// Protocol version literal.
     pub spec_version: SpecVersion,
+    /// Publisher long-term Ed25519 public key.
     pub publisher_pubkey: PublisherPubkey,
+    /// Transport-carrier binding for this manifest.
     pub origin: Origin,
+    /// Liveness/anti-downgrade canary.
     pub canary: Canary,
+    /// Closed list of state-policy entries.
     pub state_policy: Vec<StatePolicyEntry>,
+    /// Navigation entries.
     pub navigation: Vec<NavEntry>,
+    /// Minimum interval (seconds) between manifest re-fetches.
     pub min_refresh_interval: u32,
+    /// Time at which the manifest was last updated.
     pub updated: EntangledTimestamp,
 }
 
+/// Unsigned counterpart of [`crate::types::ContentDocument`].
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct UnsignedContent {
+    /// Protocol version literal.
     pub spec_version: SpecVersion,
+    /// Path at which this document is served.
     pub path: EntangledPath,
+    /// Publication metadata.
     pub meta: Meta,
+    /// Ordered block list.
     pub blocks: Vec<Block>,
 }
 
+/// Unsigned counterpart of [`crate::types::TransactionDocument`].
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct UnsignedTransaction {
+    /// Protocol version literal.
     pub spec_version: SpecVersion,
+    /// Path of the form whose submission this transaction answers.
     pub in_response_to: EntangledPath,
+    /// State update operations to apply.
     pub state_updates: Vec<StateUpdateOp>,
+    /// Ordered block list rendered as the response.
     pub blocks: Vec<Block>,
 }
 
@@ -86,6 +106,11 @@ impl UnsignedManifest {
     /// Convert into the §05 signed payload: a JSON object containing every
     /// field of the manifest envelope except `sig`, with the `kind`
     /// discriminator added back in.
+    ///
+    /// # Errors
+    ///
+    /// Forwards any [`serde_json::Error`] produced while serializing the
+    /// struct (unreachable in practice given the closed schema).
     pub fn to_signed_payload(&self) -> Result<Value, serde_json::Error> {
         let mut value = serde_json::to_value(self)?;
         attach_kind(&mut value, MANIFEST_KIND);
@@ -94,6 +119,11 @@ impl UnsignedManifest {
 }
 
 impl UnsignedContent {
+    /// Convert into the §05 signed payload for a content document.
+    ///
+    /// # Errors
+    ///
+    /// See [`UnsignedManifest::to_signed_payload`].
     pub fn to_signed_payload(&self) -> Result<Value, serde_json::Error> {
         let mut value = serde_json::to_value(self)?;
         attach_kind(&mut value, CONTENT_KIND);
@@ -102,6 +132,11 @@ impl UnsignedContent {
 }
 
 impl UnsignedTransaction {
+    /// Convert into the §05 signed payload for a transaction document.
+    ///
+    /// # Errors
+    ///
+    /// See [`UnsignedManifest::to_signed_payload`].
     pub fn to_signed_payload(&self) -> Result<Value, serde_json::Error> {
         let mut value = serde_json::to_value(self)?;
         attach_kind(&mut value, TRANSACTION_KIND);

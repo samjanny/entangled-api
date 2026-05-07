@@ -40,8 +40,11 @@ const ONION_BODY_LEN: usize = 56;
 /// Decoded byte components of a Tor v3 onion address.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DecodedOnionAddress {
+    /// 32-byte Ed25519 service public key.
     pub pubkey: [u8; 32],
+    /// 2 bytes of `SHA3-256(".onion checksum" || pubkey || version)`.
     pub checksum: [u8; 2],
+    /// Tor onion-service version byte; always `0x03` for v3.
     pub version: u8,
 }
 

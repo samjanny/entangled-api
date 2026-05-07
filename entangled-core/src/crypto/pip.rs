@@ -38,12 +38,16 @@ fn wordlist() -> &'static [&'static str] {
     })
 }
 
+/// Errors produced when parsing a PIP back into a [`PublisherPubkey`].
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum PipError {
+    /// The whitespace-split phrase did not contain exactly 24 words.
     #[error("PIP must contain exactly 24 words, got {0}")]
     WrongWordCount(usize),
+    /// One of the words is not in the BIP-39 English wordlist.
     #[error("PIP word not in BIP-39 English wordlist: {0}")]
     UnknownWord(String),
+    /// The 8-bit checksum did not match `SHA-256(pubkey)[0]`.
     #[error("PIP checksum verification failed")]
     InvalidChecksum,
 }
@@ -68,6 +72,18 @@ pub fn derive_pip(pubkey: &PublisherPubkey) -> String {
 }
 
 /// Recover the publisher pubkey from a 24-word PIP, validating the checksum.
+///
+/// Words are separated by ASCII whitespace (any number of any whitespace
+/// characters).
+///
+/// # Errors
+///
+/// - [`PipError::WrongWordCount`] if the input does not contain exactly 24
+///   whitespace-separated words.
+/// - [`PipError::UnknownWord`] if a word is not in the BIP-39 English
+///   wordlist.
+/// - [`PipError::InvalidChecksum`] if the embedded 8-bit checksum does not
+///   match `SHA-256(pubkey)[0]`.
 pub fn pip_to_pubkey(pip: &str) -> Result<PublisherPubkey, PipError> {
     let words: Vec<&str> = pip.split_whitespace().collect();
     if words.len() != 24 {

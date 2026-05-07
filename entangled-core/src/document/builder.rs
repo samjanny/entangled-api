@@ -29,6 +29,19 @@ use crate::validation::schema::{
 use super::error::DocumentError;
 use super::unsigned::{UnsignedContent, UnsignedManifest, UnsignedTransaction};
 
+/// Validate, sign, and serialize a manifest from an [`UnsignedManifest`].
+///
+/// Returns the signed [`Manifest`] alongside its JSON envelope bytes (with
+/// the `kind` discriminator and `sig` already attached).
+///
+/// # Errors
+///
+/// - [`DocumentError::Validation`] if the unsigned manifest fails Stage 5
+///   schema/range checks.
+/// - [`DocumentError::Canon`] / [`DocumentError::Crypto`] if canonicalization
+///   or Ed25519 signing fails.
+/// - [`DocumentError::Serialization`] if `serde_json` cannot serialize the
+///   envelope (in practice unreachable under the closed schema).
 pub fn build_manifest(
     unsigned: &UnsignedManifest,
     publisher_key: &SigningKey,
@@ -59,6 +72,14 @@ pub fn build_manifest(
     Ok((manifest, bytes))
 }
 
+/// Validate, sign, and serialize a content document from an
+/// [`UnsignedContent`].
+///
+/// Returns the signed [`ContentDocument`] and its JSON envelope bytes.
+///
+/// # Errors
+///
+/// See [`build_manifest`] — same set of failures, applied to content.
 pub fn build_content(
     unsigned: &UnsignedContent,
     runtime_key: &SigningKey,
@@ -80,6 +101,14 @@ pub fn build_content(
     Ok((content, bytes))
 }
 
+/// Validate, sign, and serialize a transaction from an
+/// [`UnsignedTransaction`].
+///
+/// Returns the signed [`TransactionDocument`] and its JSON envelope bytes.
+///
+/// # Errors
+///
+/// See [`build_manifest`] — same set of failures, applied to transactions.
 pub fn build_transaction(
     unsigned: &UnsignedTransaction,
     runtime_key: &SigningKey,

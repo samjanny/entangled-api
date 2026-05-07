@@ -8,20 +8,33 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+/// Diagnostic severity per §11.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
+    /// Error — document MUST be rejected.
     Error,
+    /// Warning — document MAY be processed with caveats; UI surfaces the
+    /// condition.
     Warning,
+    /// Info — informational only; never blocks rendering.
     Info,
 }
 
+/// Tag identifying which document kind a diagnostic relates to.
+///
+/// Set to [`DocumentKindLabel::None`] for diagnostics that are produced
+/// before the kind has been discriminated (Stage 2-3).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DocumentKindLabel {
+    /// Manifest document.
     Manifest,
+    /// Content document.
     Content,
+    /// Transaction document.
     Transaction,
+    /// Kind not yet known (Stage 2-3 diagnostics).
     None,
 }
 
@@ -32,6 +45,8 @@ pub enum DocumentKindLabel {
 /// `SCREAMING_SNAKE_CASE` heuristics for adjacent uppercase letters and
 /// digits.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[allow(missing_docs)] // each variant's name is documented by §11; per-variant prose would
+                       // duplicate the spec.
 pub enum DiagnosticCode {
     // Stage 1 — Transport (§11)
     #[serde(rename = "E_TRANSPORT_STATUS")]
@@ -304,18 +319,30 @@ impl fmt::Display for DiagnosticCode {
     }
 }
 
+/// Structured diagnostic payload (§11).
+///
+/// `stage` and `severity` are derived from `code` at construction time and
+/// MUST NOT be set independently.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Diagnostic {
+    /// Normative diagnostic code.
     pub code: DiagnosticCode,
+    /// Pipeline stage at which the diagnostic was produced (`0` for
+    /// off-pipeline diagnostics).
     pub stage: u8,
+    /// Normative severity for `code`.
     pub severity: Severity,
+    /// Document kind under which the diagnostic was raised.
     pub document_kind: DocumentKindLabel,
+    /// Free-form human-readable message; not normative.
     pub message: String,
+    /// Optional structured details. Format is implementation-specific.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub details: Option<serde_json::Value>,
 }
 
 impl Diagnostic {
+    /// Build a diagnostic. `stage` and `severity` are derived from `code`.
     pub fn new(
         code: DiagnosticCode,
         document_kind: DocumentKindLabel,
@@ -331,6 +358,7 @@ impl Diagnostic {
         }
     }
 
+    /// Attach optional structured `details` payload.
     pub fn with_details(mut self, details: serde_json::Value) -> Self {
         self.details = Some(details);
         self

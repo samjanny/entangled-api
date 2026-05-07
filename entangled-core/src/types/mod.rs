@@ -1,3 +1,13 @@
+//! Wire-format types of the Entangled v1.0 protocol.
+//!
+//! Every type in this module corresponds to a JSON object or value defined in
+//! the protocol specification. Newtype wrappers carry validation invariants
+//! enforced at parse time; structural enums use serde's internally-tagged
+//! representation to preserve the wire's `kind` (or `op`) discriminator.
+//!
+//! See [§02](https://github.com/samjanny/entangled/blob/main/specs/02-document-schema.md)
+//! and [§03](https://github.com/samjanny/entangled/blob/main/specs/03-block-types.md).
+
 pub mod blocks;
 pub mod canary;
 pub mod document;

@@ -7,11 +7,17 @@ use super::limits::{
 
 const UTF8_BOM: [u8; 3] = [0xEF, 0xBB, 0xBF];
 
+/// What kind of input is being checked at Stage 2 — selects the byte cap
+/// and the diagnostic `document_kind` tag.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InputKind {
+    /// A manifest envelope (cap: [`MANIFEST_MAX_BYTES`]).
     Manifest,
+    /// A content envelope (cap: [`CONTENT_DOC_MAX_BYTES`]).
     ContentDocument,
+    /// A transaction envelope (cap: [`TRANSACTION_DOC_MAX_BYTES`]).
     TransactionDocument,
+    /// A submit body (cap: [`SUBMIT_BODY_MAX_BYTES`]).
     SubmitBody,
 }
 

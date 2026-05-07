@@ -21,6 +21,14 @@ use super::limits::{
 };
 use super::strings::no_control_chars;
 
+/// Validate a manifest's `state_policy` array (Stage 5).
+///
+/// Checks the array cap, per-entry numeric ranges, purpose length and
+/// syntax, and uniqueness of `(namespace, key)` pairs.
+///
+/// # Errors
+///
+/// Returns the first applicable Stage 5 diagnostic.
 pub fn validate_state_policy(policy: &[StatePolicyEntry]) -> Result<(), Diagnostic> {
     if policy.len() > MAX_STATE_POLICY_ENTRIES {
         return Err(Diagnostic::new(
@@ -88,6 +96,17 @@ pub fn validate_state_policy(policy: &[StatePolicyEntry]) -> Result<(), Diagnost
     Ok(())
 }
 
+/// Standalone validation of a transaction's `state_updates` array (no
+/// policy lookup).
+///
+/// Enforces the array cap and the absolute hard ranges on `value` length and
+/// `ttl`. Cross-checks against the manifest's declared `state_policy` happen
+/// in [`crate::validation::policy_check`].
+///
+/// # Errors
+///
+/// Returns the first applicable diagnostic
+/// (`E_SCHEMA_FIELD_LENGTH`, `E_STATE_VALUE_SIZE`, or `E_STATE_TTL`).
 pub fn validate_state_updates_standalone(updates: &[StateUpdateOp]) -> Result<(), Diagnostic> {
     if updates.len() > MAX_STATE_UPDATES {
         return Err(Diagnostic::new(

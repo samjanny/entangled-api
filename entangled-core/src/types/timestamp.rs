@@ -1,3 +1,5 @@
+//! `EntangledTimestamp`: strict `YYYY-MM-DDTHH:MM:SSZ` UTC timestamp (§02).
+
 use std::fmt;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -6,32 +8,47 @@ use time::{Date, Month, OffsetDateTime, PrimitiveDateTime, Time};
 
 const TIMESTAMP_LEN: usize = 20;
 
+/// A strict UTC timestamp in `YYYY-MM-DDTHH:MM:SSZ` form (§02).
+///
+/// The wire form is exactly 20 ASCII characters, second-resolution, always
+/// in UTC (`Z` suffix). Leap seconds are not permitted. Calendar validity
+/// is enforced at parse time.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct EntangledTimestamp(OffsetDateTime);
 
+/// Reasons a string fails to parse as an [`EntangledTimestamp`].
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum TimestampError {
+    /// The string does not match the fixed `YYYY-MM-DDTHH:MM:SSZ` shape.
     #[error("timestamp must be exactly 20 ASCII characters in YYYY-MM-DDTHH:MM:SSZ form")]
     BadShape,
+    /// Month component is outside 01..=12.
     #[error("timestamp month is out of range (01..=12)")]
     InvalidMonth,
+    /// Day component is outside 01..=31.
     #[error("timestamp day is out of range (01..=31)")]
     InvalidDay,
+    /// Hour component is outside 00..=23.
     #[error("timestamp hour is out of range (00..=23)")]
     InvalidHour,
+    /// Minute component is outside 00..=59.
     #[error("timestamp minute is out of range (00..=59)")]
     InvalidMinute,
+    /// Second component is outside 00..=59 (leap seconds rejected).
     #[error("timestamp second is out of range (00..=59); leap seconds are not permitted")]
     InvalidSecond,
+    /// The day does not exist in the given month/year (e.g., Feb 30).
     #[error("timestamp is not a valid calendar date")]
     InvalidDate,
 }
 
 impl EntangledTimestamp {
+    /// Seconds since the Unix epoch (1970-01-01T00:00:00Z).
     pub fn unix_timestamp(&self) -> i64 {
         self.0.unix_timestamp()
     }
 
+    /// Convert to the underlying `time::OffsetDateTime` (always UTC).
     pub fn as_offset_date_time(&self) -> OffsetDateTime {
         self.0
     }

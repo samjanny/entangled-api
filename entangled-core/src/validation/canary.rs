@@ -34,10 +34,15 @@ const NEAR_EXPIRATION_FLOOR_SECS: i64 = SECS_PER_DAY;
 /// by other layers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CanaryState {
+    /// Canary is well within its validity window.
     Fresh,
+    /// Canary is within `max(10% of interval, 24h)` of its `next_expected`.
     NearExpiration,
+    /// `now >= next_expected`.
     Expired,
+    /// Canary failed structural validation (Stage 8).
     Invalid,
+    /// No canary in hand (transport failure, missing field, etc.).
     Unavailable,
 }
 

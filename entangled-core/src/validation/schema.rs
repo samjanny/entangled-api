@@ -32,6 +32,11 @@ use crate::types::blocks::Block;
 // Public top-level pipelines (Stages 2–5)
 // -----------------------------------------------------------------------------
 
+/// Run Stages 2-5 on a manifest envelope and return the typed [`Manifest`].
+///
+/// # Errors
+///
+/// Returns the first applicable Stage 2-5 diagnostic.
 pub fn parse_and_validate_manifest(bytes: &[u8]) -> Result<Manifest, Diagnostic> {
     let s = check_input(bytes, InputKind::Manifest)?;
     let value = parse_with_limits(s).map_err(|d| set_kind(d, DocumentKindLabel::Manifest))?;
@@ -54,6 +59,12 @@ pub fn parse_and_validate_manifest(bytes: &[u8]) -> Result<Manifest, Diagnostic>
     Ok(manifest)
 }
 
+/// Run Stages 2-5 on a content envelope and return the typed
+/// [`ContentDocument`].
+///
+/// # Errors
+///
+/// Returns the first applicable Stage 2-5 diagnostic.
 pub fn parse_and_validate_content(bytes: &[u8]) -> Result<ContentDocument, Diagnostic> {
     let s = check_input(bytes, InputKind::ContentDocument)?;
     let value = parse_with_limits(s).map_err(|d| set_kind(d, DocumentKindLabel::Content))?;
@@ -76,6 +87,12 @@ pub fn parse_and_validate_content(bytes: &[u8]) -> Result<ContentDocument, Diagn
     Ok(content)
 }
 
+/// Run Stages 2-5 on a transaction envelope and return the typed
+/// [`TransactionDocument`].
+///
+/// # Errors
+///
+/// Returns the first applicable Stage 2-5 diagnostic.
 pub fn parse_and_validate_transaction(bytes: &[u8]) -> Result<TransactionDocument, Diagnostic> {
     let s = check_input(bytes, InputKind::TransactionDocument)?;
     let value = parse_with_limits(s).map_err(|d| set_kind(d, DocumentKindLabel::Transaction))?;
@@ -102,6 +119,12 @@ pub fn parse_and_validate_transaction(bytes: &[u8]) -> Result<TransactionDocumen
 // Public per-kind validators (post-deserialize)
 // -----------------------------------------------------------------------------
 
+/// Run Stage 5 schema/range/syntax checks on a typed [`Manifest`] (e.g.,
+/// after manual construction).
+///
+/// # Errors
+///
+/// Returns the first applicable Stage 5 diagnostic.
 pub fn validate_manifest(manifest: &Manifest) -> Result<(), Diagnostic> {
     validate_manifest_fields(
         manifest.min_refresh_interval,
@@ -111,10 +134,21 @@ pub fn validate_manifest(manifest: &Manifest) -> Result<(), Diagnostic> {
     )
 }
 
+/// Run Stage 5 schema/range/syntax checks on a typed [`ContentDocument`].
+///
+/// # Errors
+///
+/// Returns the first applicable Stage 5 diagnostic.
 pub fn validate_content(doc: &ContentDocument) -> Result<(), Diagnostic> {
     validate_content_fields(&doc.meta, &doc.blocks)
 }
 
+/// Run Stage 5 schema/range/syntax checks on a typed
+/// [`TransactionDocument`].
+///
+/// # Errors
+///
+/// Returns the first applicable Stage 5 diagnostic.
 pub fn validate_transaction(doc: &TransactionDocument) -> Result<(), Diagnostic> {
     validate_transaction_fields(&doc.blocks, &doc.state_updates)
 }
