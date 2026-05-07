@@ -292,14 +292,12 @@ fn schema_prepass(root: &Value, kind: DocumentKindLabel) -> Result<(), Diagnosti
                     "null literal is not permitted",
                 ));
             }
-            Value::Number(n) => {
-                if n.is_f64() {
-                    return Err(Diagnostic::new(
-                        DiagnosticCode::ESchemaNonInteger,
-                        kind,
-                        format!("non-integer numeric value: {n}"),
-                    ));
-                }
+            Value::Number(n) if n.is_f64() => {
+                return Err(Diagnostic::new(
+                    DiagnosticCode::ESchemaNonInteger,
+                    kind,
+                    format!("non-integer numeric value: {n}"),
+                ));
             }
             Value::Array(arr) => {
                 for v in arr {

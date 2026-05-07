@@ -38,17 +38,15 @@ fn walk_limits(root: &Value) -> Result<(), Diagnostic> {
         // Depth applies to compound nodes only. A leaf (string/number/bool)
         // is "at" its parent's depth and doesn't itself consume nesting.
         match node {
-            Value::String(s) => {
-                if s.len() > MAX_JSON_STRING_BYTES {
-                    return Err(Diagnostic::new(
-                        DiagnosticCode::EParseStringLength,
-                        DocumentKindLabel::None,
-                        format!(
-                            "JSON string of {} bytes exceeds limit of {MAX_JSON_STRING_BYTES}",
-                            s.len()
-                        ),
-                    ));
-                }
+            Value::String(s) if s.len() > MAX_JSON_STRING_BYTES => {
+                return Err(Diagnostic::new(
+                    DiagnosticCode::EParseStringLength,
+                    DocumentKindLabel::None,
+                    format!(
+                        "JSON string of {} bytes exceeds limit of {MAX_JSON_STRING_BYTES}",
+                        s.len()
+                    ),
+                ));
             }
             Value::Array(arr) => {
                 if depth > MAX_JSON_NESTING_DEPTH {
