@@ -12,6 +12,7 @@ use entangled_core::validation::DiagnosticCode;
 use serde_json::Value;
 
 use super::fixtures::{unsigned_content, unsigned_manifest_with_publisher, unsigned_transaction};
+use crate::common::fixed_now;
 
 #[test]
 fn manifest_bytes_parsed_as_content_rejected() {
@@ -19,7 +20,8 @@ fn manifest_bytes_parsed_as_content_rejected() {
     let publisher_pk = publisher_key.verifying_key().to_publisher_pubkey();
     let runtime_pk = publisher_key.verifying_key().to_runtime_pubkey();
     let unsigned = unsigned_manifest_with_publisher(publisher_pk);
-    let (_manifest, bytes) = build_manifest(&unsigned, &publisher_key).expect("build manifest");
+    let (_manifest, bytes) =
+        build_manifest(&unsigned, &publisher_key, &fixed_now()).expect("build manifest");
 
     // The Stage 4 discriminator reads the literal `kind` string from the
     // body; since it is `"manifest"`, parse_and_verify_content fails the
@@ -51,7 +53,8 @@ fn transaction_bytes_parsed_as_manifest_rejected() {
     let unsigned = unsigned_transaction();
     let (_tx, bytes) = build_transaction(&unsigned, &runtime_key).expect("build tx");
 
-    let err = parse_and_verify_manifest(&bytes).expect_err("manifest parse must reject tx body");
+    let err = parse_and_verify_manifest(&bytes, &fixed_now())
+        .expect_err("manifest parse must reject tx body");
     assert_eq!(err.code, DiagnosticCode::EKindUnknown);
 }
 
@@ -66,7 +69,8 @@ fn manifest_with_kind_rewritten_to_content_rejected() {
     let publisher_pk = publisher_key.verifying_key().to_publisher_pubkey();
     let runtime_pk = publisher_key.verifying_key().to_runtime_pubkey();
     let unsigned = unsigned_manifest_with_publisher(publisher_pk);
-    let (_manifest, bytes) = build_manifest(&unsigned, &publisher_key).expect("build manifest");
+    let (_manifest, bytes) =
+        build_manifest(&unsigned, &publisher_key, &fixed_now()).expect("build manifest");
 
     let mut value: Value = serde_json::from_slice(&bytes).expect("parse json");
     if let Value::Object(ref mut map) = value {

@@ -23,6 +23,7 @@ pub mod state;
 pub mod strings;
 pub mod submit;
 
+pub use clock::{check_future_timestamp, check_manifest_clock_skew};
 pub use diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel, Severity};
 pub use input::{check_input, InputKind};
 pub use kind::{discriminate_kind, DocumentKind};

@@ -13,8 +13,10 @@ use crate::types::document::{ContentDocument, Document, TransactionDocument};
 use crate::types::manifest::{Manifest, NavEntry};
 use crate::types::meta::Meta;
 use crate::types::state::{StatePolicyEntry, StateUpdateOp};
+use crate::types::timestamp::EntangledTimestamp;
 
 use super::blocks::validate_blocks;
+use super::clock::check_future_timestamp;
 use super::diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel};
 use super::input::{check_input, InputKind};
 use super::kind::{discriminate_kind, DocumentKind};
@@ -34,10 +36,17 @@ use crate::types::blocks::Block;
 
 /// Run Stages 2-5 on a manifest envelope and return the typed [`Manifest`].
 ///
+/// `now` is the local wall-clock time used for the §06 / §10 clock-skew
+/// check on `manifest.updated`: a manifest dated more than 300 seconds ahead
+/// of `now` is rejected with `E_SCHEMA_FIELD_RANGE`.
+///
 /// # Errors
 ///
 /// Returns the first applicable Stage 2-5 diagnostic.
-pub fn parse_and_validate_manifest(bytes: &[u8]) -> Result<Manifest, Diagnostic> {
+pub fn parse_and_validate_manifest(
+    bytes: &[u8],
+    now: &EntangledTimestamp,
+) -> Result<Manifest, Diagnostic> {
     let s = check_input(bytes, InputKind::Manifest)?;
     let value = parse_with_limits(s).map_err(|d| set_kind(d, DocumentKindLabel::Manifest))?;
     let kind = discriminate_kind(&value)?;
@@ -55,7 +64,7 @@ pub fn parse_and_validate_manifest(bytes: &[u8]) -> Result<Manifest, Diagnostic>
         Document::Manifest(m) => m,
         _ => unreachable!("Stage 4 already discriminated as manifest"),
     };
-    validate_manifest(&manifest)?;
+    validate_manifest(&manifest, now)?;
     Ok(manifest)
 }
 
@@ -122,15 +131,20 @@ pub fn parse_and_validate_transaction(bytes: &[u8]) -> Result<TransactionDocumen
 /// Run Stage 5 schema/range/syntax checks on a typed [`Manifest`] (e.g.,
 /// after manual construction).
 ///
+/// `now` is the local wall-clock time used for the §06 / §10 clock-skew
+/// check on `manifest.updated`.
+///
 /// # Errors
 ///
 /// Returns the first applicable Stage 5 diagnostic.
-pub fn validate_manifest(manifest: &Manifest) -> Result<(), Diagnostic> {
+pub fn validate_manifest(manifest: &Manifest, now: &EntangledTimestamp) -> Result<(), Diagnostic> {
     validate_manifest_fields(
         manifest.min_refresh_interval,
         &manifest.navigation,
         &manifest.state_policy,
         &manifest.canary,
+        &manifest.updated,
+        now,
     )
 }
 
@@ -156,12 +170,29 @@ pub fn validate_transaction(doc: &TransactionDocument) -> Result<(), Diagnostic>
 /// Stage 5 checks shared between [`validate_manifest`] and
 /// [`crate::document::unsigned::UnsignedManifest`]: range, length, and syntax
 /// of the post-deserialize fields that do not depend on the signature.
+///
+/// `updated` is passed separately because this validator is also called
+/// pre-signing from `UnsignedManifest`, where the field lives on the
+/// unsigned struct (there is no `Manifest` to borrow from yet). `now` is
+/// the wall-clock reference for the §06 clock-skew check on `updated`.
 pub(crate) fn validate_manifest_fields(
     min_refresh_interval: u32,
     navigation: &[NavEntry],
     state_policy: &[StatePolicyEntry],
     canary: &Canary,
+    updated: &EntangledTimestamp,
+    now: &EntangledTimestamp,
 ) -> Result<(), Diagnostic> {
+    // §06: reject `updated` more than 300s in the future. Run this early so a
+    // grossly misdated manifest is rejected before more expensive structural
+    // walks (state_policy, navigation, canary).
+    check_future_timestamp(
+        updated,
+        now,
+        "manifest.updated",
+        DocumentKindLabel::Manifest,
+    )?;
+
     if !MIN_REFRESH_INTERVAL_RANGE.contains(&min_refresh_interval) {
         return Err(Diagnostic::new(
             DiagnosticCode::ESchemaFieldRange,
@@ -227,6 +258,13 @@ pub(crate) fn validate_manifest_fields(
         ));
     }
     if let Some(fp) = &canary.freshness_proof {
+        if fp.is_empty() {
+            return Err(Diagnostic::new(
+                DiagnosticCode::ESchemaFieldSyntax,
+                DocumentKindLabel::Manifest,
+                "canary.freshness_proof, when present, must not be empty",
+            ));
+        }
         if fp.len() > CANARY_FRESHNESS_PROOF_MAX_BYTES {
             return Err(Diagnostic::new(
                 DiagnosticCode::ESchemaFieldLength,
@@ -268,6 +306,13 @@ pub(crate) fn validate_content_fields(meta: &Meta, blocks: &[Block]) -> Result<(
         ));
     }
 
+    if blocks.is_empty() {
+        return Err(Diagnostic::new(
+            DiagnosticCode::ESchemaRequiredField,
+            DocumentKindLabel::Content,
+            "content blocks must contain at least one block",
+        ));
+    }
     if blocks.len() > MAX_BLOCKS_CONTENT {
         return Err(Diagnostic::new(
             DiagnosticCode::ESchemaFieldLength,

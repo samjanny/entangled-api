@@ -21,7 +21,15 @@
 //! rejects:
 //!
 //! - any `Value::Null`;
-//! - any `Value::Number` that is `f64`-only or that does not fit in `i64`/`u64`.
+//! - any `Value::Number` that is `f64`-only;
+//! - any `Value::Number` outside `0..=i64::MAX`.
+//!
+//! Per §04: "All numeric fields in Entangled are non-negative integers
+//! within ranges declared by the schema of each field" and "numbers outside
+//! the range expressible as a 64-bit signed integer" are not permitted.
+//! Negative integers and unsigned values exceeding `i64::MAX` are therefore
+//! out of the Entangled domain even though they would be representable by
+//! RFC 8785's serialization rules.
 //!
 //! These checks duplicate Stage 5 closed-schema validation
 //! (see [`crate::validation`]) on purpose. The canonicalizer is a
@@ -60,14 +68,12 @@ fn validate_subset(root: &Value) -> Result<(), CanonError> {
     while let Some(v) = stack.pop() {
         match v {
             Value::Null => return Err(CanonError::NullNotPermitted),
-            Value::Number(n) => {
-                if n.as_i64().is_none() && n.as_u64().is_none() {
-                    if n.is_f64() {
-                        return Err(CanonError::NonIntegerNumber);
-                    }
-                    return Err(CanonError::NumberOutOfRange);
-                }
-            }
+            Value::Number(n) => match n.as_i64() {
+                Some(v) if v >= 0 => {}
+                Some(_) => return Err(CanonError::NumberOutOfRange),
+                None if n.is_f64() => return Err(CanonError::NonIntegerNumber),
+                None => return Err(CanonError::NumberOutOfRange),
+            },
             Value::Bool(_) | Value::String(_) => {}
             Value::Array(items) => {
                 for item in items {
@@ -99,16 +105,14 @@ fn write_value(out: &mut Vec<u8>, value: &Value) {
 }
 
 fn write_number(out: &mut Vec<u8>, n: &serde_json::Number) {
-    // Subset already guarantees integer fits in i64 or u64. Decimal
-    // formatting via `write!` produces no leading zeros, no decimal point,
-    // no exponent, and (for `0_i64`) no minus sign.
-    if let Some(u) = n.as_u64() {
-        write!(out, "{}", u).expect("write to Vec<u8> never fails");
-    } else if let Some(i) = n.as_i64() {
-        write!(out, "{}", i).expect("write to Vec<u8> never fails");
-    } else {
-        unreachable!("validate_subset rejects non-integer numbers");
-    }
+    // Subset already guarantees a non-negative i64. Decimal formatting via
+    // `write!` produces no leading zeros, no decimal point, no exponent,
+    // and (for 0) no minus sign.
+    let i = n
+        .as_i64()
+        .expect("validate_subset accepts only non-negative i64-fitting integers");
+    debug_assert!(i >= 0, "validate_subset rejects negative integers");
+    write!(out, "{}", i).expect("write to Vec<u8> never fails");
 }
 
 fn write_string(out: &mut Vec<u8>, s: &str) {

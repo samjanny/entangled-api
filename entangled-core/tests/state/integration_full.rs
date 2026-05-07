@@ -47,7 +47,7 @@ fn full_submit_flow_end_to_end() {
     // 7. Build the submit body.
     let mut fields = BTreeMap::new();
     fields.insert("name".to_owned(), "alice".to_owned());
-    let body = build_submit_body(fields, &mut store, &pub_a, &now);
+    let body = build_submit_body(fields, &mut store, &pub_a, &policy, &now);
 
     // 8. The committed entry surfaces in the submit body's request_state.
     assert_eq!(body.request_state.len(), 1);

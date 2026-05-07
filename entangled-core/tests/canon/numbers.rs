@@ -23,9 +23,30 @@ fn one_million() {
 }
 
 #[test]
-fn u64_max_boundary() {
+fn i64_max_boundary_accepted() {
+    // §04: numeric domain is non-negative integers in i64 range.
+    let v: Value = serde_json::from_str("9223372036854775807").unwrap();
+    assert_eq!(canon_str(&v), "9223372036854775807");
+}
+
+#[test]
+fn above_i64_max_rejected() {
+    // u64 values outside the i64 range exceed Entangled's numeric domain.
+    let v: Value = serde_json::from_str("9223372036854775808").unwrap();
+    assert_eq!(canonicalize(&v), Err(CanonError::NumberOutOfRange));
+}
+
+#[test]
+fn u64_max_rejected() {
     let v: Value = serde_json::from_str("18446744073709551615").unwrap();
-    assert_eq!(canon_str(&v), "18446744073709551615");
+    assert_eq!(canonicalize(&v), Err(CanonError::NumberOutOfRange));
+}
+
+#[test]
+fn negative_integer_rejected() {
+    // §04: "All numeric fields in Entangled are non-negative integers".
+    let v: Value = serde_json::from_str("-1").unwrap();
+    assert_eq!(canonicalize(&v), Err(CanonError::NumberOutOfRange));
 }
 
 #[test]

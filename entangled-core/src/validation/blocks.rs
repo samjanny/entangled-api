@@ -234,6 +234,13 @@ fn validate_image_fields(
         ));
     }
     if let Some(c) = caption {
+        if c.is_empty() {
+            return Err(Diagnostic::new(
+                DiagnosticCode::ESchemaFieldSyntax,
+                DocumentKindLabel::None,
+                "image.caption, when present, must not be empty",
+            ));
+        }
         if c.len() > IMAGE_CAPTION_MAX_BYTES {
             return Err(Diagnostic::new(
                 DiagnosticCode::ESchemaFieldLength,
@@ -427,6 +434,13 @@ fn validate_select_options(options: &[SelectOption]) -> Result<(), Diagnostic> {
 }
 
 fn validate_note_title(title: &str) -> Result<(), Diagnostic> {
+    if title.is_empty() {
+        return Err(Diagnostic::new(
+            DiagnosticCode::ESchemaFieldSyntax,
+            DocumentKindLabel::None,
+            "note.title, when present, must not be empty",
+        ));
+    }
     if title.len() > NOTE_TITLE_MAX_BYTES {
         return Err(Diagnostic::new(
             DiagnosticCode::ESchemaFieldLength,

@@ -6,14 +6,43 @@
 //! - Stage 3 (parsing): JSON limits — via [`crate::validation::parse_with_limits`].
 //! - Stage 4 (kind discrimination): cross-kind rejection.
 //! - Stage 5 (schema): closed-schema, field types, ranges, lengths, syntax.
+//!   For manifests, this includes the §06 clock-skew check on
+//!   `manifest.updated` (driven by the `now` parameter).
 //! - Stage 6 (signature): JCS canonicalization plus Ed25519 strict
 //!   verification under the document's domain-separated context.
 //!
-//! Stages 7-10 (trust state, canary, path/origin binding) are *not* applied
-//! here. Callers obtain the verified [`Manifest`] and resolve trust state
-//! separately. The parser only proves that whoever signed the manifest knew
-//! the private key matching `manifest.publisher_pubkey` — it does not prove
-//! that this pubkey is the one the user expects.
+//! # Pipeline coverage and caller responsibilities
+//!
+//! `parse_and_verify_manifest` and the rest of the `parse_and_verify_*`
+//! family cover Stages 2 through 6 of §10. The remaining stages are
+//! deliberately the **caller's responsibility**:
+//!
+//! - **Stage 7 (trust state machine)** — TOFU pinning, externally-verified
+//!   identity, mismatch resolution. Out of scope for this crate; handled by
+//!   a higher-level client layer (e.g. a future `entangled-client`).
+//! - **Stage 8 (canary state and structure)** — call
+//!   [`crate::validation::canary::validate_canary_structure`] and
+//!   [`crate::validation::canary::compute_canary_state`] explicitly after
+//!   `parse_and_verify_manifest` succeeds. The canary `issued_at`
+//!   clock-skew check lives there, not in this parse pipeline, because it
+//!   is paired with the canary state machine (fresh / stale / expired) and
+//!   anti-downgrade comparisons against previously seen canaries — neither
+//!   of which is a closed-schema concern.
+//! - **Stage 9 (binding)** — for manifests, call
+//!   [`crate::tor::verify_origin_binding`] to prove the carrier endpoint
+//!   matches `manifest.origin`. For content and transaction documents,
+//!   path/in-response-to binding is the caller's check too.
+//! - **Stage 10 (rendering decisions)** — chrome and UI concerns.
+//!
+//! Stage 5 includes `manifest.updated` clock-skew because that field is a
+//! pure schema-level range check on a single self-contained timestamp; it
+//! does not depend on history or trust state. Stage 8's canary check
+//! depends on both, so it is exposed as a separate helper rather than
+//! folded into the parse pipeline.
+//!
+//! The parser only proves that whoever signed the manifest knew the private
+//! key matching `manifest.publisher_pubkey` — it does not prove that this
+//! pubkey is the one the user expects.
 //!
 //! ## Known limitation: Stage 5 / Stage 6 boundary for `sig` shape
 //!
@@ -37,6 +66,7 @@ use crate::crypto::{CryptoError, VerifyingKey};
 use crate::types::document::{ContentDocument, TransactionDocument};
 use crate::types::keys::RuntimePubkey;
 use crate::types::manifest::Manifest;
+use crate::types::timestamp::EntangledTimestamp;
 use crate::validation::schema::{
     parse_and_validate_content, parse_and_validate_manifest, parse_and_validate_transaction,
 };
@@ -50,8 +80,17 @@ use super::envelope::extract_sig;
 /// "Stage 6 self-verification" only. Stage 7 trust-state resolution
 /// (TOFU pinning, externally verified PIP, mismatch detection) is the
 /// caller's responsibility.
-pub fn parse_and_verify_manifest(raw: &[u8]) -> Result<Manifest, Diagnostic> {
-    let manifest = parse_and_validate_manifest(raw)?;
+///
+/// `now` is the local wall-clock time used for the §06 / §10 clock-skew
+/// check on `manifest.updated` (Stage 5). Pass a deterministic timestamp in
+/// tests; pass `OffsetDateTime::now_utc().into()` (or equivalent) in
+/// production callers — `entangled-core` deliberately does not query the
+/// system clock itself.
+pub fn parse_and_verify_manifest(
+    raw: &[u8],
+    now: &EntangledTimestamp,
+) -> Result<Manifest, Diagnostic> {
+    let manifest = parse_and_validate_manifest(raw, now)?;
     let mut value = serde_json::to_value(&manifest).map_err(|e| {
         Diagnostic::new(
             DiagnosticCode::EParseJson,

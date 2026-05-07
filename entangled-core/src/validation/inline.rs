@@ -169,11 +169,11 @@ fn validate_citation_url(url: &str) -> Result<(), Diagnostic> {
             "citation url contains control characters",
         ));
     }
-    // RFC 3986: ASCII-only printable URL characters. Reject any non-ASCII or
-    // ASCII whitespace beyond the control-char check above.
+    // RFC 3986: only unreserved / gen-delims / sub-delims / "%" are valid.
+    // Anything else (including printable ASCII like < > " \\ ^ ` { | } and
+    // any non-ASCII byte) is rejected.
     for b in url.bytes() {
-        let ok = (0x21..=0x7E).contains(&b);
-        if !ok {
+        if !is_rfc3986_uri_byte(b) {
             return Err(Diagnostic::new(
                 DiagnosticCode::ESchemaFieldSyntax,
                 DocumentKindLabel::None,
@@ -182,4 +182,22 @@ fn validate_citation_url(url: &str) -> Result<(), Diagnostic> {
         }
     }
     Ok(())
+}
+
+/// Returns true if `b` is a byte that may legally appear in a URI per
+/// RFC 3986 §2.2 / §2.3 (unreserved, gen-delims, sub-delims, or "%"). The
+/// helper does not validate percent-encoded sequences; it only ensures that
+/// each byte is from the URI character set.
+fn is_rfc3986_uri_byte(b: u8) -> bool {
+    matches!(b,
+        // unreserved: ALPHA / DIGIT / "-" / "." / "_" / "~"
+        b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~'
+        // gen-delims
+        | b':' | b'/' | b'?' | b'#' | b'[' | b']' | b'@'
+        // sub-delims
+        | b'!' | b'$' | b'&' | b'\'' | b'(' | b')' | b'*' | b'+' | b',' | b';' | b'='
+        // pct-encoded prefix (the two hex digits after must be ALPHA/DIGIT,
+        // which is already covered above; we don't track triplet structure)
+        | b'%'
+    )
 }

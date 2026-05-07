@@ -7,6 +7,7 @@ use entangled_core::document::{
 use entangled_core::validation::DiagnosticCode;
 
 use super::fixtures::{unsigned_content, unsigned_manifest_with_publisher};
+use crate::common::fixed_now;
 
 /// Find the first byte that is not part of the JSON literal `"sig":"…"`.
 /// We want to flip a byte that does NOT live inside the signature string.
@@ -25,15 +26,16 @@ fn manifest_body_byte_flip_rejected_with_sig_verification() {
     let publisher_pk = publisher_key.verifying_key().to_publisher_pubkey();
     let unsigned = unsigned_manifest_with_publisher(publisher_pk);
 
-    let (_manifest, mut bytes) = build_manifest(&unsigned, &publisher_key).expect("build");
+    let (_manifest, mut bytes) =
+        build_manifest(&unsigned, &publisher_key, &fixed_now()).expect("build");
     let idx = first_byte_outside_sig(&bytes);
     bytes[idx] ^= 0x01;
 
     // The flip might invalidate the JSON outright (if it lands on a
     // structural byte) or leave us with valid JSON whose canonicalization
     // differs from what was signed. Either way the parser must refuse.
-    let err =
-        parse_and_verify_manifest(&bytes).expect_err("tampered manifest must not parse-and-verify");
+    let err = parse_and_verify_manifest(&bytes, &fixed_now())
+        .expect_err("tampered manifest must not parse-and-verify");
     assert!(
         matches!(
             err.code,
@@ -55,13 +57,14 @@ fn manifest_with_sig_replaced_by_other_keys_signature_rejected() {
     let publisher_pk = key_a.verifying_key().to_publisher_pubkey();
     let unsigned = unsigned_manifest_with_publisher(publisher_pk);
 
-    let (_manifest_a, _bytes_a) = build_manifest(&unsigned, &key_a).expect("build A");
-    let (_manifest_b, bytes_b) = build_manifest(&unsigned, &key_b).expect("build B");
+    let (_manifest_a, _bytes_a) = build_manifest(&unsigned, &key_a, &fixed_now()).expect("build A");
+    let (_manifest_b, bytes_b) = build_manifest(&unsigned, &key_b, &fixed_now()).expect("build B");
 
     // bytes_b carries B's sig but A's `publisher_pubkey` (because the
     // unsigned struct declares A as publisher). A's pubkey can't verify B's
     // sig, so Stage 6 must fail.
-    let err = parse_and_verify_manifest(&bytes_b).expect_err("wrong key sig must fail");
+    let err =
+        parse_and_verify_manifest(&bytes_b, &fixed_now()).expect_err("wrong key sig must fail");
     assert_eq!(err.code, DiagnosticCode::ESigVerification);
 }
 
@@ -84,7 +87,8 @@ fn manifest_sig_byte_flip_rejected() {
     let publisher_pk = publisher_key.verifying_key().to_publisher_pubkey();
     let unsigned = unsigned_manifest_with_publisher(publisher_pk);
 
-    let (_manifest, bytes) = build_manifest(&unsigned, &publisher_key).expect("build");
+    let (_manifest, bytes) =
+        build_manifest(&unsigned, &publisher_key, &fixed_now()).expect("build");
     // Locate the sig string and flip a base64url character within it.
     let s = std::str::from_utf8(&bytes).unwrap().to_owned();
     let sig_field_start = s.find("\"sig\":\"").unwrap() + "\"sig\":\"".len();
@@ -95,7 +99,8 @@ fn manifest_sig_byte_flip_rejected() {
     let replacement = if original == b'A' { b'B' } else { b'A' };
     bytes[target_idx] = replacement;
 
-    let err = parse_and_verify_manifest(&bytes).expect_err("flipped sig must not verify");
+    let err =
+        parse_and_verify_manifest(&bytes, &fixed_now()).expect_err("flipped sig must not verify");
     assert!(
         matches!(
             err.code,

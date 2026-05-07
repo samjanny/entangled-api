@@ -8,15 +8,18 @@ use entangled_core::document::{
 };
 
 use super::fixtures::{unsigned_content, unsigned_manifest_with_publisher, unsigned_transaction};
+use crate::common::fixed_now;
 
 #[test]
 fn manifest_round_trip() {
     let publisher_key = SigningKey::from_seed(&[0xA1; 32]);
     let publisher_pk = publisher_key.verifying_key().to_publisher_pubkey();
     let unsigned = unsigned_manifest_with_publisher(publisher_pk);
+    let now = fixed_now();
 
-    let (manifest, bytes) = build_manifest(&unsigned, &publisher_key).expect("build_manifest");
-    let parsed = parse_and_verify_manifest(&bytes).expect("parse_and_verify_manifest");
+    let (manifest, bytes) =
+        build_manifest(&unsigned, &publisher_key, &now).expect("build_manifest");
+    let parsed = parse_and_verify_manifest(&bytes, &now).expect("parse_and_verify_manifest");
 
     assert_eq!(
         parsed, manifest,

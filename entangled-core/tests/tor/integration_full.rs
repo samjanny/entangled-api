@@ -69,10 +69,12 @@ fn full_pillar_b_closure() {
     };
 
     // (a) Sign it.
-    let (manifest, bytes) = build_manifest(&unsigned, &publisher_key).expect("build_manifest");
+    let now = ts("2026-05-07T00:00:00Z");
+    let (manifest, bytes) =
+        build_manifest(&unsigned, &publisher_key, &now).expect("build_manifest");
 
     // (b) Parse + signature verify.
-    let parsed = parse_and_verify_manifest(&bytes).expect("parse_and_verify_manifest");
+    let parsed = parse_and_verify_manifest(&bytes, &now).expect("parse_and_verify_manifest");
     assert_eq!(parsed, manifest);
 
     // (c) Origin binding: the address we (would have) fetched from matches

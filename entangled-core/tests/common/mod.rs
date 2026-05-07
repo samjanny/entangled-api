@@ -48,6 +48,14 @@ pub fn ts(s: &str) -> EntangledTimestamp {
     EntangledTimestamp::try_from(s).unwrap()
 }
 
+/// Deterministic "now" used as the wall-clock argument for the public
+/// manifest pipeline (`parse_and_verify_manifest`, `build_manifest`, etc.).
+/// Aligned with [`minimal_manifest`]'s `updated` so existing fixtures pass
+/// the §06 clock-skew check unchanged.
+pub fn fixed_now() -> EntangledTimestamp {
+    ts("2026-05-07T00:00:00Z")
+}
+
 pub fn path(s: &str) -> EntangledPath {
     EntangledPath::try_from(s).unwrap()
 }

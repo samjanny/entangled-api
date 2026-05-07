@@ -32,7 +32,7 @@ fn content_round_trip() {
 #[test]
 fn transaction_round_trip() {
     let key = SigningKey::from_seed(&[0xA3; 32]);
-    let pk = key.verifying_key().to_origin_pubkey();
+    let pk = key.verifying_key().to_runtime_pubkey();
     let payload = sample_payload();
     let sig = sign_transaction_payload(&payload, &key).expect("sign");
     verify_transaction_payload(&payload, &sig, &pk).expect("verify");
@@ -59,8 +59,8 @@ fn domain_separation_content_signature_does_not_verify_as_transaction() {
     let payload = sample_payload();
     let content_sig = sign_content_payload(&payload, &key).expect("sign");
 
-    let origin_pk = key.verifying_key().to_origin_pubkey();
-    let result = verify_transaction_payload(&payload, &content_sig, &origin_pk);
+    let runtime_pk = key.verifying_key().to_runtime_pubkey();
+    let result = verify_transaction_payload(&payload, &content_sig, &runtime_pk);
     assert!(
         matches!(result, Err(SigningError::Crypto(_))),
         "content sig must not verify as transaction, got {result:?}"

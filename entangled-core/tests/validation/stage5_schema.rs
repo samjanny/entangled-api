@@ -4,7 +4,9 @@ use entangled_core::validation::{
 };
 use serde_json::{json, Value};
 
-use crate::common::{minimal_canary, minimal_content_doc, minimal_manifest, KEY_ZEROS, SIG_ZEROS};
+use crate::common::{
+    fixed_now, minimal_canary, minimal_content_doc, minimal_manifest, KEY_ZEROS, SIG_ZEROS,
+};
 
 fn manifest_value() -> Value {
     let mut v = serde_json::to_value(minimal_manifest()).unwrap();
@@ -40,7 +42,7 @@ fn t01_content_doc_with_extra_top_field_rejected() {
 fn t02_manifest_without_canary_rejected() {
     let mut v = manifest_value();
     v.as_object_mut().unwrap().remove("canary");
-    let err = parse_and_validate_manifest(&manifest_bytes(&v)).unwrap_err();
+    let err = parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now()).unwrap_err();
     assert_eq!(err.code, DiagnosticCode::ESchemaRequiredField);
 }
 
@@ -73,7 +75,7 @@ fn t04_min_refresh_interval_100_rejected_with_field_range() {
     v.as_object_mut()
         .unwrap()
         .insert("min_refresh_interval".to_owned(), json!(100));
-    let err = parse_and_validate_manifest(&manifest_bytes(&v)).unwrap_err();
+    let err = parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now()).unwrap_err();
     assert_eq!(err.code, DiagnosticCode::ESchemaFieldRange);
 }
 
@@ -91,7 +93,7 @@ fn t05_state_policy_duplicate_namespace_key_rejected() {
     v.as_object_mut()
         .unwrap()
         .insert("state_policy".to_owned(), json!([entry, entry]));
-    let err = parse_and_validate_manifest(&manifest_bytes(&v)).unwrap_err();
+    let err = parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now()).unwrap_err();
     assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
 }
 
@@ -216,7 +218,7 @@ fn t12_canary_statement_with_line_feed_accepted() {
     v.as_object_mut()
         .unwrap()
         .insert("canary".to_owned(), canary);
-    parse_and_validate_manifest(&manifest_bytes(&v))
+    parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now())
         .expect("LF in canary.statement must be accepted");
 }
 
@@ -234,7 +236,7 @@ fn t13_state_policy_purpose_with_line_feed_rejected() {
             "purpose": "line one\nline two"
         }]),
     );
-    let err = parse_and_validate_manifest(&manifest_bytes(&v)).unwrap_err();
+    let err = parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now()).unwrap_err();
     assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
 }
 
@@ -246,7 +248,7 @@ fn t14_navigation_label_101_bytes_rejected() {
         "navigation".to_owned(),
         json!([{ "label": label, "path": "/" }]),
     );
-    let err = parse_and_validate_manifest(&manifest_bytes(&v)).unwrap_err();
+    let err = parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now()).unwrap_err();
     assert_eq!(
         err.code,
         DiagnosticCode::ESchemaFieldLength,
@@ -264,7 +266,7 @@ fn t15_navigation_label_200_bytes_rejected_too() {
         "navigation".to_owned(),
         json!([{ "label": label, "path": "/" }]),
     );
-    let err = parse_and_validate_manifest(&manifest_bytes(&v)).unwrap_err();
+    let err = parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now()).unwrap_err();
     assert_eq!(
         err.code,
         DiagnosticCode::ESchemaFieldLength,
@@ -323,7 +325,7 @@ fn t18_non_integer_number_rejected() {
     v.as_object_mut()
         .unwrap()
         .insert("min_refresh_interval".to_owned(), json!(42.5));
-    let err = parse_and_validate_manifest(&manifest_bytes(&v)).unwrap_err();
+    let err = parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now()).unwrap_err();
     assert_eq!(err.code, DiagnosticCode::ESchemaNonInteger);
 }
 
@@ -349,6 +351,83 @@ fn t20_citation_url_with_ftp_scheme_rejected() {
             "kind": "link",
             "label": [{ "kind": "text", "value": "src", "marks": [] }],
             "target": { "kind": "citation", "url": "ftp://x" }
+        }
+    ]);
+    let err = parse_and_validate_content(&manifest_bytes(&v)).unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
+}
+
+#[test]
+fn t22_content_with_empty_blocks_array_rejected() {
+    // §02: content `blocks` MUST contain at least one block.
+    let mut v = content_value();
+    let blocks = v.as_object_mut().unwrap().get_mut("blocks").unwrap();
+    *blocks = json!([]);
+    let err = parse_and_validate_content(&manifest_bytes(&v)).unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::ESchemaRequiredField);
+}
+
+#[test]
+fn t23_image_caption_empty_string_rejected() {
+    // §03: when `caption` is present it MUST NOT be an empty string.
+    let mut v = content_value();
+    let blocks = v.as_object_mut().unwrap().get_mut("blocks").unwrap();
+    *blocks = json!([
+        {
+            "kind": "image",
+            "src": "/a.png",
+            "sha256": KEY_ZEROS,
+            "media_type": "image/png",
+            "width": 800,
+            "height": 600,
+            "alt": "diagram",
+            "caption": ""
+        }
+    ]);
+    let err = parse_and_validate_content(&manifest_bytes(&v)).unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
+}
+
+#[test]
+fn t24_note_title_empty_string_rejected() {
+    // §03: when `title` is present on a note block it MUST NOT be empty.
+    let mut v = content_value();
+    let blocks = v.as_object_mut().unwrap().get_mut("blocks").unwrap();
+    *blocks = json!([
+        {
+            "kind": "note",
+            "variant": "info",
+            "title": "",
+            "content": [{ "kind": "text", "value": "body", "marks": [] }]
+        }
+    ]);
+    let err = parse_and_validate_content(&manifest_bytes(&v)).unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
+}
+
+#[test]
+fn t25_canary_freshness_proof_empty_string_rejected() {
+    // §08: when `freshness_proof` is present it MUST NOT be empty.
+    let mut v = manifest_value();
+    let canary = v.as_object_mut().unwrap().get_mut("canary").unwrap();
+    canary
+        .as_object_mut()
+        .unwrap()
+        .insert("freshness_proof".to_owned(), json!(""));
+    let err = parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now()).unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
+}
+
+#[test]
+fn t26_citation_url_with_brace_rejected_as_field_syntax() {
+    // §03 / RFC 3986: braces are not in the unreserved/reserved URI set.
+    let mut v = content_value();
+    let blocks = v.as_object_mut().unwrap().get_mut("blocks").unwrap();
+    *blocks = json!([
+        {
+            "kind": "link",
+            "label": [{ "kind": "text", "value": "src", "marks": [] }],
+            "target": { "kind": "citation", "url": "https://example.org/{template}" }
         }
     ]);
     let err = parse_and_validate_content(&manifest_bytes(&v)).unwrap_err();

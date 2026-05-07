@@ -15,6 +15,7 @@
 //! that further constrain "how far in the past" live with the field's other
 //! validations (e.g. anti-downgrade in [`super::canary`]).
 
+use crate::types::manifest::Manifest;
 use crate::types::EntangledTimestamp;
 use crate::validation::diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel};
 use crate::validation::limits::CLOCK_SKEW_TOLERANCE_SECS;
@@ -59,4 +60,28 @@ pub fn check_future_timestamp(
             "{field_name} is {delta}s in the future, exceeds clock-skew tolerance of {CLOCK_SKEW_TOLERANCE_SECS}s"
         ),
     ))
+}
+
+/// Reject a manifest whose `updated` timestamp is more than
+/// [`CLOCK_SKEW_TOLERANCE_SECS`] in the future relative to `now` (§06).
+///
+/// This is a normative Stage 5 check, but threaded as a separate helper so
+/// the basic [`crate::validation::validate_manifest`] API can stay
+/// `now`-agnostic. Callers running the full pipeline against a wall clock
+/// MUST invoke this in addition to the basic validator.
+///
+/// # Errors
+///
+/// Returns `E_SCHEMA_FIELD_RANGE` when `manifest.updated` exceeds the
+/// tolerance.
+pub fn check_manifest_clock_skew(
+    manifest: &Manifest,
+    now: &EntangledTimestamp,
+) -> Result<(), Diagnostic> {
+    check_future_timestamp(
+        &manifest.updated,
+        now,
+        "manifest.updated",
+        DocumentKindLabel::Manifest,
+    )
 }

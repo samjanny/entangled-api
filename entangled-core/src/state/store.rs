@@ -11,7 +11,7 @@ use time::Duration;
 
 use crate::types::keys::PublisherPubkey;
 use crate::types::slug::Slug;
-use crate::types::state::{StateMode, StateUpdateOp};
+use crate::types::state::{StateMode, StatePolicyEntry, StateUpdateOp};
 use crate::types::timestamp::EntangledTimestamp;
 use crate::validation::diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel};
 
@@ -51,16 +51,17 @@ pub struct StorageCap {
 }
 
 impl Default for StorageCap {
-    /// 64 KiB per publisher. §07 only requires that the cap be at least
-    /// sufficient to hold the maximum allowed state for the current policy
-    /// (`sum(max_size)` across all entries). 64 KiB is below the absolute
-    /// upper bound of 32 entries × 4096 bytes = 128 KiB, so this default is
-    /// restrictive relative to the maximum policy-allowed total. A caller
-    /// that needs more headroom constructs the store via
-    /// [`StateStore::with_cap`].
+    /// 256 KiB per publisher. §07 requires the cap be at least sufficient to
+    /// hold the maximum allowed state for the current policy
+    /// (`sum(max_size)` across all entries). The protocol-wide ceiling is
+    /// 32 entries × 4096 bytes = 128 KiB of value bytes; this store also
+    /// charges namespace and key bytes against the cap, so 256 KiB leaves
+    /// headroom for that overhead while still satisfying the lower bound on
+    /// any conforming policy. Callers that want a tighter or looser cap
+    /// construct the store via [`StateStore::with_cap`].
     fn default() -> Self {
         Self {
-            bytes_per_publisher: 64 * 1024,
+            bytes_per_publisher: 256 * 1024,
         }
     }
 }
@@ -268,11 +269,18 @@ impl StateStore {
         Ok(self.inner.remove(&k).is_some())
     }
 
-    /// All non-expired request-mode entries for a publisher, formatted as
-    /// `RequestStateItem`. Used by `build_submit_body`.
+    /// All non-expired request-mode entries for `publisher` whose
+    /// `(namespace, key)` is still declared in the current `state_policy`,
+    /// formatted as `RequestStateItem`. Used by `build_submit_body`.
+    ///
+    /// §07: state for `(namespace, key)` combinations no longer declared in
+    /// the current policy MUST NOT be included in submit requests, even if
+    /// the entry has not yet expired and was committed in `Request` mode.
+    /// The entry is retained for inspection/deletion but excluded here.
     pub fn get_request_state(
         &mut self,
         publisher: &PublisherPubkey,
+        current_policy: &[StatePolicyEntry],
         now: &EntangledTimestamp,
     ) -> Vec<super::submit::RequestStateItem> {
         let mut out = Vec::new();
@@ -284,6 +292,9 @@ impl StateStore {
                 continue;
             }
             if e.mode != StateMode::Request {
+                continue;
+            }
+            if !policy_declares(current_policy, &k.namespace, &k.key) {
                 continue;
             }
             // Slug syntax was validated when the entry was inserted (the
@@ -345,4 +356,10 @@ fn is_expired(entry: &StateEntry, now: &EntangledTimestamp) -> bool {
 
 fn entry_storage_bytes(namespace: &str, key: &str, value: &str) -> usize {
     namespace.len() + key.len() + value.len()
+}
+
+fn policy_declares(policy: &[StatePolicyEntry], namespace: &str, key: &str) -> bool {
+    policy
+        .iter()
+        .any(|p| p.namespace.as_str() == namespace && p.key.as_str() == key)
 }

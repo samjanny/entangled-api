@@ -3,6 +3,8 @@ use entangled_core::validation::{
 };
 use serde_json::json;
 
+use crate::common::fixed_now;
+
 #[test]
 fn byte_cap_takes_precedence_over_json_parse_error() {
     // Body that is both oversized and malformed JSON. Stage 2 must fire
@@ -27,7 +29,8 @@ fn kind_error_takes_precedence_over_schema_error() {
         "sig": "x"
         // No publisher_pubkey, no origin, etc. — Stage 5 would also fail.
     });
-    let err = parse_and_validate_manifest(&serde_json::to_vec(&bad).unwrap()).unwrap_err();
+    let err =
+        parse_and_validate_manifest(&serde_json::to_vec(&bad).unwrap(), &fixed_now()).unwrap_err();
     assert_eq!(
         err.code,
         DiagnosticCode::EKindSpecVersion,

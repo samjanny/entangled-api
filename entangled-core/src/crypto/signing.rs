@@ -16,7 +16,7 @@ use crate::canon::{
     build_content_signature_input, build_manifest_signature_input,
     build_transaction_signature_input, CanonError,
 };
-use crate::types::{OriginPubkey, PublisherPubkey, RuntimePubkey, Signature};
+use crate::types::{PublisherPubkey, RuntimePubkey, Signature};
 
 use super::ed25519::{CryptoError, SigningKey, VerifyingKey};
 
@@ -93,20 +93,22 @@ pub fn verify_content_payload(
 }
 
 /// Sign a transaction payload (the transaction body without `sig`) under the
-/// origin key.
+/// runtime key. Per §05, transaction documents are signed by `K_runtime` —
+/// the same operational key used for content — and verified against the
+/// runtime pubkey authorized by the relevant publication cycle's manifest.
 ///
 /// # Errors
 ///
 /// Forwards any [`CanonError`] from canonicalization.
 pub fn sign_transaction_payload(
     payload: &Value,
-    origin_key: &SigningKey,
+    runtime_key: &SigningKey,
 ) -> Result<Signature, SigningError> {
     let input = build_transaction_signature_input(payload)?;
-    Ok(origin_key.sign(&input))
+    Ok(runtime_key.sign(&input))
 }
 
-/// Verify a transaction signature against the origin pubkey.
+/// Verify a transaction signature against the runtime pubkey.
 ///
 /// # Errors
 ///
@@ -114,10 +116,10 @@ pub fn sign_transaction_payload(
 pub fn verify_transaction_payload(
     payload: &Value,
     sig: &Signature,
-    origin_pubkey: &OriginPubkey,
+    runtime_pubkey: &RuntimePubkey,
 ) -> Result<(), SigningError> {
     let input = build_transaction_signature_input(payload)?;
-    let vk = VerifyingKey::from_origin_pubkey(origin_pubkey)?;
+    let vk = VerifyingKey::from_runtime_pubkey(runtime_pubkey)?;
     vk.verify(&input, sig)?;
     Ok(())
 }

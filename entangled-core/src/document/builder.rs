@@ -22,6 +22,7 @@ use crate::crypto::{
 };
 use crate::types::document::{ContentDocument, TransactionDocument};
 use crate::types::manifest::Manifest;
+use crate::types::timestamp::EntangledTimestamp;
 use crate::validation::schema::{
     validate_content_fields, validate_manifest_fields, validate_transaction_fields,
 };
@@ -34,10 +35,15 @@ use super::unsigned::{UnsignedContent, UnsignedManifest, UnsignedTransaction};
 /// Returns the signed [`Manifest`] alongside its JSON envelope bytes (with
 /// the `kind` discriminator and `sig` already attached).
 ///
+/// `now` is the wall-clock reference for the §06 clock-skew check on
+/// `unsigned.updated`. The publisher signing the manifest knows the current
+/// time, so the caller passes it in explicitly. Pass a deterministic value
+/// in tests.
+///
 /// # Errors
 ///
 /// - [`DocumentError::Validation`] if the unsigned manifest fails Stage 5
-///   schema/range checks.
+///   schema/range checks (including `manifest.updated` clock-skew).
 /// - [`DocumentError::Canon`] / [`DocumentError::Crypto`] if canonicalization
 ///   or Ed25519 signing fails.
 /// - [`DocumentError::Serialization`] if `serde_json` cannot serialize the
@@ -45,12 +51,15 @@ use super::unsigned::{UnsignedContent, UnsignedManifest, UnsignedTransaction};
 pub fn build_manifest(
     unsigned: &UnsignedManifest,
     publisher_key: &SigningKey,
+    now: &EntangledTimestamp,
 ) -> Result<(Manifest, Vec<u8>), DocumentError> {
     validate_manifest_fields(
         unsigned.min_refresh_interval,
         &unsigned.navigation,
         &unsigned.state_policy,
         &unsigned.canary,
+        &unsigned.updated,
+        now,
     )?;
 
     let signed_payload = unsigned.to_signed_payload()?;

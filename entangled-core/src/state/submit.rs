@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::types::keys::PublisherPubkey;
 use crate::types::slug::Slug;
+use crate::types::state::StatePolicyEntry;
 use crate::types::timestamp::EntangledTimestamp;
 
 use super::store::StateStore;
@@ -46,16 +47,20 @@ pub struct RequestStateItem {
 }
 
 /// Compose a submit body for `publisher` by reading the request-mode
-/// entries from `store` and pairing them with `user_input_fields`. Does
-/// not validate; pass the result through
+/// entries from `store` and pairing them with `user_input_fields`. Only
+/// entries whose `(namespace, key)` is still declared in `current_policy`
+/// are included, per §07 ("state entries for `(namespace, key)` combinations
+/// no longer declared in the new policy ... MUST NOT be included in submit
+/// requests"). Does not validate; pass the result through
 /// `validation::submit::validate_submit_body` before transmission.
 pub fn build_submit_body(
     user_input_fields: BTreeMap<String, String>,
     store: &mut StateStore,
     publisher: &PublisherPubkey,
+    current_policy: &[StatePolicyEntry],
     now: &EntangledTimestamp,
 ) -> SubmitBody {
-    let request_state = store.get_request_state(publisher, now);
+    let request_state = store.get_request_state(publisher, current_policy, now);
     SubmitBody {
         fields: user_input_fields,
         request_state,
