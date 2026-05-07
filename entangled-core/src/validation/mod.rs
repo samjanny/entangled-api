@@ -5,6 +5,8 @@
 //! delivered in subsequent phases.
 
 pub mod blocks;
+pub mod canary;
+pub mod clock;
 pub mod diagnostic;
 pub mod inline;
 pub mod input;
