@@ -14,6 +14,20 @@
 //! separately. The parser only proves that whoever signed the manifest knew
 //! the private key matching `manifest.publisher_pubkey` — it does not prove
 //! that this pubkey is the one the user expects.
+//!
+//! ## Known limitation: Stage 5 / Stage 6 boundary for `sig` shape
+//!
+//! A `sig` field that is a string but has the wrong length or non-base64url
+//! contents fails inside `serde_json::from_value` while deserializing the
+//! [`crate::types::keys::Signature`] newtype. That happens during Stage 5
+//! (the closed-schema deserialization step), so the diagnostic is reported
+//! as `E_SCHEMA_FIELD_LENGTH` / `E_SCHEMA_FIELD_SYNTAX` — *not* the
+//! `E_SIG_MALFORMED` code that §11 reserves for Stage 6. Strict adherence
+//! would require splitting deserialization into two passes (read `sig` as a
+//! generic string at Stage 5, decode it as Ed25519 at Stage 6); we accept
+//! the current behavior as a documented deviation and may revisit it during
+//! the final cleanup pass. The pipeline still rejects the document with the
+//! correct severity and stage range — only the specific code differs.
 
 use crate::canon::{
     build_content_signature_input, build_manifest_signature_input,
