@@ -34,6 +34,44 @@ fn keys_differing_only_in_last_character() {
 }
 
 #[test]
+fn utf16_distinguishing_supplementary_vs_pua() {
+    // This case rigorously distinguishes UTF-8 byte ordering from
+    // UTF-16-code-unit ordering — the previous test (~ vs 😀) sorts the same
+    // way under both, so it could not catch a regression to byte ordering.
+    //
+    // 😀 (U+1F600): UTF-8 starts with 0xF0; UTF-16 high surrogate 0xD83D.
+    // \u{E000}    : UTF-8 starts with 0xEE; UTF-16 code unit 0xE000.
+    //
+    // Byte order:  \u{E000} (0xEE) < 😀 (0xF0)  → PUA before emoji.
+    // UTF-16 code unit order: 😀 (0xD83D) < \u{E000} (0xE000) → emoji before PUA.
+    //
+    // JCS mandates UTF-16 code unit order, so emoji must appear first.
+    let v = json!({"\u{E000}": 1, "\u{1F600}": 2});
+    let bytes = canonicalize(&v).unwrap();
+
+    // 😀 encodes to F0 9F 98 80 in UTF-8.
+    let emoji_bytes: &[u8] = &[0xF0, 0x9F, 0x98, 0x80];
+    // \u{E000} encodes to EE 80 80 in UTF-8.
+    let pua_bytes: &[u8] = &[0xEE, 0x80, 0x80];
+
+    let pos_emoji = bytes
+        .windows(emoji_bytes.len())
+        .position(|w| w == emoji_bytes)
+        .expect("emoji bytes must be in canonical output");
+    let pos_pua = bytes
+        .windows(pua_bytes.len())
+        .position(|w| w == pua_bytes)
+        .expect("PUA bytes must be in canonical output");
+
+    assert!(
+        pos_emoji < pos_pua,
+        "UTF-16 code unit ordering required: 😀 (0xD83D) must precede \\u{{E000}} (0xE000); \
+         pos_emoji={pos_emoji} pos_pua={pos_pua} canonical={canonical:?}",
+        canonical = String::from_utf8_lossy(&bytes)
+    );
+}
+
+#[test]
 fn supplementary_codepoint_key_sorts_after_ascii_tilde_under_utf16_ordering() {
     // U+1F600 GRINNING FACE: UTF-16 code unit sequence is [0xD83D, 0xDE00].
     // U+007E TILDE: [0x007E].

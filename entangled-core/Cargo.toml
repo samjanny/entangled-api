@@ -5,9 +5,15 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Entangled v1.0 protocol library — types, validation, signing, verification (WIP)"
 
+[features]
+test-utils = []
+
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 data-encoding = "2"
 time = { version = "0.3", default-features = false, features = ["parsing", "formatting", "macros"] }
 thiserror = "1"
+ed25519-dalek = { version = "2", default-features = false, features = ["std", "zeroize"] }
+sha2 = { version = "0.10", default-features = false, features = ["std"] }
+getrandom = "0.2"
