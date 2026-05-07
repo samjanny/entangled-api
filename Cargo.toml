@@ -1,0 +1,3 @@
+[workspace]
+members = ["entangled-core"]
+resolver = "2"
