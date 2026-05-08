@@ -1,7 +1,7 @@
 //! Pillar B end-to-end: the PIP alone is enough to recover the publisher
 //! pubkey and verify a manifest signature, with no external trust anchor.
 
-use entangled_core::crypto::{derive_pip, pip_to_pubkey, SigningKey};
+use entangled_core::crypto::{derive_pip, pip_to_pubkey, PublisherSigningKey};
 use entangled_core::document::{build_manifest, parse_and_verify_manifest, ManifestRead};
 
 use super::fixtures::unsigned_manifest_with_publisher;
@@ -9,8 +9,8 @@ use crate::common::fixed_now;
 
 #[test]
 fn pip_round_trip_to_verified_manifest() {
-    let publisher_key = SigningKey::from_seed(&[0xC0; 32]);
-    let publisher_pk = publisher_key.verifying_key().to_publisher_pubkey();
+    let publisher_key = PublisherSigningKey::from_seed(&[0xC0; 32]);
+    let publisher_pk = publisher_key.verifying_key();
     let pip = derive_pip(&publisher_pk);
     let now = fixed_now();
 

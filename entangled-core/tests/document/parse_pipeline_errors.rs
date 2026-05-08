@@ -1,7 +1,7 @@
 //! Stage 2-6 errors must propagate through the document parser with the
 //! correct §11 code.
 
-use entangled_core::crypto::SigningKey;
+use entangled_core::crypto::PublisherSigningKey;
 use entangled_core::document::{build_manifest, parse_and_verify_manifest};
 use entangled_core::validation::DiagnosticCode;
 use serde_json::Value;
@@ -10,8 +10,8 @@ use super::fixtures::unsigned_manifest_with_publisher;
 use crate::common::fixed_now;
 
 fn build_valid_manifest_bytes() -> Vec<u8> {
-    let publisher_key = SigningKey::from_seed(&[0x31; 32]);
-    let publisher_pk = publisher_key.verifying_key().to_publisher_pubkey();
+    let publisher_key = PublisherSigningKey::from_seed(&[0x31; 32]);
+    let publisher_pk = publisher_key.verifying_key();
     let unsigned = unsigned_manifest_with_publisher(publisher_pk);
     build_manifest(&unsigned, &publisher_key, &fixed_now())
         .expect("build")

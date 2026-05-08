@@ -1,7 +1,7 @@
 //! `verify_origin_binding` exercises (Stage 9, §10).
 
 use data_encoding::BASE32;
-use entangled_core::crypto::ed25519::SigningKey;
+use entangled_core::crypto::PublisherSigningKey;
 use entangled_core::tor::verify_origin_binding;
 use entangled_core::types::keys::OriginPubkey;
 use entangled_core::types::manifest::{Carrier, OnionAddress, Origin};
@@ -24,8 +24,12 @@ fn make_onion_address(pubkey: &[u8; 32]) -> String {
 }
 
 fn pubkey_from_seed(seed: u8) -> [u8; 32] {
-    let key = SigningKey::from_seed(&[seed; 32]);
-    *key.verifying_key().to_origin_pubkey().as_bytes()
+    // Origin keys do not sign anything in the public crate API; tests need
+    // the raw 32 pubkey bytes corresponding to a deterministic seed. The
+    // bytes are independent of which role newtype wraps the signing key.
+    *PublisherSigningKey::from_seed(&[seed; 32])
+        .verifying_key()
+        .as_bytes()
 }
 
 #[test]

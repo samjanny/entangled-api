@@ -1,7 +1,7 @@
 //! `OnionAddress::decode` and `verify_strict` exercises.
 
 use data_encoding::BASE32;
-use entangled_core::crypto::ed25519::SigningKey;
+use entangled_core::crypto::PublisherSigningKey;
 use entangled_core::tor::TorError;
 use entangled_core::types::manifest::OnionAddress;
 use sha3::{Digest, Sha3_256};
@@ -26,8 +26,11 @@ fn make_onion_address(pubkey: &[u8; 32]) -> String {
 }
 
 fn pubkey_from_seed(seed: u8) -> [u8; 32] {
-    let key = SigningKey::from_seed(&[seed; 32]);
-    *key.verifying_key().to_origin_pubkey().as_bytes()
+    // Tests need the raw 32 pubkey bytes for a deterministic seed; the
+    // bytes are independent of which role newtype wraps the signing key.
+    *PublisherSigningKey::from_seed(&[seed; 32])
+        .verifying_key()
+        .as_bytes()
 }
 
 #[test]
@@ -36,7 +39,7 @@ fn self_consistent_round_trip() {
     let addr_str = make_onion_address(&pubkey);
     let addr = OnionAddress::try_from(addr_str.as_str()).expect("valid syntax");
     let decoded = addr.verify_strict().expect("must verify");
-    assert_eq!(decoded.pubkey, pubkey);
+    assert_eq!(decoded.pubkey.as_bytes(), &pubkey);
     assert_eq!(decoded.version, 0x03);
 }
 

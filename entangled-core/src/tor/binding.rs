@@ -12,7 +12,6 @@
 
 use serde_json::json;
 
-use crate::types::keys::OriginPubkey;
 use crate::types::manifest::{Carrier, OnionAddress, Origin};
 use crate::validation::diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel};
 
@@ -49,8 +48,7 @@ pub fn verify_origin_binding(
         .map_err(|e| e.into_diagnostic(DocumentKindLabel::Manifest))?;
 
     // (4) pubkey embedded in the address must equal the declared origin_pubkey.
-    let decoded_pubkey = OriginPubkey::from_bytes(decoded.pubkey);
-    if decoded_pubkey != manifest_origin.origin_pubkey {
+    if decoded.pubkey != manifest_origin.origin_pubkey {
         return Err(Diagnostic::new(
             DiagnosticCode::EBindOrigin,
             DocumentKindLabel::Manifest,

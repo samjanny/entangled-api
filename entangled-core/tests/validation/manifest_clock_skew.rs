@@ -9,7 +9,7 @@
 //!   audit found, where the helper existed but was never invoked from the
 //!   public pipeline.
 
-use entangled_core::crypto::SigningKey;
+use entangled_core::crypto::PublisherSigningKey;
 use entangled_core::document::{build_manifest, parse_and_verify_manifest, UnsignedManifest};
 use entangled_core::types::canary::Canary;
 use entangled_core::types::keys::RuntimePubkey;
@@ -149,8 +149,8 @@ fn integration_canary_parse_and_verify_rejects_future_dated_manifest() {
     // through the builder. We then hand the bytes to the parser with a `now`
     // that exposes the skew, and expect rejection at Stage 5 — *before* the
     // signature is even checked.
-    let publisher_key = SigningKey::from_seed(&[0x77; 32]);
-    let publisher_pk = publisher_key.verifying_key().to_publisher_pubkey();
+    let publisher_key = PublisherSigningKey::from_seed(&[0x77; 32]);
+    let publisher_pk = publisher_key.verifying_key();
 
     let signing_now = ts("2026-05-07T00:00:00Z");
     let future_updated = ts("2026-05-07T00:16:40Z"); // +1000s vs verifier's `now`
@@ -184,8 +184,8 @@ fn integration_canary_parse_and_verify_accepts_well_dated_manifest() {
     // The mirror of the canary: when `updated` is within tolerance the
     // pipeline still completes successfully. This guards against an
     // over-eager Stage 5 implementation that rejects too aggressively.
-    let publisher_key = SigningKey::from_seed(&[0x88; 32]);
-    let publisher_pk = publisher_key.verifying_key().to_publisher_pubkey();
+    let publisher_key = PublisherSigningKey::from_seed(&[0x88; 32]);
+    let publisher_pk = publisher_key.verifying_key();
 
     let now = ts("2026-05-07T00:00:00Z");
     let unsigned = unsigned_manifest_for_clock_skew_canary(publisher_pk, now);

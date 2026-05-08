@@ -3,17 +3,17 @@
 //! signature.
 
 use entangled_core::crypto::{
-    derive_pip, pip_to_pubkey, sign_manifest_payload, verify_manifest_payload, SigningKey,
+    derive_pip, pip_to_pubkey, sign_manifest_payload, verify_manifest_payload, PublisherSigningKey,
 };
 use serde_json::json;
 
 #[test]
 fn pip_round_trip_then_verifies_manifest_signature() {
-    // 1. Publisher derives a SigningKey.
-    let publisher_key = SigningKey::from_seed(&[0xAB; 32]);
+    // 1. Publisher derives a PublisherSigningKey.
+    let publisher_key = PublisherSigningKey::from_seed(&[0xAB; 32]);
 
     // 2. Extract publisher pubkey.
-    let publisher_pk = publisher_key.verifying_key().to_publisher_pubkey();
+    let publisher_pk = publisher_key.verifying_key();
 
     // 3. Compute the PIP, which is what the publisher communicates out-of-band.
     let pip = derive_pip(&publisher_pk);

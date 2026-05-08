@@ -18,7 +18,7 @@ use crate::canon::{
 };
 use crate::types::{PublisherPubkey, RuntimePubkey, Signature};
 
-use super::ed25519::{CryptoError, SigningKey, VerifyingKey};
+use super::ed25519::{CryptoError, PublisherSigningKey, RuntimeSigningKey, VerifyingKey};
 
 /// Errors that can occur during high-level sign/verify.
 #[derive(Debug, Error)]
@@ -39,7 +39,7 @@ pub enum SigningError {
 /// Forwards any [`CanonError`] from canonicalization.
 pub fn sign_manifest_payload(
     payload: &Value,
-    publisher_key: &SigningKey,
+    publisher_key: &PublisherSigningKey,
 ) -> Result<Signature, SigningError> {
     let input = build_manifest_signature_input(payload)?;
     Ok(publisher_key.sign(&input))
@@ -70,7 +70,7 @@ pub fn verify_manifest_payload(
 /// Forwards any [`CanonError`] from canonicalization.
 pub fn sign_content_payload(
     payload: &Value,
-    runtime_key: &SigningKey,
+    runtime_key: &RuntimeSigningKey,
 ) -> Result<Signature, SigningError> {
     let input = build_content_signature_input(payload)?;
     Ok(runtime_key.sign(&input))
@@ -102,7 +102,7 @@ pub fn verify_content_payload(
 /// Forwards any [`CanonError`] from canonicalization.
 pub fn sign_transaction_payload(
     payload: &Value,
-    runtime_key: &SigningKey,
+    runtime_key: &RuntimeSigningKey,
 ) -> Result<Signature, SigningError> {
     let input = build_transaction_signature_input(payload)?;
     Ok(runtime_key.sign(&input))

@@ -1,7 +1,7 @@
 //! End-to-end round trip: a signed document produced by the builder must
 //! parse and verify via the corresponding parser.
 
-use entangled_core::crypto::SigningKey;
+use entangled_core::crypto::{PublisherSigningKey, RuntimeSigningKey};
 use entangled_core::document::{
     build_content, build_manifest, build_transaction, parse_and_verify_content,
     parse_and_verify_manifest, parse_and_verify_transaction,
@@ -12,8 +12,8 @@ use crate::common::fixed_now;
 
 #[test]
 fn manifest_round_trip() {
-    let publisher_key = SigningKey::from_seed(&[0xA1; 32]);
-    let publisher_pk = publisher_key.verifying_key().to_publisher_pubkey();
+    let publisher_key = PublisherSigningKey::from_seed(&[0xA1; 32]);
+    let publisher_pk = publisher_key.verifying_key();
     let unsigned = unsigned_manifest_with_publisher(publisher_pk);
     let now = fixed_now();
 
@@ -31,8 +31,8 @@ fn manifest_round_trip() {
 
 #[test]
 fn content_round_trip() {
-    let runtime_key = SigningKey::from_seed(&[0xA2; 32]);
-    let runtime_pk = runtime_key.verifying_key().to_runtime_pubkey();
+    let runtime_key = RuntimeSigningKey::from_seed(&[0xA2; 32]);
+    let runtime_pk = runtime_key.verifying_key();
     let unsigned = unsigned_content();
 
     let (content, bytes) = build_content(&unsigned, &runtime_key).expect("build_content");
@@ -43,8 +43,8 @@ fn content_round_trip() {
 
 #[test]
 fn transaction_round_trip() {
-    let runtime_key = SigningKey::from_seed(&[0xA3; 32]);
-    let runtime_pk = runtime_key.verifying_key().to_runtime_pubkey();
+    let runtime_key = RuntimeSigningKey::from_seed(&[0xA3; 32]);
+    let runtime_pk = runtime_key.verifying_key();
     let unsigned = unsigned_transaction();
 
     let (tx, bytes) = build_transaction(&unsigned, &runtime_key).expect("build_transaction");

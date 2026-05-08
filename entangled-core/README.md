@@ -29,11 +29,11 @@ Out of scope for this crate (will be in `entangled-client` and `entangled-transp
 ## Quick start
 
 ```rust
-use entangled_core::crypto::{derive_pip, pip_to_pubkey, SigningKey};
+use entangled_core::crypto::{derive_pip, pip_to_pubkey, PublisherSigningKey};
 
-// Generate a publisher signing key (test/dev only).
-let publisher = SigningKey::from_seed(&[0x42; 32]);
-let publisher_pubkey = publisher.verifying_key().to_publisher_pubkey();
+// Build a publisher signing key from a deterministic seed (test/dev).
+let publisher = PublisherSigningKey::from_seed(&[0x42; 32]);
+let publisher_pubkey = publisher.verifying_key();
 
 // Derive the human-shareable Publisher Identity Phrase.
 let pip = derive_pip(&publisher_pubkey);

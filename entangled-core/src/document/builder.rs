@@ -18,7 +18,8 @@
 use serde_json::Value;
 
 use crate::crypto::{
-    sign_content_payload, sign_manifest_payload, sign_transaction_payload, SigningKey,
+    sign_content_payload, sign_manifest_payload, sign_transaction_payload, PublisherSigningKey,
+    RuntimeSigningKey,
 };
 use crate::types::document::{ContentDocument, TransactionDocument};
 use crate::types::manifest::Manifest;
@@ -50,7 +51,7 @@ use super::unsigned::{UnsignedContent, UnsignedManifest, UnsignedTransaction};
 ///   envelope (in practice unreachable under the closed schema).
 pub fn build_manifest(
     unsigned: &UnsignedManifest,
-    publisher_key: &SigningKey,
+    publisher_key: &PublisherSigningKey,
     now: &EntangledTimestamp,
 ) -> Result<(Manifest, Vec<u8>), DocumentError> {
     validate_manifest_fields(
@@ -91,7 +92,7 @@ pub fn build_manifest(
 /// See [`build_manifest`] — same set of failures, applied to content.
 pub fn build_content(
     unsigned: &UnsignedContent,
-    runtime_key: &SigningKey,
+    runtime_key: &RuntimeSigningKey,
 ) -> Result<(ContentDocument, Vec<u8>), DocumentError> {
     validate_content_fields(&unsigned.meta, &unsigned.blocks)?;
 
@@ -120,7 +121,7 @@ pub fn build_content(
 /// See [`build_manifest`] — same set of failures, applied to transactions.
 pub fn build_transaction(
     unsigned: &UnsignedTransaction,
-    runtime_key: &SigningKey,
+    runtime_key: &RuntimeSigningKey,
 ) -> Result<(TransactionDocument, Vec<u8>), DocumentError> {
     validate_transaction_fields(&unsigned.blocks, &unsigned.state_updates)?;
 

@@ -7,6 +7,15 @@
 //! `Signature` and `*Pubkey` newtypes for syntactic validity, so any
 //! cryptographic mismatch reaching this layer is by definition a verification
 //! failure.
+//!
+//! The crate-private `SigningKey` is not exposed to downstream callers.
+//! Two role-tagged newtypes — [`PublisherSigningKey`] and
+//! [`RuntimeSigningKey`] — wrap it and gate the high-level
+//! [`crate::crypto::sign_manifest_payload`],
+//! [`crate::crypto::sign_content_payload`], and
+//! [`crate::crypto::sign_transaction_payload`] helpers, so a content
+//! document cannot be signed by a manifest-role key (and vice versa) at
+//! compile time.
 
 use ed25519_dalek::Signer as _;
 use thiserror::Error;
@@ -26,7 +35,11 @@ pub enum CryptoError {
 }
 
 /// An Ed25519 signing key (private key + cached verifying key).
-pub struct SigningKey(ed25519_dalek::SigningKey);
+///
+/// Crate-private: external callers must use the role-tagged
+/// [`PublisherSigningKey`] / [`RuntimeSigningKey`] newtypes to obtain
+/// signing capability.
+pub(crate) struct SigningKey(ed25519_dalek::SigningKey);
 
 /// An Ed25519 verifying key (public key) suitable for `verify_strict`.
 pub struct VerifyingKey(ed25519_dalek::VerifyingKey);
@@ -40,26 +53,118 @@ impl SigningKey {
     /// `BCryptGenRandom` on Windows, `arc4random_buf` on the BSDs, etc.) —
     /// this is the de-facto standard for OS-level entropy in Rust.
     #[cfg(any(test, feature = "test-utils"))]
-    pub fn generate() -> Self {
+    pub(crate) fn generate() -> Self {
         let mut seed = [0u8; 32];
         getrandom::getrandom(&mut seed).expect("OS RNG unavailable");
         Self::from_seed(&seed)
     }
 
     /// Build a `SigningKey` from a 32-byte seed (the RFC 8032 secret key).
-    pub fn from_seed(seed: &[u8; 32]) -> Self {
+    pub(crate) fn from_seed(seed: &[u8; 32]) -> Self {
         Self(ed25519_dalek::SigningKey::from_bytes(seed))
     }
 
     /// Return the [`VerifyingKey`] (public key) for this signing key.
-    pub fn verifying_key(&self) -> VerifyingKey {
+    pub(crate) fn verifying_key(&self) -> VerifyingKey {
         VerifyingKey(self.0.verifying_key())
     }
 
     /// Sign an arbitrary input. Infallible per RFC 8032.
-    pub fn sign(&self, input: &[u8]) -> Signature {
+    pub(crate) fn sign(&self, input: &[u8]) -> Signature {
         let sig: ed25519_dalek::Signature = self.0.sign(input);
         Signature::from_bytes(sig.to_bytes())
+    }
+}
+
+/// Publisher identity signing key. Used to sign manifests only.
+///
+/// `K_publisher` (§05) is the publisher's long-term identity key: it is
+/// generated offline and used only during publisher ceremonies to sign
+/// manifests authorizing operational keys. The newtype is deliberately
+/// distinct from [`RuntimeSigningKey`] and not interconvertible with it
+/// at the public API level: this prevents accidental cross-role signing
+/// (e.g. signing a content document with the publisher key and
+/// verifying it against `runtime_pubkey` after a coercion bug).
+///
+/// ```compile_fail
+/// // Cross-role bypass attempt: build_content expects a RuntimeSigningKey,
+/// // not a PublisherSigningKey. This must not compile.
+/// use entangled_core::crypto::PublisherSigningKey;
+/// use entangled_core::document::{build_content, UnsignedContent};
+/// fn _no_compile(unsigned: &UnsignedContent) {
+///     let key = PublisherSigningKey::from_seed(&[0x42; 32]);
+///     let _ = build_content(unsigned, &key);
+/// }
+/// ```
+pub struct PublisherSigningKey(SigningKey);
+
+/// Runtime operational signing key. Used to sign content and transaction
+/// documents within an authorized publication cycle.
+///
+/// `K_runtime` (§05, §08) is rotated per publication cycle; the
+/// corresponding public key is declared in the manifest's canary. The
+/// newtype is deliberately distinct from [`PublisherSigningKey`] and
+/// not interconvertible with it at the public API level.
+pub struct RuntimeSigningKey(SigningKey);
+
+impl PublisherSigningKey {
+    /// Generate a fresh publisher keypair from OS entropy.
+    ///
+    /// Test-only: gated behind `#[cfg(test)]` and the `test-utils`
+    /// feature. Production publisher ceremonies generate `K_publisher`
+    /// offline through their own procedures, not through this function.
+    #[cfg(any(test, feature = "test-utils"))]
+    pub fn generate() -> Self {
+        Self(SigningKey::generate())
+    }
+
+    /// Build a [`PublisherSigningKey`] from a 32-byte seed
+    /// (the RFC 8032 secret key).
+    pub fn from_seed(seed: &[u8; 32]) -> Self {
+        Self(SigningKey::from_seed(seed))
+    }
+
+    /// Return the [`PublisherPubkey`] derived from this signing key.
+    pub fn verifying_key(&self) -> PublisherPubkey {
+        self.0.verifying_key().to_publisher_pubkey()
+    }
+
+    /// Sign an arbitrary byte string under this key. Crate-private: high-level
+    /// callers must go through the role-typed
+    /// [`crate::crypto::sign_manifest_payload`] helper (or, for unit-test
+    /// access, the crate's internal sign primitives).
+    pub(crate) fn sign(&self, input: &[u8]) -> Signature {
+        self.0.sign(input)
+    }
+}
+
+impl RuntimeSigningKey {
+    /// Generate a fresh runtime keypair from OS entropy.
+    ///
+    /// Test-only: gated behind `#[cfg(test)]` and the `test-utils`
+    /// feature.
+    #[cfg(any(test, feature = "test-utils"))]
+    pub fn generate() -> Self {
+        Self(SigningKey::generate())
+    }
+
+    /// Build a [`RuntimeSigningKey`] from a 32-byte seed
+    /// (the RFC 8032 secret key).
+    pub fn from_seed(seed: &[u8; 32]) -> Self {
+        Self(SigningKey::from_seed(seed))
+    }
+
+    /// Return the [`RuntimePubkey`] derived from this signing key.
+    pub fn verifying_key(&self) -> RuntimePubkey {
+        self.0.verifying_key().to_runtime_pubkey()
+    }
+
+    /// Sign an arbitrary byte string under this key. Crate-private: high-level
+    /// callers must go through the role-typed
+    /// [`crate::crypto::sign_content_payload`] /
+    /// [`crate::crypto::sign_transaction_payload`] helpers.
+    pub(crate) fn sign(&self, input: &[u8]) -> Signature {
+        self.0.sign(input)
     }
 }
 
@@ -123,5 +228,113 @@ impl VerifyingKey {
     /// Encode the underlying 32 bytes as a [`RuntimePubkey`].
     pub fn to_runtime_pubkey(&self) -> RuntimePubkey {
         RuntimePubkey::from_bytes(self.0.to_bytes())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! Crate-internal Ed25519 wrapper sanity, including the RFC 8032 §7.1
+    //! TEST 1 vector. These tests exercise the crate-private [`SigningKey`]
+    //! primitive directly; integration tests in `tests/` go through the
+    //! role-tagged [`PublisherSigningKey`] / [`RuntimeSigningKey`] API.
+
+    use super::*;
+
+    fn hex_to_bytes(s: &str) -> Vec<u8> {
+        assert!(s.len().is_multiple_of(2));
+        (0..s.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&s[i..i + 2], 16).expect("hex"))
+            .collect()
+    }
+
+    #[test]
+    fn rfc8032_section_7_1_test_1() {
+        // RFC 8032 §7.1 TEST 1 — the canonical Ed25519 test vector.
+        let seed_hex = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";
+        let pubkey_hex = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
+        let sig_hex = "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b";
+
+        let mut seed = [0u8; 32];
+        seed.copy_from_slice(&hex_to_bytes(seed_hex));
+        let signing = SigningKey::from_seed(&seed);
+
+        // Pubkey derivation matches the spec.
+        let derived: [u8; 32] = *signing.verifying_key().to_publisher_pubkey().as_bytes();
+        let mut expected_pk = [0u8; 32];
+        expected_pk.copy_from_slice(&hex_to_bytes(pubkey_hex));
+        assert_eq!(
+            derived, expected_pk,
+            "RFC 8032 §7.1 TEST 1: derived public key must match"
+        );
+
+        // Signature on empty message matches the spec, byte-for-byte.
+        let sig: Signature = signing.sign(b"");
+        let mut expected_sig = [0u8; 64];
+        expected_sig.copy_from_slice(&hex_to_bytes(sig_hex));
+        assert_eq!(
+            *sig.as_bytes(),
+            expected_sig,
+            "RFC 8032 §7.1 TEST 1: signature must be byte-exact"
+        );
+
+        // And it verifies.
+        let pk = PublisherPubkey::from_bytes(expected_pk);
+        let vk = VerifyingKey::from_publisher_pubkey(&pk).expect("valid pubkey");
+        vk.verify(b"", &sig).expect("verify must succeed");
+    }
+
+    #[test]
+    fn deterministic_keypair_round_trip_signs_and_verifies() {
+        let signing = SigningKey::from_seed(&[0x11; 32]);
+        let pk = signing.verifying_key().to_publisher_pubkey();
+        let msg = b"hello entangled";
+        let sig = signing.sign(msg);
+
+        let vk = VerifyingKey::from_publisher_pubkey(&pk).unwrap();
+        vk.verify(msg, &sig).expect("verify ok");
+    }
+
+    #[test]
+    fn verify_fails_with_wrong_key() {
+        let a = SigningKey::from_seed(&[0x21; 32]);
+        let b = SigningKey::from_seed(&[0x22; 32]);
+        let msg = b"some message";
+        let sig = a.sign(msg);
+
+        let vk_b =
+            VerifyingKey::from_publisher_pubkey(&b.verifying_key().to_publisher_pubkey()).unwrap();
+        assert_eq!(vk_b.verify(msg, &sig), Err(CryptoError::VerificationFailed));
+    }
+
+    #[test]
+    fn verify_fails_with_modified_message() {
+        let signing = SigningKey::from_seed(&[0x31; 32]);
+        let pk = signing.verifying_key().to_publisher_pubkey();
+        let mut msg = *b"hello world";
+        let sig = signing.sign(&msg);
+
+        msg[0] ^= 0x01;
+        let vk = VerifyingKey::from_publisher_pubkey(&pk).unwrap();
+        assert_eq!(vk.verify(&msg, &sig), Err(CryptoError::VerificationFailed));
+    }
+
+    #[test]
+    fn malformed_pubkey_rejected_at_construction() {
+        // 32-byte sequence whose Edwards-Y compressed form does not decompress
+        // to a valid curve point. Empirically determined: not every 32-byte
+        // string is rejected by ed25519-dalek's `from_bytes` (e.g. all-0xFF and
+        // y=p both round-trip), but this incrementing pattern fails
+        // decompression.
+        let bad_bytes: [u8; 32] = [
+            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E,
+            0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C,
+            0x1D, 0x1E, 0x1F, 0x20,
+        ];
+        let bad = PublisherPubkey::from_bytes(bad_bytes);
+        assert_eq!(
+            VerifyingKey::from_publisher_pubkey(&bad).err(),
+            Some(CryptoError::InvalidPublicKey)
+        );
     }
 }

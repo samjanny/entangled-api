@@ -1,6 +1,6 @@
 //! PIP (24-word BIP-39 representation) round-trip and rejection tests.
 
-use entangled_core::crypto::{derive_pip, pip_to_pubkey, PipError, SigningKey};
+use entangled_core::crypto::{derive_pip, pip_to_pubkey, PipError, PublisherSigningKey};
 
 // Pull in the same wordlist file used by the implementation, via a path
 // relative to this test file. This lets the test cross-check the wordlist's
@@ -33,8 +33,8 @@ fn wordlist_sanity_2048_words_first_abandon_last_zoo() {
 
 #[test]
 fn pip_round_trip_from_known_seed() {
-    let signing = SigningKey::from_seed(&[0x42; 32]);
-    let pk = signing.verifying_key().to_publisher_pubkey();
+    let signing = PublisherSigningKey::from_seed(&[0x42; 32]);
+    let pk = signing.verifying_key();
     let pip = derive_pip(&pk);
 
     let words: Vec<&str> = pip.split(' ').collect();
@@ -46,8 +46,8 @@ fn pip_round_trip_from_known_seed() {
 
 #[test]
 fn pip_is_deterministic() {
-    let signing = SigningKey::from_seed(&[0x42; 32]);
-    let pk = signing.verifying_key().to_publisher_pubkey();
+    let signing = PublisherSigningKey::from_seed(&[0x42; 32]);
+    let pk = signing.verifying_key();
     let a = derive_pip(&pk);
     let b = derive_pip(&pk);
     assert_eq!(a, b, "derive_pip must be deterministic");
@@ -69,8 +69,8 @@ fn pip_rejects_wrong_word_count_long() {
 
 #[test]
 fn pip_rejects_unknown_word() {
-    let signing = SigningKey::from_seed(&[0x42; 32]);
-    let pip = derive_pip(&signing.verifying_key().to_publisher_pubkey());
+    let signing = PublisherSigningKey::from_seed(&[0x42; 32]);
+    let pip = derive_pip(&signing.verifying_key());
     let mut words: Vec<&str> = pip.split(' ').collect();
     words[5] = "qwerty";
     let mutated = words.join(" ");
@@ -82,8 +82,8 @@ fn pip_rejects_unknown_word() {
 
 #[test]
 fn pip_rejects_invalid_checksum_when_last_word_changed() {
-    let signing = SigningKey::from_seed(&[0x42; 32]);
-    let pip = derive_pip(&signing.verifying_key().to_publisher_pubkey());
+    let signing = PublisherSigningKey::from_seed(&[0x42; 32]);
+    let pip = derive_pip(&signing.verifying_key());
     let words: Vec<String> = pip.split(' ').map(|s| s.to_string()).collect();
     let last = &words[23];
     // Pick a different word from the wordlist that is not the original.

@@ -1,8 +1,8 @@
 [package]
 name = "entangled-core"
-version = "0.2.0"
+version = "0.1.0"
 edition = "2021"
-rust-version = "1.85"
+rust-version = "1.88"
 license = "MIT OR Apache-2.0"
 description = "Entangled v1.0 protocol — types, validation, canonicalization, signing, and verification."
 repository = "https://github.com/samjanny/entangled-api"

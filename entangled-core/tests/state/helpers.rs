@@ -1,6 +1,6 @@
 //! Shared helpers for the state test bundle.
 
-use entangled_core::crypto::ed25519::SigningKey;
+use entangled_core::crypto::PublisherSigningKey;
 use entangled_core::types::{
     keys::PublisherPubkey,
     slug::Slug,
@@ -10,9 +10,7 @@ use entangled_core::types::{
 
 pub fn pub_from_seed(byte: u8) -> PublisherPubkey {
     let seed = [byte; 32];
-    SigningKey::from_seed(&seed)
-        .verifying_key()
-        .to_publisher_pubkey()
+    PublisherSigningKey::from_seed(&seed).verifying_key()
 }
 
 pub fn slug(s: &str) -> Slug {

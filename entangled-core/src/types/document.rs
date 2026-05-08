@@ -22,8 +22,15 @@ pub struct ContentDocument {
     pub meta: Meta,
     /// Ordered block list (§03).
     pub blocks: Vec<Block>,
-    /// Ed25519 signature by the publisher key over the content signature
-    /// input (§04).
+    /// Ed25519 signature over the content signature input as defined in §05.
+    ///
+    /// Computed by signing
+    /// `"ENTANGLED-v1 content" || 0x00 || JCS(content_without_sig)`
+    /// with the runtime private key (`K_runtime`) authorized by the
+    /// manifest's canary for the current publication cycle. Verification
+    /// uses the `runtime_pubkey` declared in the manifest's canary.
+    ///
+    /// Encoded as 86 ASCII characters of base64url (no padding).
     pub sig: Signature,
 }
 
@@ -40,8 +47,16 @@ pub struct TransactionDocument {
     pub state_updates: Vec<StateUpdateOp>,
     /// Ordered block list rendered as the transaction response.
     pub blocks: Vec<Block>,
-    /// Ed25519 signature by the publisher key over the transaction signature
-    /// input (§04).
+    /// Ed25519 signature over the transaction signature input as defined
+    /// in §05.
+    ///
+    /// Computed by signing
+    /// `"ENTANGLED-v1 transaction" || 0x00 || JCS(transaction_without_sig)`
+    /// with the runtime private key (`K_runtime`) authorized by the
+    /// manifest's canary for the current publication cycle. Verification
+    /// uses the `runtime_pubkey` declared in the manifest's canary.
+    ///
+    /// Encoded as 86 ASCII characters of base64url (no padding).
     pub sig: Signature,
 }
 

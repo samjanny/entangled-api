@@ -18,10 +18,10 @@
 //! Derive a Publisher Identity Phrase (PIP) and recover the public key from it:
 //!
 //! ```
-//! use entangled_core::crypto::{derive_pip, pip_to_pubkey, SigningKey};
+//! use entangled_core::crypto::{derive_pip, pip_to_pubkey, PublisherSigningKey};
 //!
-//! let publisher = SigningKey::from_seed(&[0x42; 32]);
-//! let publisher_pubkey = publisher.verifying_key().to_publisher_pubkey();
+//! let publisher = PublisherSigningKey::from_seed(&[0x42; 32]);
+//! let publisher_pubkey = publisher.verifying_key();
 //!
 //! let pip = derive_pip(&publisher_pubkey);
 //! assert_eq!(pip.split_whitespace().count(), 24);

@@ -5,6 +5,7 @@
 #[path = "../common/mod.rs"]
 mod common;
 
+mod array_boundaries;
 mod diagnostic_codes;
 mod error_precedence;
 mod limits;

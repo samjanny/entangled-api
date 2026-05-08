@@ -26,7 +26,7 @@
 //! types.
 
 use data_encoding::BASE32;
-use entangled_core::crypto::SigningKey;
+use entangled_core::crypto::PublisherSigningKey;
 use entangled_core::document::{
     build_manifest, parse_and_verify_manifest, ManifestRead, UnsignedManifest,
 };
@@ -69,11 +69,18 @@ fn unsigned_manifest_with_consistent_origin(
     origin_seed: u8,
     canary_issued_at: EntangledTimestamp,
     canary_next_expected: EntangledTimestamp,
-) -> (SigningKey, OnionAddress, UnsignedManifest) {
-    let publisher_key = SigningKey::from_seed(&[publisher_seed; 32]);
-    let publisher_pk = publisher_key.verifying_key().to_publisher_pubkey();
-    let origin_key = SigningKey::from_seed(&[origin_seed; 32]);
-    let origin_pk_bytes = *origin_key.verifying_key().to_origin_pubkey().as_bytes();
+) -> (PublisherSigningKey, OnionAddress, UnsignedManifest) {
+    let publisher_key = PublisherSigningKey::from_seed(&[publisher_seed; 32]);
+    let publisher_pk = publisher_key.verifying_key();
+    // The origin key is only used for its pubkey bytes, which seed the
+    // canonical Tor v3 onion address. There is no role-typed
+    // `OriginSigningKey` because origin keys do not sign anything in this
+    // crate's public API; they only bind to a Tor address. We obtain the
+    // raw 32 bytes via the publisher-role newtype on a distinct seed and
+    // re-tag them as `OriginPubkey`.
+    let origin_pk_bytes = *PublisherSigningKey::from_seed(&[origin_seed; 32])
+        .verifying_key()
+        .as_bytes();
     let onion = derive_onion_address(&origin_pk_bytes);
 
     let unsigned = UnsignedManifest {

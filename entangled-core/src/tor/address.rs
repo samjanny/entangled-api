@@ -40,8 +40,14 @@ const ONION_BODY_LEN: usize = 56;
 /// Decoded byte components of a Tor v3 onion address.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DecodedOnionAddress {
-    /// 32-byte Ed25519 service public key.
-    pub pubkey: [u8; 32],
+    /// 32-byte Ed25519 service public key, typed as [`OriginPubkey`].
+    ///
+    /// Whether this value is cryptographically bound to the address depends
+    /// on which call produced it: [`OnionAddress::decode`] returns the raw
+    /// extracted bytes (no checksum/version verification), while
+    /// [`OnionAddress::verify_strict`] returns a value that has been
+    /// verified per `rend-spec-v3.txt`.
+    pub pubkey: OriginPubkey,
     /// 2 bytes of `SHA3-256(".onion checksum" || pubkey || version)`.
     pub checksum: [u8; 2],
     /// Tor onion-service version byte; always `0x03` for v3.
@@ -53,8 +59,10 @@ impl OnionAddress {
     /// (pubkey 32 + checksum 2 + version 1).
     ///
     /// Performs structural checks only: the lowercase RFC 4648 alphabet and
-    /// the 35-byte length. Does **not** verify the checksum or the version —
-    /// use [`OnionAddress::verify_strict`] for that.
+    /// the 35-byte length. Does **not** verify the checksum or the version
+    /// byte; the returned [`OriginPubkey`] is structurally extracted but
+    /// cryptographically unverified for Tor v3 binding purposes. For
+    /// verified extraction, use [`OnionAddress::verify_strict`] instead.
     pub fn decode(&self) -> Result<DecodedOnionAddress, TorError> {
         let s = self.as_str();
         // Suffix and length are already enforced at construction time; the
@@ -89,30 +97,23 @@ impl OnionAddress {
             return Err(TorError::InvalidBase32);
         }
 
-        let mut pubkey = [0u8; 32];
-        pubkey.copy_from_slice(&decoded[0..32]);
+        let mut pubkey_bytes = [0u8; 32];
+        pubkey_bytes.copy_from_slice(&decoded[0..32]);
         let mut checksum = [0u8; 2];
         checksum.copy_from_slice(&decoded[32..34]);
         let version = decoded[34];
 
         Ok(DecodedOnionAddress {
-            pubkey,
+            pubkey: OriginPubkey::from_bytes(pubkey_bytes),
             checksum,
             version,
         })
     }
 
-    /// Extract the embedded Ed25519 service pubkey. Fast-path: does **not**
-    /// verify the checksum or the version byte — callers that want the full
-    /// integrity guarantee should call [`OnionAddress::verify_strict`] first.
-    pub fn pubkey(&self) -> Result<OriginPubkey, TorError> {
-        let decoded = self.decode()?;
-        Ok(OriginPubkey::from_bytes(decoded.pubkey))
-    }
-
     /// Strict verification per §05: decode, then check `version == 0x03` and
     /// recompute the SHA3-256 checksum, comparing byte-exact against the
-    /// embedded prefix.
+    /// embedded prefix. Returns a [`DecodedOnionAddress`] whose `pubkey` is
+    /// cryptographically bound to the address per `rend-spec-v3.txt`.
     pub fn verify_strict(&self) -> Result<DecodedOnionAddress, TorError> {
         let decoded = self.decode()?;
         if decoded.version != TOR_V3_VERSION {
@@ -120,7 +121,7 @@ impl OnionAddress {
         }
         let mut hasher = Sha3_256::new();
         hasher.update(CHECKSUM_PREFIX);
-        hasher.update(decoded.pubkey);
+        hasher.update(decoded.pubkey.as_bytes());
         hasher.update([decoded.version]);
         let digest = hasher.finalize();
         let expected = [digest[0], digest[1]];

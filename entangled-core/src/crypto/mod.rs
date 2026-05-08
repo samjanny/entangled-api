@@ -7,7 +7,7 @@ pub mod pip;
 pub mod sha256;
 pub mod signing;
 
-pub use ed25519::{CryptoError, SigningKey, VerifyingKey};
+pub use ed25519::{CryptoError, PublisherSigningKey, RuntimeSigningKey, VerifyingKey};
 pub use pip::{derive_pip, pip_to_pubkey, PipError};
 pub use sha256::{sha256, sha256_base64url, sha256_image};
 pub use signing::{

@@ -1,6 +1,6 @@
 //! Tampered envelopes must fail Stage 6 verification.
 
-use entangled_core::crypto::SigningKey;
+use entangled_core::crypto::{PublisherSigningKey, RuntimeSigningKey};
 use entangled_core::document::{
     build_content, build_manifest, parse_and_verify_content, parse_and_verify_manifest,
 };
@@ -22,8 +22,8 @@ fn first_byte_outside_sig(bytes: &[u8]) -> usize {
 
 #[test]
 fn manifest_body_byte_flip_rejected_with_sig_verification() {
-    let publisher_key = SigningKey::from_seed(&[0xE1; 32]);
-    let publisher_pk = publisher_key.verifying_key().to_publisher_pubkey();
+    let publisher_key = PublisherSigningKey::from_seed(&[0xE1; 32]);
+    let publisher_pk = publisher_key.verifying_key();
     let unsigned = unsigned_manifest_with_publisher(publisher_pk);
 
     let (_manifest, mut bytes) =
@@ -52,9 +52,9 @@ fn manifest_body_byte_flip_rejected_with_sig_verification() {
 
 #[test]
 fn manifest_with_sig_replaced_by_other_keys_signature_rejected() {
-    let key_a = SigningKey::from_seed(&[0xF1; 32]);
-    let key_b = SigningKey::from_seed(&[0xF2; 32]);
-    let publisher_pk = key_a.verifying_key().to_publisher_pubkey();
+    let key_a = PublisherSigningKey::from_seed(&[0xF1; 32]);
+    let key_b = PublisherSigningKey::from_seed(&[0xF2; 32]);
+    let publisher_pk = key_a.verifying_key();
     let unsigned = unsigned_manifest_with_publisher(publisher_pk);
 
     let (_manifest_a, _bytes_a) = build_manifest(&unsigned, &key_a, &fixed_now()).expect("build A");
@@ -70,9 +70,9 @@ fn manifest_with_sig_replaced_by_other_keys_signature_rejected() {
 
 #[test]
 fn content_signed_by_wrong_runtime_key_rejected() {
-    let key_a = SigningKey::from_seed(&[0xC1; 32]);
-    let key_b = SigningKey::from_seed(&[0xC2; 32]);
-    let pk_b = key_b.verifying_key().to_runtime_pubkey();
+    let key_a = RuntimeSigningKey::from_seed(&[0xC1; 32]);
+    let key_b = RuntimeSigningKey::from_seed(&[0xC2; 32]);
+    let pk_b = key_b.verifying_key();
     let unsigned = unsigned_content();
 
     let (_content, bytes) = build_content(&unsigned, &key_a).expect("build with A");
@@ -83,8 +83,8 @@ fn content_signed_by_wrong_runtime_key_rejected() {
 
 #[test]
 fn manifest_sig_byte_flip_rejected() {
-    let publisher_key = SigningKey::from_seed(&[0xE2; 32]);
-    let publisher_pk = publisher_key.verifying_key().to_publisher_pubkey();
+    let publisher_key = PublisherSigningKey::from_seed(&[0xE2; 32]);
+    let publisher_pk = publisher_key.verifying_key();
     let unsigned = unsigned_manifest_with_publisher(publisher_pk);
 
     let (_manifest, bytes) =

@@ -3,7 +3,7 @@
 //! `.onion` address derived from the origin key.
 
 use data_encoding::BASE32;
-use entangled_core::crypto::ed25519::SigningKey;
+use entangled_core::crypto::{PublisherSigningKey, RuntimeSigningKey};
 use entangled_core::document::{build_manifest, parse_and_verify_manifest, UnsignedManifest};
 use entangled_core::types::canary::Canary;
 use entangled_core::types::keys::{OriginPubkey, SpecVersion};
@@ -32,14 +32,19 @@ fn ts(s: &str) -> EntangledTimestamp {
 
 #[test]
 fn full_pillar_b_closure() {
-    // Distinct publisher and origin keys (the spec separates the roles).
-    let publisher_key = SigningKey::from_seed(&[0xB1; 32]);
-    let origin_key = SigningKey::from_seed(&[0xB2; 32]);
-    let runtime_key = SigningKey::from_seed(&[0xB3; 32]);
+    // Distinct publisher, origin, and runtime keys (the spec separates the
+    // roles). Origin keys are not exposed as a role-typed signing newtype
+    // because the crate's public API does not have origin keys signing
+    // anything; tests derive the pubkey bytes from a fresh seed via the
+    // publisher-role newtype and re-tag the bytes as `OriginPubkey`.
+    let publisher_key = PublisherSigningKey::from_seed(&[0xB1; 32]);
+    let runtime_key = RuntimeSigningKey::from_seed(&[0xB3; 32]);
 
-    let publisher_pk = publisher_key.verifying_key().to_publisher_pubkey();
-    let origin_pk_bytes = *origin_key.verifying_key().to_origin_pubkey().as_bytes();
-    let runtime_pk = runtime_key.verifying_key().to_runtime_pubkey();
+    let publisher_pk = publisher_key.verifying_key();
+    let origin_pk_bytes = *PublisherSigningKey::from_seed(&[0xB2; 32])
+        .verifying_key()
+        .as_bytes();
+    let runtime_pk = runtime_key.verifying_key();
 
     // Derive the onion address from the origin pubkey via the canonical
     // Tor v3 procedure.

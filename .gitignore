@@ -14,3 +14,6 @@ docs-spec/
 
 # Claude Code runtime state
 .claude/
+
+#Internal audits
+audit-reports-*
