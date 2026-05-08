@@ -40,7 +40,7 @@ use serde_json::Value;
 
 use crate::types::blocks::Block;
 use crate::types::canary::Canary;
-use crate::types::keys::{PublisherPubkey, SpecVersion};
+use crate::types::keys::{PublisherPubkey, RequestHash, RequestId, SpecVersion};
 use crate::types::manifest::{NavEntry, Origin};
 use crate::types::meta::Meta;
 use crate::types::path::EntangledPath;
@@ -96,6 +96,12 @@ pub struct UnsignedTransaction {
     pub spec_version: SpecVersion,
     /// Path of the form whose submission this transaction answers.
     pub in_response_to: EntangledPath,
+    /// Echo of the `request_id` the client placed in the originating submit
+    /// body (§02 / §09).
+    pub request_id: RequestId,
+    /// SHA-256 digest of the JCS-canonical submit body bytes the publisher
+    /// received, encoded as `sha-256:<base64url>` (§02).
+    pub request_hash: RequestHash,
     /// State update operations to apply.
     pub state_updates: Vec<StateUpdateOp>,
     /// Ordered block list rendered as the response.

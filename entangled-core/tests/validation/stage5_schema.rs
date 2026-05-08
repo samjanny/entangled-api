@@ -5,7 +5,8 @@ use entangled_core::validation::{
 use serde_json::{json, Value};
 
 use crate::common::{
-    fixed_now, minimal_canary, minimal_content_doc, minimal_manifest, KEY_ZEROS, SIG_ZEROS,
+    fixed_now, minimal_canary, minimal_content_doc, minimal_manifest, KEY_ZEROS,
+    REQUEST_ID_ZEROS, SHA256_PREFIXED_ZEROS, SIG_ZEROS,
 };
 
 fn manifest_value() -> Value {
@@ -280,6 +281,8 @@ fn t16_transaction_with_submit_form_block_rejected() {
         "spec_version": "1.0",
         "kind": "transaction",
         "in_response_to": "/contact",
+        "request_id": REQUEST_ID_ZEROS,
+        "request_hash": SHA256_PREFIXED_ZEROS,
         "state_updates": [],
         "blocks": [
             {
@@ -307,7 +310,7 @@ fn t17_null_anywhere_rejected_with_null_value() {
         {
             "kind": "image",
             "src": "/a.png",
-            "sha256": KEY_ZEROS,
+            "sha256": SHA256_PREFIXED_ZEROS,
             "media_type": "image/png",
             "width": 800,
             "height": 600,
@@ -340,6 +343,23 @@ fn t19_list_with_65_items_rejected() {
     *blocks = json!([{ "kind": "list", "ordered": false, "items": items }]);
     let err = parse_and_validate_content(&manifest_bytes(&v)).unwrap_err();
     assert_eq!(err.code, DiagnosticCode::ESchemaFieldLength);
+}
+
+#[test]
+fn t20a_citation_url_with_http_scheme_rejected() {
+    // §03 / Tranche 2 fix #5: clearnet citations are restricted to https://;
+    // plain http:// is not permitted in v1.
+    let mut v = content_value();
+    let blocks = v.as_object_mut().unwrap().get_mut("blocks").unwrap();
+    *blocks = json!([
+        {
+            "kind": "link",
+            "label": [{ "kind": "text", "value": "src", "marks": [] }],
+            "target": { "kind": "citation", "url": "http://example.org/x" }
+        }
+    ]);
+    let err = parse_and_validate_content(&manifest_bytes(&v)).unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
 }
 
 #[test]
@@ -376,7 +396,7 @@ fn t23_image_caption_empty_string_rejected() {
         {
             "kind": "image",
             "src": "/a.png",
-            "sha256": KEY_ZEROS,
+            "sha256": SHA256_PREFIXED_ZEROS,
             "media_type": "image/png",
             "width": 800,
             "height": 600,

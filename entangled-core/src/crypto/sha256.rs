@@ -4,7 +4,7 @@
 use data_encoding::BASE64URL_NOPAD;
 use sha2::{Digest, Sha256};
 
-use crate::types::ImageSha256;
+use crate::types::{ImageSha256, RequestHash};
 
 /// SHA-256 digest of `data` as a 32-byte array.
 pub fn sha256(data: &[u8]) -> [u8; 32] {
@@ -22,4 +22,11 @@ pub fn sha256_base64url(data: &[u8]) -> String {
 /// for use in image blocks (§02 / §03).
 pub fn sha256_image(data: &[u8]) -> ImageSha256 {
     ImageSha256::from_bytes(sha256(data))
+}
+
+/// Compute a SHA-256 digest and wrap it in the typed [`RequestHash`] newtype
+/// for use in transaction `request_hash` binding (§02 / §09). `data`
+/// MUST be the JCS-canonical bytes of the submit body.
+pub fn sha256_request(data: &[u8]) -> RequestHash {
+    RequestHash::from_bytes(sha256(data))
 }

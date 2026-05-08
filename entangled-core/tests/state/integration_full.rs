@@ -4,6 +4,7 @@
 use std::collections::BTreeMap;
 
 use entangled_core::state::{build_submit_body, ConsentDecision, StateStore};
+use entangled_core::types::keys::RequestId;
 use entangled_core::types::state::StateMode;
 use entangled_core::validation::policy_check::validate_state_updates_against_policy;
 use entangled_core::validation::state::validate_state_policy;
@@ -47,7 +48,14 @@ fn full_submit_flow_end_to_end() {
     // 7. Build the submit body.
     let mut fields = BTreeMap::new();
     fields.insert("name".to_owned(), "alice".to_owned());
-    let body = build_submit_body(fields, &mut store, &pub_a, &policy, &now);
+    let body = build_submit_body(
+        fields,
+        &mut store,
+        &pub_a,
+        &policy,
+        &now,
+        RequestId::from_bytes([0u8; 16]),
+    );
 
     // 8. The committed entry surfaces in the submit body's request_state.
     assert_eq!(body.request_state.len(), 1);

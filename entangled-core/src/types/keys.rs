@@ -1,5 +1,6 @@
 //! Ed25519 public-key, signature, and SHA-256 newtypes plus `SpecVersion`
-//! (§02).
+//! (§02), submit `request_id` (16 bytes / 22 base64url characters, §09),
+//! and submit `request_hash` (`sha-256:<base64url>`, §02).
 
 use std::fmt;
 
@@ -12,6 +13,22 @@ const KEY_BASE64URL_LEN: usize = 43;
 const SIG_BYTES: usize = 64;
 const SIG_BASE64URL_LEN: usize = 86;
 
+/// Bytes consumed by a SHA-256 digest.
+const SHA256_BYTES: usize = 32;
+/// Length of an unpadded base64url SHA-256 digest (32 bytes → 43 chars).
+const SHA256_BASE64URL_LEN: usize = 43;
+/// Lowercase ASCII tag prefix preceding an Entangled `sha-256:<base64url>`
+/// digest string (§02 / §03).
+const SHA256_PREFIX: &str = "sha-256:";
+/// Total length of a fully-encoded `sha-256:<base64url>` string
+/// (8 prefix + 43 digest = 51 ASCII characters).
+const SHA256_PREFIXED_LEN: usize = SHA256_PREFIX.len() + SHA256_BASE64URL_LEN;
+
+/// Bytes consumed by a submit `request_id` (§09).
+const REQUEST_ID_BYTES: usize = 16;
+/// Length of an unpadded base64url submit `request_id` (16 bytes → 22 chars).
+const REQUEST_ID_BASE64URL_LEN: usize = 22;
+
 /// Reasons a string fails to decode as a 32-byte public-key newtype.
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum KeyDecodeError {
@@ -23,6 +40,38 @@ pub enum KeyDecodeError {
     InvalidEncoding,
     /// Decoded bytes are not exactly 32 in length.
     #[error("decoded byte length is not {KEY_BYTES}")]
+    InvalidByteLength,
+}
+
+/// Reasons a string fails to decode as a `sha-256:<base64url>` digest.
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum Sha256HashDecodeError {
+    /// Input is not exactly 51 ASCII characters
+    /// (8 prefix + 43 base64url digest).
+    #[error("expected {SHA256_PREFIXED_LEN} ASCII characters, got {0}")]
+    InvalidLength(usize),
+    /// Input does not begin with the lowercase `sha-256:` tag.
+    #[error("expected lowercase sha-256: prefix")]
+    MissingPrefix,
+    /// The base64url digest segment is not valid unpadded base64url.
+    #[error("digest is not valid unpadded base64url")]
+    InvalidEncoding,
+    /// The decoded digest is not exactly 32 bytes.
+    #[error("decoded digest length is not {SHA256_BYTES}")]
+    InvalidByteLength,
+}
+
+/// Reasons a string fails to decode as a submit `request_id` (§09).
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum RequestIdDecodeError {
+    /// Input is not exactly 22 base64url characters.
+    #[error("expected {REQUEST_ID_BASE64URL_LEN} base64url characters (no padding), got {0}")]
+    InvalidLength(usize),
+    /// Input is not valid unpadded base64url.
+    #[error("input is not valid unpadded base64url")]
+    InvalidEncoding,
+    /// Decoded bytes are not exactly 16 in length.
+    #[error("decoded byte length is not {REQUEST_ID_BYTES}")]
     InvalidByteLength,
 }
 
@@ -145,10 +194,178 @@ key32_newtype!(
     RuntimePubkey,
     "Runtime Ed25519 public key used to sign canary statements (§02 canary, §08)."
 );
-key32_newtype!(
+
+fn decode_sha256_prefixed(input: &str) -> Result<[u8; SHA256_BYTES], Sha256HashDecodeError> {
+    if input.len() != SHA256_PREFIXED_LEN {
+        return Err(Sha256HashDecodeError::InvalidLength(input.len()));
+    }
+    if !input.starts_with(SHA256_PREFIX) {
+        return Err(Sha256HashDecodeError::MissingPrefix);
+    }
+    let digest = &input[SHA256_PREFIX.len()..];
+    let decoded = BASE64URL_NOPAD
+        .decode(digest.as_bytes())
+        .map_err(|_| Sha256HashDecodeError::InvalidEncoding)?;
+    if decoded.len() != SHA256_BYTES {
+        return Err(Sha256HashDecodeError::InvalidByteLength);
+    }
+    let mut out = [0u8; SHA256_BYTES];
+    out.copy_from_slice(&decoded);
+    Ok(out)
+}
+
+macro_rules! sha256_prefixed_newtype {
+    ($name:ident, $doc:expr) => {
+        #[doc = $doc]
+        ///
+        /// On the wire: 51 ASCII characters of the form
+        /// `sha-256:<base64url>` (8-character lowercase tag + 43-character
+        /// unpadded base64url digest), byte-for-byte identical between
+        /// §02 and §03.
+        #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+        pub struct $name([u8; SHA256_BYTES]);
+
+        impl $name {
+            /// Borrow the raw 32-byte digest.
+            pub fn as_bytes(&self) -> &[u8; SHA256_BYTES] {
+                &self.0
+            }
+
+            /// Build from a raw 32-byte digest (no validation).
+            pub fn from_bytes(bytes: [u8; SHA256_BYTES]) -> Self {
+                Self(bytes)
+            }
+        }
+
+        impl<'a> TryFrom<&'a str> for $name {
+            type Error = Sha256HashDecodeError;
+
+            fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+                Ok(Self(decode_sha256_prefixed(value)?))
+            }
+        }
+
+        impl TryFrom<String> for $name {
+            type Error = Sha256HashDecodeError;
+
+            fn try_from(value: String) -> Result<Self, Self::Error> {
+                Self::try_from(value.as_str())
+            }
+        }
+
+        impl fmt::Display for $name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str(SHA256_PREFIX)?;
+                f.write_str(&BASE64URL_NOPAD.encode(&self.0))
+            }
+        }
+
+        impl fmt::Debug for $name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{}({})", stringify!($name), self)
+            }
+        }
+
+        impl Serialize for $name {
+            fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                serializer.collect_str(self)
+            }
+        }
+
+        impl<'de> Deserialize<'de> for $name {
+            fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                let raw = String::deserialize(deserializer)?;
+                Self::try_from(raw).map_err(serde::de::Error::custom)
+            }
+        }
+    };
+}
+
+sha256_prefixed_newtype!(
     ImageSha256,
     "SHA-256 digest of an image's encoded bytes (§03 image block)."
 );
+sha256_prefixed_newtype!(
+    RequestHash,
+    "SHA-256 digest of the JCS-canonical submit body bytes (§02 transaction \
+     `request_hash`, §09)."
+);
+
+fn decode_request_id(input: &str) -> Result<[u8; REQUEST_ID_BYTES], RequestIdDecodeError> {
+    if input.len() != REQUEST_ID_BASE64URL_LEN {
+        return Err(RequestIdDecodeError::InvalidLength(input.len()));
+    }
+    let decoded = BASE64URL_NOPAD
+        .decode(input.as_bytes())
+        .map_err(|_| RequestIdDecodeError::InvalidEncoding)?;
+    if decoded.len() != REQUEST_ID_BYTES {
+        return Err(RequestIdDecodeError::InvalidByteLength);
+    }
+    let mut out = [0u8; REQUEST_ID_BYTES];
+    out.copy_from_slice(&decoded);
+    Ok(out)
+}
+
+/// Submit `request_id` (§09): a fresh 16-byte (128-bit) value drawn by the
+/// client for every submit, encoded on the wire as 22 unpadded base64url
+/// characters. Echoed by the publisher into the corresponding transaction
+/// document (§02) under the runtime signature, where the client compares
+/// it byte-exact at Stage 9 binding.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct RequestId([u8; REQUEST_ID_BYTES]);
+
+impl RequestId {
+    /// Borrow the raw 16 bytes.
+    pub fn as_bytes(&self) -> &[u8; REQUEST_ID_BYTES] {
+        &self.0
+    }
+
+    /// Build from raw 16 bytes (no validation).
+    pub fn from_bytes(bytes: [u8; REQUEST_ID_BYTES]) -> Self {
+        Self(bytes)
+    }
+}
+
+impl<'a> TryFrom<&'a str> for RequestId {
+    type Error = RequestIdDecodeError;
+
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        Ok(Self(decode_request_id(value)?))
+    }
+}
+
+impl TryFrom<String> for RequestId {
+    type Error = RequestIdDecodeError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::try_from(value.as_str())
+    }
+}
+
+impl fmt::Display for RequestId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&BASE64URL_NOPAD.encode(&self.0))
+    }
+}
+
+impl fmt::Debug for RequestId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RequestId({self})")
+    }
+}
+
+impl Serialize for RequestId {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(self)
+    }
+}
+
+impl<'de> Deserialize<'de> for RequestId {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let raw = String::deserialize(deserializer)?;
+        Self::try_from(raw).map_err(serde::de::Error::custom)
+    }
+}
 
 /// An Ed25519 signature: 64 bytes, encoded on the wire as 86 unpadded
 /// base64url characters.

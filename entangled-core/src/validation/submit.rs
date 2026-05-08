@@ -7,6 +7,8 @@
 //! pre-pass), then deserializes into a closed-schema `SubmitBody` before
 //! handing off to `validate_submit_body`.
 
+use std::collections::HashSet;
+
 use serde_json::Value;
 
 use crate::state::submit::SubmitBody;
@@ -65,6 +67,30 @@ pub fn validate_submit_body(body: &SubmitBody) -> Result<(), Diagnostic> {
     // RequestStateItem.namespace / key are already `Slug` (validated at
     // deserialize). §09 places no per-entry cap on `value`; the policy
     // `max_size` (≤ 4096) was enforced at `set` time.
+
+    // §09: each (namespace, key) pair appears at most once. Publishers MUST
+    // reject submit bodies containing duplicate request_state entries
+    // (`E_STATE_DUPLICATE`, §11). A conformant client never emits one;
+    // running the check here protects publisher-side parsers that share
+    // this validator.
+    let mut seen: HashSet<(&Slug, &Slug)> = HashSet::with_capacity(body.request_state.len());
+    for entry in &body.request_state {
+        if !seen.insert((&entry.namespace, &entry.key)) {
+            return Err(Diagnostic::new(
+                DiagnosticCode::EStateDuplicate,
+                DocumentKindLabel::Transaction,
+                format!(
+                    "duplicate request_state entry for ({}, {})",
+                    entry.namespace.as_str(),
+                    entry.key.as_str()
+                ),
+            )
+            .with_details(serde_json::json!({
+                "duplicate_namespace": entry.namespace.as_str(),
+                "duplicate_key": entry.key.as_str(),
+            })));
+        }
+    }
     Ok(())
 }
 

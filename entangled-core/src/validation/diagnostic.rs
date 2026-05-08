@@ -91,6 +91,8 @@ pub enum DiagnosticCode {
     EParseArrayLength,
     #[serde(rename = "E_PARSE_OBJECT_KEYS")]
     EParseObjectKeys,
+    #[serde(rename = "E_PARSE_DUPLICATE_KEY")]
+    EParseDuplicateKey,
 
     // Stage 4 — Document kind discrimination
     #[serde(rename = "E_KIND_MISSING_FIELDS")]
@@ -147,6 +149,8 @@ pub enum DiagnosticCode {
     ECanaryInvalid,
     #[serde(rename = "E_CANARY_DOWNGRADE")]
     ECanaryDowngrade,
+    #[serde(rename = "E_CANARY_CONFLICT")]
+    ECanaryConflict,
     #[serde(rename = "W_CANARY_NEAR_EXPIRATION")]
     WCanaryNearExpiration,
     #[serde(rename = "W_CANARY_EXPIRED")]
@@ -161,6 +165,10 @@ pub enum DiagnosticCode {
     EBindPath,
     #[serde(rename = "E_BIND_RESPONSE_PATH")]
     EBindResponsePath,
+    #[serde(rename = "E_BIND_REQUEST_ID")]
+    EBindRequestId,
+    #[serde(rename = "E_BIND_REQUEST_HASH")]
+    EBindRequestHash,
     #[serde(rename = "E_BIND_ORIGIN")]
     EBindOrigin,
 
@@ -175,6 +183,8 @@ pub enum DiagnosticCode {
     EStateOp,
     #[serde(rename = "E_STATE_STORAGE_CAP")]
     EStateStorageCap,
+    #[serde(rename = "E_STATE_DUPLICATE")]
+    EStateDuplicate,
     #[serde(rename = "I_STATE_CONSENT_REJECTED")]
     IStateConsentRejected,
     #[serde(rename = "I_STATE_CONSENT_REMEMBERED")]
@@ -201,6 +211,8 @@ pub enum DiagnosticCode {
     WImageDecodeFailed,
     #[serde(rename = "W_IMAGE_FETCH_FAILED")]
     WImageFetchFailed,
+    #[serde(rename = "W_IMAGE_BUDGET")]
+    WImageBudget,
 }
 
 impl DiagnosticCode {
@@ -219,7 +231,8 @@ impl DiagnosticCode {
             | WImageContentType
             | WImageDimensions
             | WImageDecodeFailed
-            | WImageFetchFailed => Severity::Warning,
+            | WImageFetchFailed
+            | WImageBudget => Severity::Warning,
 
             // Info-severity codes.
             ITrustFirstContact
@@ -255,7 +268,7 @@ impl DiagnosticCode {
 
             // Stage 3 — Parsing.
             EParseJson | EParseNestingDepth | EParseStringLength | EParseArrayLength
-            | EParseObjectKeys => 3,
+            | EParseObjectKeys | EParseDuplicateKey => 3,
 
             // Stage 4 — Document kind discrimination.
             EKindMissingFields | EKindSpecVersion | EKindUnknown => 4,
@@ -282,13 +295,14 @@ impl DiagnosticCode {
             // Stage 8 — Canary.
             ECanaryInvalid
             | ECanaryDowngrade
+            | ECanaryConflict
             | WCanaryNearExpiration
             | WCanaryExpired
             | WCanaryGap
             | WCanaryUnavailable => 8,
 
             // Stage 9 — Binding.
-            EBindPath | EBindResponsePath | EBindOrigin => 9,
+            EBindPath | EBindResponsePath | EBindRequestId | EBindRequestHash | EBindOrigin => 9,
 
             // Off-pipeline (state, historical, image).
             EStateUndeclared
@@ -296,6 +310,7 @@ impl DiagnosticCode {
             | EStateTtl
             | EStateOp
             | EStateStorageCap
+            | EStateDuplicate
             | IStateConsentRejected
             | IStateConsentRemembered
             | EHistoricalNoAuthorization
@@ -306,7 +321,8 @@ impl DiagnosticCode {
             | WImageContentType
             | WImageDimensions
             | WImageDecodeFailed
-            | WImageFetchFailed => 0,
+            | WImageFetchFailed
+            | WImageBudget => 0,
         }
     }
 }

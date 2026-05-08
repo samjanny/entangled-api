@@ -15,6 +15,7 @@
 //! String length caps for `statement` and `freshness_proof` are part of Stage
 //! 5 schema validation and are not duplicated here.
 
+use crate::types::keys::RuntimePubkey;
 use crate::types::{Canary, EntangledTimestamp};
 use crate::validation::clock::{check_future_timestamp, CANARY_ISSUED_AT_FIELD};
 use crate::validation::diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel};
@@ -128,7 +129,13 @@ pub fn validate_canary_structure(
 /// or storage cleared).
 ///
 /// The comparison is strict: equality is allowed (re-fetch of the same
-/// manifest), only `new_issued_at < newest_known` is a downgrade.
+/// manifest) and is policed separately by [`check_canary_conflict`] which
+/// handles the equal-`issued_at` case. Only `new_issued_at < newest_known`
+/// triggers `E_CANARY_DOWNGRADE` here.
+///
+/// `E_CANARY_DOWNGRADE` and `E_CANARY_CONFLICT` are mutually exclusive
+/// (§08): the former applies when the fetched `issued_at` is strictly
+/// older, the latter when it is equal but the signed payload differs.
 pub fn check_anti_downgrade(
     new_issued_at: &EntangledTimestamp,
     newest_known: Option<&EntangledTimestamp>,
@@ -144,4 +151,74 @@ pub fn check_anti_downgrade(
         ));
     }
     Ok(())
+}
+
+/// Retained record of a previously verified manifest for a single
+/// `K_publisher.pub`, supplied by the caller to [`check_canary_conflict`].
+///
+/// The 32-byte `manifest_payload_hash` is the SHA-256 digest of the
+/// manifest's JCS-canonical signed payload (the bytes signed under
+/// `K_publisher.pub` — i.e., the manifest object minus `sig`, with the
+/// `kind` discriminator attached, then JCS-canonicalized). Two manifests
+/// with the same `issued_at` but different `manifest_payload_hash` are a
+/// conflict; two manifests with the same `manifest_payload_hash` are by
+/// construction byte-equivalent and not a conflict (re-fetch). Persistence
+/// of this record is the caller's responsibility.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RetainedManifestRecord {
+    /// `canary.issued_at` of the previously accepted manifest.
+    pub issued_at: EntangledTimestamp,
+    /// `canary.runtime_pubkey` of the previously accepted manifest.
+    pub runtime_pubkey: RuntimePubkey,
+    /// SHA-256 digest of the manifest's JCS-canonical signed payload.
+    pub manifest_payload_hash: [u8; 32],
+}
+
+/// Equal-`issued_at` conflict check (§08).
+///
+/// A publisher MUST NOT issue two distinct manifests with the same
+/// `canary.issued_at` for the same `K_publisher.pub`. A client that has
+/// already accepted a manifest with `canary.issued_at = T` for
+/// `K_publisher.pub = P` MUST reject any later manifest from any origin
+/// with `canary.issued_at = T` for the same `P` whose JCS-canonical signed
+/// payload differs (§08, §11 `E_CANARY_CONFLICT`).
+///
+/// Refetching the same manifest is permitted: a byte-for-byte equivalent
+/// payload (matching `manifest_payload_hash`) is not a conflict.
+///
+/// Caller provides:
+/// * `new_issued_at`, `new_runtime_pubkey`, `new_manifest_payload_hash` —
+///   from the freshly fetched manifest;
+/// * `retained` — the previously accepted record for the same
+///   `K_publisher.pub`, or `None` if none.
+///
+/// Returns `Err` only when `retained.issued_at == new_issued_at` and the
+/// new payload hash differs from the retained one. The diagnostic carries
+/// `details = { issued_at, retained_runtime_pubkey, presented_runtime_pubkey }`
+/// (§11).
+pub fn check_canary_conflict(
+    new_issued_at: &EntangledTimestamp,
+    new_runtime_pubkey: &RuntimePubkey,
+    new_manifest_payload_hash: &[u8; 32],
+    retained: Option<&RetainedManifestRecord>,
+) -> Result<(), Diagnostic> {
+    let Some(retained) = retained else {
+        return Ok(());
+    };
+    if &retained.issued_at != new_issued_at {
+        return Ok(());
+    }
+    if &retained.manifest_payload_hash == new_manifest_payload_hash {
+        return Ok(());
+    }
+    Err(Diagnostic::new(
+        DiagnosticCode::ECanaryConflict,
+        DocumentKindLabel::Manifest,
+        "canary.issued_at matches a previously accepted manifest with a different signed payload",
+    )
+    .with_details(serde_json::json!({
+        "issued_at": new_issued_at.to_string(),
+        "retained_runtime_pubkey": retained.runtime_pubkey.to_string(),
+        "presented_runtime_pubkey": new_runtime_pubkey.to_string(),
+    })))
 }

@@ -11,4 +11,5 @@ mod integration_pip_to_verify;
 mod parse_pipeline_errors;
 mod payload_consistency;
 mod tampering_rejected;
+mod transaction_binding;
 mod type_state;

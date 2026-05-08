@@ -3,12 +3,19 @@
 use std::collections::BTreeMap;
 
 use entangled_core::state::{RequestStateItem, SubmitBody};
+use entangled_core::types::keys::RequestId;
 use entangled_core::types::slug::Slug;
 use entangled_core::validation::submit::{validate_submit_body, validate_submit_body_bytes};
 use entangled_core::validation::DiagnosticCode;
 
 fn slug(s: &str) -> Slug {
     Slug::try_from(s).unwrap()
+}
+
+/// 16 zero bytes encoded as 22 base64url characters. Tests do not exercise
+/// the no-reuse rule (§09); a fixed value keeps fixtures terse.
+fn rid_zero() -> RequestId {
+    RequestId::from_bytes([0u8; 16])
 }
 
 fn ok_body() -> SubmitBody {
@@ -19,6 +26,7 @@ fn ok_body() -> SubmitBody {
     SubmitBody {
         fields,
         request_state: vec![],
+        request_id: rid_zero(),
     }
 }
 
@@ -36,6 +44,7 @@ fn fields_above_32_rejected() {
     let body = SubmitBody {
         fields,
         request_state: vec![],
+        request_id: rid_zero(),
     };
     let err = validate_submit_body(&body).unwrap_err();
     assert_eq!(err.code, DiagnosticCode::ESchemaFieldLength);
@@ -48,6 +57,7 @@ fn field_key_invalid_slug_rejected() {
     let body = SubmitBody {
         fields,
         request_state: vec![],
+        request_id: rid_zero(),
     };
     let err = validate_submit_body(&body).unwrap_err();
     assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
@@ -60,6 +70,7 @@ fn field_value_above_8_kib_rejected() {
     let body = SubmitBody {
         fields,
         request_state: vec![],
+        request_id: rid_zero(),
     };
     let err = validate_submit_body(&body).unwrap_err();
     assert_eq!(err.code, DiagnosticCode::ESchemaFieldLength);
@@ -77,6 +88,7 @@ fn request_state_above_32_rejected() {
     let body = SubmitBody {
         fields: BTreeMap::new(),
         request_state,
+        request_id: rid_zero(),
     };
     let err = validate_submit_body(&body).unwrap_err();
     assert_eq!(err.code, DiagnosticCode::ESchemaFieldLength);
@@ -89,6 +101,7 @@ fn empty_field_key_rejected() {
     let body = SubmitBody {
         fields,
         request_state: vec![],
+        request_id: rid_zero(),
     };
     let err = validate_submit_body(&body).unwrap_err();
     assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
@@ -107,9 +120,59 @@ fn submit_bytes_over_64_kib_rejected() {
 
 #[test]
 fn unknown_top_level_field_rejected() {
-    let s = r#"{"fields":{},"request_state":[],"foo":1}"#;
+    let s = r#"{"fields":{},"request_state":[],"request_id":"AAAAAAAAAAAAAAAAAAAAAA","foo":1}"#;
     let err = validate_submit_body_bytes(s.as_bytes()).unwrap_err();
     assert_eq!(err.code, DiagnosticCode::ESchemaUnknownField);
+}
+
+#[test]
+fn duplicate_namespace_key_pair_in_request_state_rejected() {
+    // §09 / §11: a submit body MUST NOT carry the same `(namespace, key)`
+    // twice in `request_state`. Publishers reject with E_STATE_DUPLICATE
+    // and the structured details must call out the duplicated pair.
+    let body = SubmitBody {
+        fields: BTreeMap::new(),
+        request_state: vec![
+            RequestStateItem {
+                namespace: slug("session"),
+                key: slug("auth"),
+                value: "first".to_owned(),
+            },
+            RequestStateItem {
+                namespace: slug("session"),
+                key: slug("auth"),
+                value: "second".to_owned(),
+            },
+        ],
+        request_id: rid_zero(),
+    };
+    let err = validate_submit_body(&body).unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::EStateDuplicate);
+    let details = err.details.as_ref().expect("details payload");
+    assert_eq!(details["duplicate_namespace"].as_str(), Some("session"));
+    assert_eq!(details["duplicate_key"].as_str(), Some("auth"));
+}
+
+#[test]
+fn distinct_keys_in_same_namespace_accepted() {
+    // Sanity check: same namespace, different keys is not a duplicate.
+    let body = SubmitBody {
+        fields: BTreeMap::new(),
+        request_state: vec![
+            RequestStateItem {
+                namespace: slug("session"),
+                key: slug("auth"),
+                value: "a".to_owned(),
+            },
+            RequestStateItem {
+                namespace: slug("session"),
+                key: slug("csrf"),
+                value: "b".to_owned(),
+            },
+        ],
+        request_id: rid_zero(),
+    };
+    validate_submit_body(&body).unwrap();
 }
 
 #[test]
@@ -123,6 +186,7 @@ fn round_trip_serialize_then_validate_bytes() {
             key: slug("auth"),
             value: "abc".to_owned(),
         }],
+        request_id: rid_zero(),
     };
     let bytes = serde_json::to_vec(&body).unwrap();
     let parsed = validate_submit_body_bytes(&bytes).unwrap();

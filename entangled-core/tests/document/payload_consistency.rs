@@ -78,6 +78,8 @@ fn transaction_unsigned_and_signed_produce_byte_identical_payload() {
     let signed = TransactionDocument {
         spec_version: unsigned.spec_version,
         in_response_to: unsigned.in_response_to.clone(),
+        request_id: unsigned.request_id,
+        request_hash: unsigned.request_hash,
         state_updates: unsigned.state_updates.clone(),
         blocks: unsigned.blocks.clone(),
         sig: signature_zero(),

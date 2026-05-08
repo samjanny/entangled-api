@@ -28,8 +28,9 @@ pub use document::{ContentDocument, Document, TransactionDocument};
 pub use form::{FormField, SelectOption};
 pub use inline::{InlineContent, InlineElement, TextMark};
 pub use keys::{
-    ImageSha256, KeyDecodeError, OriginPubkey, PublisherPubkey, RuntimePubkey, Signature,
-    SignatureDecodeError, SpecVersion, SpecVersionError,
+    ImageSha256, KeyDecodeError, OriginPubkey, PublisherPubkey, RequestHash, RequestId,
+    RequestIdDecodeError, RuntimePubkey, Sha256HashDecodeError, Signature, SignatureDecodeError,
+    SpecVersion, SpecVersionError,
 };
 pub use link::LinkTarget;
 pub use manifest::{Carrier, Manifest, NavEntry, OnionAddress, OnionAddressError, Origin};

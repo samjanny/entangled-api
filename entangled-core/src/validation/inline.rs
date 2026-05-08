@@ -155,11 +155,11 @@ fn validate_citation_url(url: &str) -> Result<(), Diagnostic> {
             ),
         ));
     }
-    if !(url.starts_with("http://") || url.starts_with("https://")) {
+    if !url.starts_with("https://") {
         return Err(Diagnostic::new(
             DiagnosticCode::ESchemaFieldSyntax,
             DocumentKindLabel::None,
-            "citation url must begin with http:// or https://",
+            "citation url must begin with https://",
         ));
     }
     if !no_control_chars(url, false) {

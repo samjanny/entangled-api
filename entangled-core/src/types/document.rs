@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::blocks::Block;
-use super::keys::{Signature, SpecVersion};
+use super::keys::{RequestHash, RequestId, Signature, SpecVersion};
 use super::manifest::Manifest;
 use super::meta::Meta;
 use super::path::EntangledPath;
@@ -35,7 +35,16 @@ pub struct ContentDocument {
 }
 
 /// A signed Transaction document (§02): a publisher's response to a form
-/// submit, optionally carrying state updates and rendered blocks.
+/// submit, carrying the originating submit's `request_id`/`request_hash`
+/// binding fields, optional state updates, and rendered blocks.
+///
+/// All eight top-level fields are required (§02). The `request_id` and
+/// `request_hash` fields bind the transaction to the specific submit body
+/// the client sent: the publisher echoes the client's `request_id`
+/// byte-for-byte and computes `request_hash` over the JCS-canonical submit
+/// body bytes it received. The client verifies both at Stage 9 binding
+/// (§10) and rejects with `E_BIND_REQUEST_ID` or `E_BIND_REQUEST_HASH` on
+/// mismatch.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TransactionDocument {
@@ -43,6 +52,17 @@ pub struct TransactionDocument {
     pub spec_version: SpecVersion,
     /// Path of the form whose submission this transaction answers.
     pub in_response_to: EntangledPath,
+    /// Echo of the `request_id` the client placed in the originating submit
+    /// body (§09); the publisher copies this byte-for-byte. The client
+    /// compares it byte-exact against the `RequestId` it generated for the
+    /// submit and rejects mismatches with `E_BIND_REQUEST_ID` (§11).
+    pub request_id: RequestId,
+    /// SHA-256 digest of the JCS-canonical submit body bytes the publisher
+    /// received, encoded as `sha-256:<base64url>` (§02). The client compares
+    /// it byte-exact against the digest it computed locally over the submit
+    /// body it sent and rejects mismatches with `E_BIND_REQUEST_HASH`
+    /// (§11).
+    pub request_hash: RequestHash,
     /// State update operations to apply (Set/Delete) per §07.
     pub state_updates: Vec<StateUpdateOp>,
     /// Ordered block list rendered as the transaction response.

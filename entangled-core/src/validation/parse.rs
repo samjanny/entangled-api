@@ -2,15 +2,20 @@
 //!
 //! Deserialization goes through a custom `serde::Visitor` that produces a
 //! `serde_json::Value` while rejecting **duplicate object keys** at parse
-//! time. Without this, `serde_json::from_str` silently last-write-wins and
-//! a hostile producer could hide a payload under the surviving key.
+//! time (§04, §10 Stage 3). Without this, `serde_json::from_str` silently
+//! last-write-wins and a hostile producer could hide a payload under the
+//! surviving key.
 //!
-//! Errors raised by `serde_json` are then post-classified: messages whose
-//! text identifies a malformed `\uXXXX` surrogate pair are mapped to
-//! `E_SCHEMA_MALFORMED_UNICODE` per §11; everything else is `E_PARSE_JSON`.
-//! The `walk_limits` post-pass still enforces depth/length caps; it remains
-//! O(n) over the same input bounded by Stage 2's 1 MiB cap.
+//! Errors raised by `serde_json` are then post-classified: a duplicate-key
+//! rejection is reported as `E_PARSE_DUPLICATE_KEY` (§11) with structured
+//! `details` carrying the duplicated member name and a JSON-pointer
+//! `object_path` to the offending object; messages identifying a malformed
+//! `\uXXXX` surrogate pair are mapped to `E_SCHEMA_MALFORMED_UNICODE`;
+//! everything else is `E_PARSE_JSON`. The `walk_limits` post-pass still
+//! enforces depth/length caps; it remains O(n) over the same input
+//! bounded by Stage 2's 1 MiB cap.
 
+use std::cell::RefCell;
 use std::fmt;
 
 use serde::de::{Deserialize, Deserializer, Error as DeError, MapAccess, SeqAccess, Visitor};
@@ -21,10 +26,33 @@ use super::limits::{
     MAX_JSON_ARRAY_ELEMENTS, MAX_JSON_NESTING_DEPTH, MAX_JSON_OBJECT_KEYS, MAX_JSON_STRING_BYTES,
 };
 
+thread_local! {
+    /// Path of object keys currently being descended into. Pushed before
+    /// recursing into a child value, popped after. Captured into
+    /// `DEDUP_INFO` if a duplicate key is hit at the deepest object.
+    static DEDUP_PATH: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    /// Set when the duplicate-key visitor rejects a map. Read by
+    /// `classify_serde_error` to attach structured details.
+    static DEDUP_INFO: RefCell<Option<DuplicateInfo>> = const { RefCell::new(None) };
+}
+
+/// Captured at the visitor when a duplicate object key is detected; consumed
+/// by `classify_serde_error` to emit `E_PARSE_DUPLICATE_KEY` details.
+struct DuplicateInfo {
+    duplicate_key: String,
+    object_path: String,
+}
+
 /// Stage 3 entry: parse and apply parser limits. The diagnostic
 /// `document_kind` is `None` because the kind is not yet known at this
 /// stage; callers may reassign it after Stage 4.
 pub fn parse_with_limits(s: &str) -> Result<Value, Diagnostic> {
+    DEDUP_INFO.with(|i| {
+        i.borrow_mut().take();
+    });
+    DEDUP_PATH.with(|p| {
+        p.borrow_mut().clear();
+    });
     let value: Value = serde_json::from_str::<DedupedValue>(s)
         .map(|d| d.0)
         .map_err(classify_serde_error)?;
@@ -34,12 +62,29 @@ pub fn parse_with_limits(s: &str) -> Result<Value, Diagnostic> {
 
 /// Map a `serde_json` deserialization error to a Stage 3 diagnostic.
 ///
+/// A duplicate-key rejection (signalled via the `DEDUP_INFO` thread-local
+/// captured by the visitor) is reported as `E_PARSE_DUPLICATE_KEY` (§04,
+/// §11) with structured details `{ duplicate_key, object_path }`.
 /// Surrogate-pair complaints (`\uXXXX` escapes that don't form a valid code
 /// point) are routed to `E_SCHEMA_MALFORMED_UNICODE` because §11 reserves
 /// that code for "malformed Unicode escape sequences or isolated
-/// surrogates". Every other parse failure — including the duplicate-key
-/// rejection emitted by `DedupedMapVisitor` — falls under `E_PARSE_JSON`.
+/// surrogates". Every other parse failure falls under `E_PARSE_JSON`.
 fn classify_serde_error(e: serde_json::Error) -> Diagnostic {
+    let dup = DEDUP_INFO.with(|i| i.borrow_mut().take());
+    if let Some(info) = dup {
+        return Diagnostic::new(
+            DiagnosticCode::EParseDuplicateKey,
+            DocumentKindLabel::None,
+            format!(
+                "duplicate object member name {:?} at {}",
+                info.duplicate_key, info.object_path
+            ),
+        )
+        .with_details(serde_json::json!({
+            "duplicate_key": info.duplicate_key,
+            "object_path": info.object_path,
+        }));
+    }
     let msg = e.to_string();
     if is_surrogate_error(&msg) {
         return Diagnostic::new(
@@ -126,14 +171,55 @@ impl<'de> Visitor<'de> for DedupedValueVisitor {
     fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
         let mut out = serde_json::Map::with_capacity(map.size_hint().unwrap_or(0));
         while let Some(key) = map.next_key::<String>()? {
-            let DedupedValue(value) = map.next_value()?;
             if out.contains_key(&key) {
-                return Err(A::Error::custom(format!("duplicate object key {key:?}")));
+                let object_path = DEDUP_PATH.with(|p| {
+                    let parts = p.borrow();
+                    if parts.is_empty() {
+                        "/".to_owned()
+                    } else {
+                        let mut s = String::new();
+                        for part in parts.iter() {
+                            s.push('/');
+                            s.push_str(&escape_json_pointer(part));
+                        }
+                        s
+                    }
+                });
+                DEDUP_INFO.with(|i| {
+                    *i.borrow_mut() = Some(DuplicateInfo {
+                        duplicate_key: key.clone(),
+                        object_path,
+                    });
+                });
+                return Err(A::Error::custom(format!(
+                    "duplicate object member name {key:?}"
+                )));
             }
+            DEDUP_PATH.with(|p| p.borrow_mut().push(key.clone()));
+            let result = map.next_value::<DedupedValue>();
+            DEDUP_PATH.with(|p| {
+                p.borrow_mut().pop();
+            });
+            let DedupedValue(value) = result?;
             out.insert(key, value);
         }
         Ok(Value::Object(out))
     }
+}
+
+/// Escape a member name for use as a single segment of an RFC 6901 JSON
+/// pointer: `~` becomes `~0`, `/` becomes `~1`. Other characters are
+/// emitted as-is.
+fn escape_json_pointer(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '~' => out.push_str("~0"),
+            '/' => out.push_str("~1"),
+            _ => out.push(c),
+        }
+    }
+    out
 }
 
 fn walk_limits(root: &Value) -> Result<(), Diagnostic> {

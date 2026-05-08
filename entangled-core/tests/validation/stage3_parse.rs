@@ -77,22 +77,25 @@ fn malformed_json_unbalanced_brace_rejected() {
 fn duplicate_object_key_rejected() {
     // serde_json silently overwrites duplicates by default; the custom
     // visitor in `parse_with_limits` must reject them so a hostile producer
-    // cannot smuggle a payload past the surviving key.
+    // cannot smuggle a payload past the surviving key. §04 / §11 require
+    // the dedicated `E_PARSE_DUPLICATE_KEY` code with structured details
+    // identifying the duplicate member name and the containing object.
     let s = r#"{"a": 1, "a": 2}"#;
     let err = parse_with_limits(s).unwrap_err();
-    assert_eq!(err.code, DiagnosticCode::EParseJson);
-    assert!(
-        err.message.contains("duplicate"),
-        "expected duplicate-key message, got {:?}",
-        err.message
-    );
+    assert_eq!(err.code, DiagnosticCode::EParseDuplicateKey);
+    let details = err.details.as_ref().expect("details payload");
+    assert_eq!(details["duplicate_key"].as_str(), Some("a"));
+    assert_eq!(details["object_path"].as_str(), Some("/"));
 }
 
 #[test]
 fn duplicate_object_key_nested_rejected() {
     let s = r#"{"outer": {"a": 1, "a": 2}}"#;
     let err = parse_with_limits(s).unwrap_err();
-    assert_eq!(err.code, DiagnosticCode::EParseJson);
+    assert_eq!(err.code, DiagnosticCode::EParseDuplicateKey);
+    let details = err.details.as_ref().expect("details payload");
+    assert_eq!(details["duplicate_key"].as_str(), Some("a"));
+    assert_eq!(details["object_path"].as_str(), Some("/outer"));
 }
 
 #[test]

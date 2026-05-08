@@ -8,7 +8,10 @@ use entangled_core::types::{
     canary::Canary,
     document::{ContentDocument, TransactionDocument},
     inline::{InlineElement, TextMark},
-    keys::{ImageSha256, OriginPubkey, PublisherPubkey, RuntimePubkey, Signature, SpecVersion},
+    keys::{
+        ImageSha256, OriginPubkey, PublisherPubkey, RequestHash, RequestId, RuntimePubkey,
+        Signature, SpecVersion,
+    },
     manifest::{Carrier, Manifest, OnionAddress, Origin},
     meta::Meta,
     path::EntangledPath,
@@ -17,6 +20,12 @@ use entangled_core::types::{
 
 /// 43 zero base64url chars → 32 zero bytes.
 pub const KEY_ZEROS: &str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
+/// 51 ASCII chars: `sha-256:` + 43 zero base64url chars → 32 zero bytes.
+pub const SHA256_PREFIXED_ZEROS: &str = "sha-256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
+/// 22 zero base64url chars → 16 zero bytes (submit `request_id`).
+pub const REQUEST_ID_ZEROS: &str = "AAAAAAAAAAAAAAAAAAAAAA";
 
 /// 86 zero base64url chars → 64 zero bytes.
 pub const SIG_ZEROS: &str =
@@ -41,7 +50,15 @@ pub fn signature_zero() -> Signature {
 }
 
 pub fn image_sha_zero() -> ImageSha256 {
-    ImageSha256::try_from(KEY_ZEROS).unwrap()
+    ImageSha256::try_from(SHA256_PREFIXED_ZEROS).unwrap()
+}
+
+pub fn request_id_zero() -> RequestId {
+    RequestId::try_from(REQUEST_ID_ZEROS).unwrap()
+}
+
+pub fn request_hash_zero() -> RequestHash {
+    RequestHash::try_from(SHA256_PREFIXED_ZEROS).unwrap()
 }
 
 pub fn ts(s: &str) -> EntangledTimestamp {
@@ -118,6 +135,8 @@ pub fn minimal_transaction_doc() -> TransactionDocument {
     TransactionDocument {
         spec_version: SpecVersion,
         in_response_to: path("/contact"),
+        request_id: request_id_zero(),
+        request_hash: request_hash_zero(),
         state_updates: vec![],
         blocks: vec![Block::Feedback {
             variant: FeedbackVariant::Success,

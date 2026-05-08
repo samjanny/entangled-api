@@ -21,6 +21,7 @@
 //! chain via [`ManifestOriginBound::into_parts`] or explicitly opt out
 //! of further stages via `skip_canary_check` / `skip_origin_check`.
 
+pub mod binding;
 pub mod builder;
 pub mod envelope;
 pub mod error;
@@ -28,6 +29,7 @@ pub mod parser;
 pub mod unsigned;
 pub mod verified;
 
+pub use binding::verify_transaction_binding;
 pub use builder::{build_content, build_manifest, build_transaction};
 pub use envelope::{attach_sig, extract_sig};
 pub use error::DocumentError;

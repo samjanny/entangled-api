@@ -10,7 +10,10 @@ use entangled_core::types::{
     meta::Meta,
 };
 
-use super::common::{onion, origin_key_zero, path, runtime_key_zero, signature_zero, ts};
+use super::common::{
+    onion, origin_key_zero, path, request_hash_zero, request_id_zero, runtime_key_zero,
+    signature_zero, ts,
+};
 
 pub fn unsigned_manifest_with_publisher(
     publisher_pubkey: entangled_core::types::keys::PublisherPubkey,
@@ -58,6 +61,8 @@ pub fn unsigned_transaction() -> UnsignedTransaction {
     UnsignedTransaction {
         spec_version: SpecVersion,
         in_response_to: path("/contact"),
+        request_id: request_id_zero(),
+        request_hash: request_hash_zero(),
         state_updates: vec![],
         blocks: vec![Block::Feedback {
             variant: FeedbackVariant::Success,

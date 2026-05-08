@@ -4,5 +4,6 @@
 mod common;
 
 mod anti_downgrade;
+mod conflict;
 mod state;
 mod structure;

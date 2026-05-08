@@ -4,9 +4,16 @@
 use std::collections::BTreeMap;
 
 use entangled_core::state::{build_submit_body, ConsentDecision, StateStore};
+use entangled_core::types::keys::RequestId;
 use entangled_core::types::state::StateMode;
 
 use crate::helpers::{policy_entry, pub_from_seed, set_op, ts};
+
+/// 16 zero bytes — these tests exercise field/state plumbing, not §09's
+/// freshness rule for `request_id`.
+fn rid_zero() -> RequestId {
+    RequestId::from_bytes([0u8; 16])
+}
 
 const ACCEPTED: ConsentDecision = ConsentDecision {
     accepted: true,
@@ -42,7 +49,7 @@ fn build_with_two_request_entries() {
         policy_entry("session", "auth", StateMode::Request, 512, 86_400),
         policy_entry("session", "csrf", StateMode::Request, 512, 86_400),
     ];
-    let body = build_submit_body(BTreeMap::new(), &mut store, &pub_a, &policy, &now);
+    let body = build_submit_body(BTreeMap::new(), &mut store, &pub_a, &policy, &now, rid_zero());
     assert_eq!(body.fields.len(), 0);
     assert_eq!(body.request_state.len(), 2);
 }
@@ -52,7 +59,7 @@ fn build_with_empty_store_yields_empty_request_state() {
     let pub_a = pub_from_seed(72);
     let now = ts("2026-05-07T00:00:00Z");
     let mut store = StateStore::new();
-    let body = build_submit_body(BTreeMap::new(), &mut store, &pub_a, &[], &now);
+    let body = build_submit_body(BTreeMap::new(), &mut store, &pub_a, &[], &now, rid_zero());
     assert!(body.request_state.is_empty());
     assert!(body.fields.is_empty());
 }
@@ -67,7 +74,7 @@ fn build_includes_user_input_fields() {
     fields.insert("name".to_owned(), "alice".to_owned());
     fields.insert("message".to_owned(), "hello".to_owned());
 
-    let body = build_submit_body(fields.clone(), &mut store, &pub_a, &[], &now);
+    let body = build_submit_body(fields.clone(), &mut store, &pub_a, &[], &now, rid_zero());
     assert_eq!(body.fields, fields);
     assert!(body.request_state.is_empty());
 }
@@ -96,6 +103,13 @@ fn build_excludes_expired_request_state() {
         512,
         86_400,
     )];
-    let body = build_submit_body(BTreeMap::new(), &mut store, &pub_a, &policy, &later);
+    let body = build_submit_body(
+        BTreeMap::new(),
+        &mut store,
+        &pub_a,
+        &policy,
+        &later,
+        rid_zero(),
+    );
     assert!(body.request_state.is_empty());
 }
