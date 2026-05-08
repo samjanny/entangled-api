@@ -5,7 +5,6 @@
 use data_encoding::BASE32;
 use entangled_core::crypto::ed25519::SigningKey;
 use entangled_core::document::{build_manifest, parse_and_verify_manifest, UnsignedManifest};
-use entangled_core::tor::verify_origin_binding;
 use entangled_core::types::canary::Canary;
 use entangled_core::types::keys::{OriginPubkey, SpecVersion};
 use entangled_core::types::manifest::{Carrier, OnionAddress, Origin};
@@ -73,11 +72,17 @@ fn full_pillar_b_closure() {
     let (manifest, bytes) =
         build_manifest(&unsigned, &publisher_key, &now).expect("build_manifest");
 
-    // (b) Parse + signature verify.
-    let parsed = parse_and_verify_manifest(&bytes, &now).expect("parse_and_verify_manifest");
+    // (b) Parse + signature verify, then walk the type-state chain through
+    // Stage 8 (canary structure) and Stage 9 (origin binding). The chain is
+    // the public way to close Pillar B end-to-end; Stage 9 succeeds iff the
+    // address we would have fetched from matches both `manifest.origin.address`
+    // and the embedded origin pubkey.
+    let (parsed, _canary_state) = parse_and_verify_manifest(&bytes, &now)
+        .expect("parse_and_verify_manifest")
+        .verify_canary(&now)
+        .expect("canary structure")
+        .verify_origin(&onion)
+        .expect("origin binding must succeed")
+        .into_parts();
     assert_eq!(parsed, manifest);
-
-    // (c) Origin binding: the address we (would have) fetched from matches
-    // both `manifest.origin.address` and the embedded origin pubkey.
-    verify_origin_binding(&onion, &parsed.origin).expect("origin binding must succeed");
 }

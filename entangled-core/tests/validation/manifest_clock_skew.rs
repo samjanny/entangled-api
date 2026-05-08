@@ -192,8 +192,9 @@ fn integration_canary_parse_and_verify_accepts_well_dated_manifest() {
     let (signed, bytes) =
         build_manifest(&unsigned, &publisher_key, &now).expect("build_manifest must succeed");
 
-    let parsed =
-        parse_and_verify_manifest(&bytes, &now).expect("manifest within skew must be accepted");
+    let parsed = parse_and_verify_manifest(&bytes, &now)
+        .expect("manifest within skew must be accepted")
+        .skip_canary_check();
     assert_eq!(
         parsed, signed,
         "round-tripped manifest must equal builder output",

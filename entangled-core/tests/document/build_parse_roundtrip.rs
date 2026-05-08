@@ -19,7 +19,9 @@ fn manifest_round_trip() {
 
     let (manifest, bytes) =
         build_manifest(&unsigned, &publisher_key, &now).expect("build_manifest");
-    let parsed = parse_and_verify_manifest(&bytes, &now).expect("parse_and_verify_manifest");
+    let parsed = parse_and_verify_manifest(&bytes, &now)
+        .expect("parse_and_verify_manifest")
+        .skip_canary_check();
 
     assert_eq!(
         parsed, manifest,

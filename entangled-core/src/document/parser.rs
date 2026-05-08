@@ -20,17 +20,25 @@
 //! - **Stage 7 (trust state machine)** — TOFU pinning, externally-verified
 //!   identity, mismatch resolution. Out of scope for this crate; handled by
 //!   a higher-level client layer (e.g. a future `entangled-client`).
-//! - **Stage 8 (canary state and structure)** — call
+//! - **Stage 8 (canary state and structure)** — for manifests, traverse the
+//!   type-state chain returned by `parse_and_verify_manifest`: call
+//!   [`super::verified::ManifestSigVerified::verify_canary`], or opt out
+//!   explicitly via
+//!   [`super::verified::ManifestSigVerified::skip_canary_check`]. The
+//!   canary `issued_at` clock-skew check lives there, not in this parse
+//!   pipeline, because it is paired with the canary state machine
+//!   (fresh / stale / expired) and anti-downgrade comparisons against
+//!   previously seen canaries — neither of which is a closed-schema
+//!   concern. Standalone helpers
 //!   [`crate::validation::canary::validate_canary_structure`] and
-//!   [`crate::validation::canary::compute_canary_state`] explicitly after
-//!   `parse_and_verify_manifest` succeeds. The canary `issued_at`
-//!   clock-skew check lives there, not in this parse pipeline, because it
-//!   is paired with the canary state machine (fresh / stale / expired) and
-//!   anti-downgrade comparisons against previously seen canaries — neither
-//!   of which is a closed-schema concern.
-//! - **Stage 9 (binding)** — for manifests, call
-//!   [`crate::tor::verify_origin_binding`] to prove the carrier endpoint
-//!   matches `manifest.origin`. For content and transaction documents,
+//!   [`crate::validation::canary::compute_canary_state`] remain available
+//!   for callers operating on a `Manifest` not obtained from
+//!   `parse_and_verify_manifest`.
+//! - **Stage 9 (binding)** — for manifests, traverse the chain via
+//!   [`super::verified::ManifestCanaryChecked::verify_origin`] (or opt out
+//!   via [`super::verified::ManifestCanaryChecked::skip_origin_check`]).
+//!   The standalone [`crate::tor::verify_origin_binding`] helper remains
+//!   available. For content and transaction documents,
 //!   path/in-response-to binding is the caller's check too.
 //! - **Stage 10 (rendering decisions)** — chrome and UI concerns.
 //!
@@ -39,6 +47,21 @@
 //! does not depend on history or trust state. Stage 8's canary check
 //! depends on both, so it is exposed as a separate helper rather than
 //! folded into the parse pipeline.
+//!
+//! ## Manifest type-state chain
+//!
+//! `parse_and_verify_manifest` returns a [`super::verified::ManifestSigVerified`]
+//! type-state wrapper rather than a bare [`crate::types::Manifest`]. To
+//! extract a bare `Manifest`, the caller traverses the chain via
+//! `verify_canary` and
+//! `verify_origin`, or opts out explicitly via the corresponding `skip_*`
+//! methods. This forces the caller to consider Stage 8 and Stage 9 of §10
+//! at compile time.
+//!
+//! Content and transaction documents return bare [`ContentDocument`] and
+//! [`TransactionDocument`] because their signature verification already
+//! binds them to a specific path or `in_response_to`, leaving less surface
+//! for stage omission.
 //!
 //! The parser only proves that whoever signed the manifest knew the private
 //! key matching `manifest.publisher_pubkey` — it does not prove that this
@@ -65,7 +88,6 @@ use crate::canon::{
 use crate::crypto::{CryptoError, VerifyingKey};
 use crate::types::document::{ContentDocument, TransactionDocument};
 use crate::types::keys::RuntimePubkey;
-use crate::types::manifest::Manifest;
 use crate::types::timestamp::EntangledTimestamp;
 use crate::validation::schema::{
     parse_and_validate_content, parse_and_validate_manifest, parse_and_validate_transaction,
@@ -73,13 +95,25 @@ use crate::validation::schema::{
 use crate::validation::{Diagnostic, DiagnosticCode, DocumentKindLabel};
 
 use super::envelope::extract_sig;
+use super::verified::ManifestSigVerified;
 
 /// Parse, validate, and self-verify a manifest envelope.
 ///
-/// The verification key is `manifest.publisher_pubkey` — the parser performs
-/// "Stage 6 self-verification" only. Stage 7 trust-state resolution
-/// (TOFU pinning, externally verified PIP, mismatch detection) is the
-/// caller's responsibility.
+/// Returns a [`ManifestSigVerified`] type-state wrapper. To extract the
+/// bare [`crate::types::Manifest`], traverse the chain via
+/// [`ManifestSigVerified::verify_canary`] (Stage 8) and
+/// [`super::verified::ManifestCanaryChecked::verify_origin`] (Stage 9), or
+/// opt out explicitly via [`ManifestSigVerified::skip_canary_check`] /
+/// [`super::verified::ManifestCanaryChecked::skip_origin_check`]. The
+/// `#[must_use]` annotation on each wrapper produces a compile-time
+/// warning when the chain is dropped without being either advanced or
+/// explicitly skipped.
+///
+/// The verification key is `manifest.publisher_pubkey` — the parser
+/// performs "Stage 6 self-verification" only. Stage 7 trust-state
+/// resolution (TOFU pinning, externally verified PIP, mismatch detection)
+/// remains the caller's responsibility, after the chain has been
+/// completed.
 ///
 /// `now` is the local wall-clock time used for the §06 / §10 clock-skew
 /// check on `manifest.updated` (Stage 5). Pass a deterministic timestamp in
@@ -89,7 +123,7 @@ use super::envelope::extract_sig;
 pub fn parse_and_verify_manifest(
     raw: &[u8],
     now: &EntangledTimestamp,
-) -> Result<Manifest, Diagnostic> {
+) -> Result<ManifestSigVerified, Diagnostic> {
     let manifest = parse_and_validate_manifest(raw, now)?;
     let mut value = serde_json::to_value(&manifest).map_err(|e| {
         Diagnostic::new(
@@ -116,7 +150,7 @@ pub fn parse_and_verify_manifest(
         .map_err(|e| crypto_to_diagnostic(e, DocumentKindLabel::Manifest))?;
     vk.verify(&input, &sig)
         .map_err(|e| crypto_to_diagnostic(e, DocumentKindLabel::Manifest))?;
-    Ok(manifest)
+    Ok(ManifestSigVerified::new(manifest))
 }
 
 /// Parse, validate, and verify a content document against the supplied

@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking**: `parse_and_verify_manifest` now returns `ManifestSigVerified`
+  (a type-state wrapper) instead of a bare `Manifest`. The caller traverses
+  the pipeline via `verify_canary` (Stage 8) and `verify_origin` (Stage 9),
+  or explicitly opts out via `skip_canary_check` / `skip_origin_check`.
+  This enforces, at compile time, that every caller has considered every
+  applicable stage of §10. The wrappers carry `#[must_use]`, so dropping
+  the result without traversing or skipping is a hard error in CI under
+  `-D warnings`. Stage 7 (trust state) remains delegated to the calling
+  client. Standalone helpers `validate_canary_structure`,
+  `compute_canary_state`, and `verify_origin_binding` remain public for
+  callers operating on manifests obtained from sources other than
+  `parse_and_verify_manifest` (test harnesses, conformance corpus
+  runners, mock servers).
+
+  Migration: a callsite that previously did
+  `parse_and_verify_manifest(bytes, now)?.publisher_pubkey` becomes
+  `parse_and_verify_manifest(bytes, now)?.manifest().publisher_pubkey`.
+  A callsite that needs the full Stage 6+8+9 chain becomes
+  `parse_and_verify_manifest(bytes, now)?.verify_canary(now)?.verify_origin(fetched)?.into_parts()`.
+  Callers that only need the bare `Manifest` (offline tooling, batch
+  validators, tests) call `.skip_canary_check()` after Stage 6.
+
 ## [0.2.0] - 2026-05-07
 
 ### Fixed (pre-release audit, AUDIT-2026-05)

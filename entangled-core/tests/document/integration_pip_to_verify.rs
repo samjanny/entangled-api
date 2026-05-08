@@ -25,10 +25,12 @@ fn pip_round_trip_to_verified_manifest() {
         "PIP must yield the same pubkey byte-for-byte",
     );
 
-    // The same PIP-recovered pubkey appears in the verified manifest.
+    // The same PIP-recovered pubkey appears in the verified manifest. We
+    // only need to inspect the publisher pubkey here, so we read it through
+    // the type-state wrapper without consuming it.
     let parsed = parse_and_verify_manifest(&bytes, &now).expect("parse_and_verify");
     assert_eq!(
-        parsed.publisher_pubkey.as_bytes(),
+        parsed.manifest().publisher_pubkey.as_bytes(),
         recovered.as_bytes(),
         "verified manifest pubkey must equal PIP-recovered pubkey",
     );
