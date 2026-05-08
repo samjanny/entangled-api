@@ -173,9 +173,7 @@ fn validate_carrier_url(carrier: Carrier, url: &str) -> Result<(), Diagnostic> {
                 Diagnostic::new(
                     DiagnosticCode::ESchemaFieldSyntax,
                     DocumentKindLabel::None,
-                    format!(
-                        "carrier url host {host:?} is not a valid tor-v3 .onion address: {e}"
-                    ),
+                    format!("carrier url host {host:?} is not a valid tor-v3 .onion address: {e}"),
                 )
             })?;
         }

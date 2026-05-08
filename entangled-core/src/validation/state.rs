@@ -5,9 +5,9 @@
 //! to a later phase and require the current manifest at evaluation time.
 //!
 //! Note: an unknown `op` value in a state update produces a serde
-//! deserialization error mapped to `E_SCHEMA_FIELD_TYPE` at Stage 5; the
-//! dedicated `E_STATE_OP` code is reserved for state-update operation
-//! processing in later phases.
+//! deserialization error mapped to `E_SCHEMA_ENUM_VIOLATION` at Stage 5
+//! (§11 closed-enum violation); the dedicated `E_STATE_OP` code is
+//! reserved for state-update operation processing in later phases.
 
 use std::collections::HashSet;
 

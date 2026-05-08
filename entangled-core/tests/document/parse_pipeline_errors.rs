@@ -98,10 +98,10 @@ fn stage5_malformed_sig_string_rejected() {
     }
     let altered = serde_json::to_vec(&value).unwrap();
     let err = parse_and_verify_manifest(&altered, &fixed_now()).expect_err("must reject");
-    // Observed: Signature::try_from emits "expected 86 base64url characters
-    // (no padding), got 9", which the serde-error mapping in
-    // validation::schema classifies as E_SCHEMA_FIELD_LENGTH at Stage 5.
-    assert_eq!(err.code, DiagnosticCode::ESchemaFieldLength);
+    // §11 (rc.9): on the wire, a `sig` whose length or alphabet is wrong is
+    // a Stage 5 base64url-syntax violation. `E_SIG_MALFORMED` only applies in
+    // non-wire contexts where Stage 5 field-syntax validation does not run.
+    assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
 }
 
 #[test]

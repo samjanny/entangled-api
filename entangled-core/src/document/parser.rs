@@ -79,19 +79,19 @@
 //! key matching `manifest.publisher_pubkey` — it does not prove that this
 //! pubkey is the one the user expects.
 //!
-//! ## Known limitation: Stage 5 / Stage 6 boundary for `sig` shape
+//! ## Stage 5 / Stage 6 boundary for `sig` shape
 //!
-//! A `sig` field that is a string but has the wrong length or non-base64url
-//! contents fails inside `serde_json::from_value` while deserializing the
-//! [`crate::types::keys::Signature`] newtype. That happens during Stage 5
-//! (the closed-schema deserialization step), so the diagnostic is reported
-//! as `E_SCHEMA_FIELD_LENGTH` / `E_SCHEMA_FIELD_SYNTAX` — *not* the
-//! `E_SIG_MALFORMED` code that §11 reserves for Stage 6. Strict adherence
-//! would require splitting deserialization into two passes (read `sig` as a
-//! generic string at Stage 5, decode it as Ed25519 at Stage 6); we accept
-//! the current behavior as a documented deviation and may revisit it during
-//! the final cleanup pass. The pipeline still rejects the document with the
-//! correct severity and stage range — only the specific code differs.
+//! Per §11 (rc.9), a `sig` field received on the wire whose length or
+//! base64url alphabet is wrong is a Stage 5 schema violation reported as
+//! `E_SCHEMA_FIELD_SYNTAX`. `E_SIG_MALFORMED` is reserved for the off-wire
+//! case where the same decoding is attempted in a context where Stage 5
+//! field-syntax validation does not apply (e.g. signatures handed to
+//! [`crate::document::extract_sig`] from a non-pipeline source). The
+//! pipeline already runs the schema deserializer first, so on the wire the
+//! malformed-sig path is reached as Stage 5 syntax — the
+//! [`crate::types::keys::Signature`] newtype's decoder errors flow through
+//! [`crate::validation::schema`]'s serde-error mapper and surface as
+//! `E_SCHEMA_FIELD_SYNTAX`.
 
 use crate::canon::{
     build_content_signature_input, build_manifest_signature_input,

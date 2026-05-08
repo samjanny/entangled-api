@@ -358,8 +358,10 @@ pub(crate) fn validate_transaction_fields(
 // Pre-pass over the parsed Value
 // -----------------------------------------------------------------------------
 
-/// Detects `null` literals and non-integer numbers anywhere in the document.
-/// §0.10: null and float values are forbidden in Entangled wire form.
+/// Detects `null` literals and out-of-grammar numbers anywhere in the
+/// document. §04 v1.0-rc.5: floats and integers outside the 64-bit signed
+/// range are rejected lexically with `E_SCHEMA_NON_INTEGER` before any
+/// schema-level type/range check fires.
 fn schema_prepass(root: &Value, kind: DocumentKindLabel) -> Result<(), Diagnostic> {
     let mut stack: Vec<&Value> = vec![root];
     while let Some(node) = stack.pop() {
@@ -376,6 +378,20 @@ fn schema_prepass(root: &Value, kind: DocumentKindLabel) -> Result<(), Diagnosti
                     DiagnosticCode::ESchemaNonInteger,
                     kind,
                     format!("non-integer numeric value: {n}"),
+                ));
+            }
+            // §04 v1.0-rc.5: the protocol's integer grammar is 64-bit
+            // signed. Values strictly above i64::MAX (e.g. 2^63 written as
+            // a JSON literal) are not representable in the grammar; they
+            // are reported as `E_SCHEMA_NON_INTEGER` at Stage 5 — the
+            // rejection precedes serde's per-field range narrowing
+            // (`u32::deserialize`) so the diagnostic matches the lexical
+            // failure rather than a downstream field-range failure.
+            Value::Number(n) if n.as_i64().is_none() && !n.is_f64() => {
+                return Err(Diagnostic::new(
+                    DiagnosticCode::ESchemaNonInteger,
+                    kind,
+                    format!("integer literal {n} exceeds the 64-bit signed range"),
                 ));
             }
             Value::Array(arr) => {
@@ -414,14 +430,28 @@ fn map_serde_err(err: serde_json::Error, kind: DocumentKindLabel) -> Diagnostic 
         DiagnosticCode::ESchemaRequiredField
     } else if msg.contains("unknown field") {
         DiagnosticCode::ESchemaUnknownField
+    } else if msg.contains("unknown variant") {
+        // serde reports a closed-enum miss (e.g. block `kind: "marquee"`,
+        // unknown state-policy `mode`, unknown feedback `variant`) as
+        // "unknown variant". §11 (rc.9) classifies this as
+        // `E_SCHEMA_ENUM_VIOLATION`, distinct from purely syntactic field
+        // violations (`E_SCHEMA_FIELD_SYNTAX`).
+        DiagnosticCode::ESchemaEnumViolation
     } else if msg.contains("invalid type") {
         DiagnosticCode::ESchemaFieldType
     } else if is_range_message(&msg) {
         DiagnosticCode::ESchemaFieldRange
+    } else if is_syntax_message(&msg) {
+        // §04 / §11 (rc.9): base64url and ASCII-fixed-form length violations
+        // (e.g. a 43-char `sig` instead of 86) are reported at Stage 5 as
+        // `E_SCHEMA_FIELD_SYNTAX`, not `E_SCHEMA_FIELD_LENGTH`. The dedicated
+        // length code is reserved for fields whose syntax permits a variable
+        // size up to a declared cap (navigation labels, list aggregates,
+        // submit-form arrays, etc.). Order matters here: detect base64url /
+        // syntax messages before the generic length heuristic.
+        DiagnosticCode::ESchemaFieldSyntax
     } else if is_length_message(&msg) {
         DiagnosticCode::ESchemaFieldLength
-    } else if is_syntax_message(&msg) {
-        DiagnosticCode::ESchemaFieldSyntax
     } else {
         DiagnosticCode::ESchemaFieldType
     };

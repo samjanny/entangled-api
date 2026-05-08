@@ -40,6 +40,7 @@ fn all_codes_round_trip_via_json() {
         DiagnosticCode::ESchemaFieldType,
         DiagnosticCode::ESchemaFieldRange,
         DiagnosticCode::ESchemaFieldSyntax,
+        DiagnosticCode::ESchemaEnumViolation,
         DiagnosticCode::ESchemaFieldLength,
         DiagnosticCode::ESchemaNullValue,
         DiagnosticCode::ESchemaNonInteger,

@@ -119,6 +119,8 @@ pub enum DiagnosticCode {
     ESchemaFieldRange,
     #[serde(rename = "E_SCHEMA_FIELD_SYNTAX")]
     ESchemaFieldSyntax,
+    #[serde(rename = "E_SCHEMA_ENUM_VIOLATION")]
+    ESchemaEnumViolation,
     #[serde(rename = "E_SCHEMA_FIELD_LENGTH")]
     ESchemaFieldLength,
     #[serde(rename = "E_SCHEMA_NULL_VALUE")]
@@ -286,6 +288,7 @@ impl DiagnosticCode {
             | ESchemaFieldType
             | ESchemaFieldRange
             | ESchemaFieldSyntax
+            | ESchemaEnumViolation
             | ESchemaFieldLength
             | ESchemaNullValue
             | ESchemaNonInteger

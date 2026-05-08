@@ -49,7 +49,14 @@ fn build_with_two_request_entries() {
         policy_entry("session", "auth", StateMode::Request, 512, 86_400),
         policy_entry("session", "csrf", StateMode::Request, 512, 86_400),
     ];
-    let body = build_submit_body(BTreeMap::new(), &mut store, &pub_a, &policy, &now, rid_zero());
+    let body = build_submit_body(
+        BTreeMap::new(),
+        &mut store,
+        &pub_a,
+        &policy,
+        &now,
+        rid_zero(),
+    );
     assert_eq!(body.fields.len(), 0);
     assert_eq!(body.request_state.len(), 2);
 }

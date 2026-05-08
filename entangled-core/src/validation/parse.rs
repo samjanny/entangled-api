@@ -107,10 +107,7 @@ fn enforce_integer_grammar(input: &str) -> Result<(), Diagnostic> {
                 let start = i;
                 i += 1;
                 while i < bytes.len()
-                    && matches!(
-                        bytes[i],
-                        b'0'..=b'9' | b'.' | b'e' | b'E' | b'+' | b'-'
-                    )
+                    && matches!(bytes[i], b'0'..=b'9' | b'.' | b'e' | b'E' | b'+' | b'-')
                 {
                     i += 1;
                 }
@@ -123,6 +120,16 @@ fn enforce_integer_grammar(input: &str) -> Result<(), Diagnostic> {
 }
 
 /// Validate a single numeric token against §04's integer grammar.
+///
+/// §04 (rc.5) defines the protocol's numeric domain as
+/// `integer = "0" / non-zero-digit *digit` with a value range
+/// `[0, 2^63 - 1]`. Any token that fails this grammar — float-shaped,
+/// negative, or out of range — is rejected with `E_SCHEMA_NON_INTEGER`
+/// per §04 line 95 ("A document containing a numeric token that fails
+/// the integer grammar is rejected with `E_SCHEMA_NON_INTEGER`").
+/// `E_SCHEMA_FIELD_RANGE` is reserved for in-grammar integers that
+/// exceed a specific field's narrower range (e.g. `heading.level = 7`
+/// when the field permits `1..=6`).
 fn check_integer_token(token: &str) -> Result<(), Diagnostic> {
     if token
         .bytes()
@@ -136,27 +143,25 @@ fn check_integer_token(token: &str) -> Result<(), Diagnostic> {
     }
     if let Some(rest) = token.strip_prefix('-') {
         return Err(Diagnostic::new(
-            DiagnosticCode::ESchemaFieldRange,
+            DiagnosticCode::ESchemaNonInteger,
             DocumentKindLabel::None,
             if rest == "0" {
                 format!("negative-zero numeric token {token:?} is not in the integer grammar")
             } else {
-                format!(
-                    "negative integer {token:?} is not in the protocol range [0, 2^63 - 1]"
-                )
+                format!("negative integer {token:?} is not in the protocol range [0, 2^63 - 1]")
             },
         ));
     }
     let value: u64 = token.parse().map_err(|_| {
         Diagnostic::new(
-            DiagnosticCode::ESchemaFieldRange,
+            DiagnosticCode::ESchemaNonInteger,
             DocumentKindLabel::None,
             format!("integer token {token:?} exceeds the protocol range [0, 2^63 - 1]"),
         )
     })?;
     if value > i64::MAX as u64 {
         return Err(Diagnostic::new(
-            DiagnosticCode::ESchemaFieldRange,
+            DiagnosticCode::ESchemaNonInteger,
             DocumentKindLabel::None,
             format!("integer {value} exceeds the protocol range [0, 2^63 - 1]"),
         ));

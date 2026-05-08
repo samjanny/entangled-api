@@ -52,8 +52,7 @@ fn mismatched_path_emits_bind_response_path() {
     tx.request_id = rid;
     tx.request_hash = sha256_request(&canonicalize(&serde_json::to_value(&body).unwrap()).unwrap());
 
-    let err =
-        verify_transaction_binding(&tx, &path("/contact"), &body).expect_err("path mismatch");
+    let err = verify_transaction_binding(&tx, &path("/contact"), &body).expect_err("path mismatch");
     assert_eq!(err.code, DiagnosticCode::EBindResponsePath);
     let details = err.details.as_ref().expect("details payload");
     assert_eq!(details["expected"].as_str(), Some("/contact"));
@@ -72,8 +71,8 @@ fn mismatched_request_id_emits_bind_request_id() {
     tx.request_id = RequestId::from_bytes([1u8; 16]); // differs from body_rid
     tx.request_hash = sha256_request(&canonical);
 
-    let err = verify_transaction_binding(&tx, &path("/contact"), &body)
-        .expect_err("request_id mismatch");
+    let err =
+        verify_transaction_binding(&tx, &path("/contact"), &body).expect_err("request_id mismatch");
     assert_eq!(err.code, DiagnosticCode::EBindRequestId);
     let details = err.details.as_ref().expect("details payload");
     assert!(details["expected"].as_str().is_some());

@@ -1,13 +1,15 @@
 # Conformance corpus integration
 
-The Entangled v1.0 conformance corpus is distributed separately from this implementation.
-When the corpus becomes available, place the corpus archive under
-`tests/conformance/corpus/` (gitignored) and add tests in this directory that:
+The Entangled v1.0 conformance corpus is vendored at the workspace root
+under `docs-spec/corpus/`. The harness in this directory loads
+`corpus.json`, mocks the implementation clock to its top-level `clock_now`
+field, and runs every vector through the appropriate
+`parse_and_verify_*` plus, where context dictates, Stage 8 canary checks
+and Stage 9 binding.
 
-1. enumerate the corpus files;
-2. for each file, parse it with the appropriate `parse_and_verify_*` function;
-3. check that the outcome (accept or reject with specific diagnostic code) matches the expected outcome encoded in the corpus.
+A single integration test — `corpus_vectors_match_spec` — fails on the
+first divergence with a message naming the vector id.
 
-The corpus is not vendored in this repository. Each test run reads from a local copy.
-
-This file is intentionally minimal until the corpus exists.
+```
+cargo test --test conformance
+```

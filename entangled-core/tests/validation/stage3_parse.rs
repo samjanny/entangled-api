@@ -103,24 +103,30 @@ fn duplicate_object_key_nested_rejected() {
 #[test]
 fn negative_zero_token_rejected() {
     // §04 v1.0-rc.5: `-0` is not in the grammar `"0" / non-zero-digit *digit`
-    // and conflates with positive zero in many JSON readers. Reject lexically.
+    // and conflates with positive zero in many JSON readers. Reject lexically
+    // with `E_SCHEMA_NON_INTEGER` per §04: any token that fails the integer
+    // grammar is non-integer, regardless of why.
     let err = parse_with_limits(r#"{"v": -0}"#).unwrap_err();
-    assert_eq!(err.code, DiagnosticCode::ESchemaFieldRange);
+    assert_eq!(err.code, DiagnosticCode::ESchemaNonInteger);
 }
 
 #[test]
 fn negative_integer_token_rejected() {
-    // No Entangled wire-format field accepts negative integers; the grammar
-    // pins the value range to [0, 2^63 - 1].
+    // §04: protocol numeric domain is non-negative integers in [0, 2^63 - 1].
+    // A negative token fails the grammar → `E_SCHEMA_NON_INTEGER`.
     let err = parse_with_limits(r#"{"v": -42}"#).unwrap_err();
-    assert_eq!(err.code, DiagnosticCode::ESchemaFieldRange);
+    assert_eq!(err.code, DiagnosticCode::ESchemaNonInteger);
 }
 
 #[test]
 fn integer_above_i64_max_rejected() {
-    // 2^63 fits in u64 but exceeds the protocol range [0, 2^63 - 1].
+    // §04 / corpus rc.9 vector 142: 2^63 fits in u64 but exceeds the
+    // protocol's signed 64-bit grammar; the value is not representable in
+    // the integer grammar and is rejected with `E_SCHEMA_NON_INTEGER` (not
+    // `E_SCHEMA_FIELD_RANGE`, which is reserved for in-grammar integers
+    // exceeding a narrower per-field range).
     let err = parse_with_limits(r#"{"v": 9223372036854775808}"#).unwrap_err();
-    assert_eq!(err.code, DiagnosticCode::ESchemaFieldRange);
+    assert_eq!(err.code, DiagnosticCode::ESchemaNonInteger);
 }
 
 #[test]
