@@ -58,6 +58,16 @@
 //! methods. This forces the caller to consider Stage 8 and Stage 9 of §10
 //! at compile time.
 //!
+//! The `Manifest` type itself is not accessible through the wrappers;
+//! only field-level accessors are exposed via the
+//! [`super::verified::ManifestRead`] trait pre-canary, with
+//! [`crate::types::Canary`] access available post-canary. To obtain a
+//! `Manifest` value, callers must complete the chain via
+//! [`super::verified::ManifestOriginBound::into_parts`] or explicitly
+//! opt out of further stages via
+//! [`super::verified::ManifestSigVerified::skip_canary_check`] /
+//! [`super::verified::ManifestCanaryChecked::skip_origin_check`].
+//!
 //! Content and transaction documents return bare [`ContentDocument`] and
 //! [`TransactionDocument`] because their signature verification already
 //! binds them to a specific path or `in_response_to`, leaving less surface

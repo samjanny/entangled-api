@@ -12,10 +12,20 @@
 //! warning under `#[warn(unused_must_use)]` (and a hard error in CI under
 //! `-D warnings`). See the `compile_fail` doctest in
 //! `entangled-core/src/document/verified.rs` for the must_use canary.
+//!
+//! Closing the related `manifest().clone()` bypass — i.e. the
+//! short-circuit that previously let a caller obtain a bare `Manifest`
+//! without traversing Stage 8 / Stage 9 — is enforced by the
+//! `compile_fail` doctests on `ManifestRead` in
+//! `entangled-core/src/document/verified.rs`, which assert that
+//! `wrapper.manifest()` does not resolve for any of the three wrapper
+//! types.
 
 use data_encoding::BASE32;
 use entangled_core::crypto::SigningKey;
-use entangled_core::document::{build_manifest, parse_and_verify_manifest, UnsignedManifest};
+use entangled_core::document::{
+    build_manifest, parse_and_verify_manifest, ManifestRead, UnsignedManifest,
+};
 use entangled_core::types::canary::Canary;
 use entangled_core::types::keys::{OriginPubkey, SpecVersion};
 use entangled_core::types::manifest::{Carrier, Manifest, OnionAddress, Origin};
@@ -153,29 +163,51 @@ fn manifest_and_canary_state_readable_pre_into_parts() {
         .verify_canary(&fixed_now())
         .expect("Stage 8");
 
-    // Read-only access on `ManifestCanaryChecked` does not consume the wrapper.
-    assert_eq!(canary_checked.manifest(), &built);
+    // Field-level read-only access via `ManifestRead` and the
+    // post-canary `canary()` accessor — neither consumes the wrapper, and
+    // neither hands out a bare `&Manifest`.
+    assert_eq!(canary_checked.publisher_pubkey(), &built.publisher_pubkey);
+    assert_eq!(canary_checked.origin(), &built.origin);
+    assert_eq!(canary_checked.state_policy(), built.state_policy.as_slice());
+    assert_eq!(canary_checked.navigation(), built.navigation.as_slice());
+    assert_eq!(
+        canary_checked.min_refresh_interval(),
+        built.min_refresh_interval
+    );
+    assert_eq!(canary_checked.updated(), &built.updated);
+    assert_eq!(canary_checked.canary(), &built.canary);
     assert_eq!(canary_checked.canary_state(), CanaryState::Fresh);
 
     // Same for `ManifestOriginBound`.
     let origin_bound = canary_checked.verify_origin(&onion).expect("Stage 9");
-    assert_eq!(origin_bound.manifest(), &built);
+    assert_eq!(origin_bound.publisher_pubkey(), &built.publisher_pubkey);
+    assert_eq!(origin_bound.origin(), &built.origin);
+    assert_eq!(origin_bound.canary(), &built.canary);
     assert_eq!(origin_bound.canary_state(), CanaryState::Fresh);
 
-    // `into_parts` finally consumes.
+    // `into_parts` finally consumes and yields the bare `Manifest`.
     let (m, s) = origin_bound.into_parts();
     assert_eq!(m, built);
     assert_eq!(s, CanaryState::Fresh);
 }
 
 #[test]
-fn sig_verified_wrapper_exposes_manifest_for_read() {
+fn sig_verified_wrapper_exposes_field_level_reads() {
     let (built, bytes, _onion) = build_default_consistent_manifest();
 
     let sig_verified = parse_and_verify_manifest(&bytes, &fixed_now()).expect("Stage 6");
-    // The wrapper exposes a borrow of the underlying manifest so callers
-    // can read e.g. `state_policy` before deciding to traverse further.
-    assert_eq!(sig_verified.manifest(), &built);
+    // The wrapper exposes field-level borrows via `ManifestRead` so
+    // callers can read e.g. `state_policy` before deciding to traverse
+    // further. The bare `Manifest` is intentionally unreachable here.
+    assert_eq!(sig_verified.publisher_pubkey(), &built.publisher_pubkey);
+    assert_eq!(sig_verified.origin(), &built.origin);
+    assert_eq!(sig_verified.state_policy(), built.state_policy.as_slice());
+    assert_eq!(sig_verified.navigation(), built.navigation.as_slice());
+    assert_eq!(
+        sig_verified.min_refresh_interval(),
+        built.min_refresh_interval
+    );
+    assert_eq!(sig_verified.updated(), &built.updated);
 
     // We still need to consume the wrapper for the chain to be considered
     // resolved (must_use compliance); skip_canary_check is the explicit

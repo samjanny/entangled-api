@@ -25,11 +25,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Migration: a callsite that previously did
   `parse_and_verify_manifest(bytes, now)?.publisher_pubkey` becomes
-  `parse_and_verify_manifest(bytes, now)?.manifest().publisher_pubkey`.
-  A callsite that needs the full Stage 6+8+9 chain becomes
+  `parse_and_verify_manifest(bytes, now)?.publisher_pubkey()` (with
+  `use entangled_core::document::ManifestRead;` in scope; see entry
+  below). A callsite that needs the full Stage 6+8+9 chain becomes
   `parse_and_verify_manifest(bytes, now)?.verify_canary(now)?.verify_origin(fetched)?.into_parts()`.
   Callers that only need the bare `Manifest` (offline tooling, batch
   validators, tests) call `.skip_canary_check()` after Stage 6.
+
+- **Breaking**: `ManifestSigVerified` and `ManifestCanaryChecked` no longer
+  expose a `manifest(&self) -> &Manifest` accessor. The bare `Manifest`
+  is reachable only via `into_parts()` after the full chain, or via the
+  explicit `skip_canary_check` / `skip_origin_check` opt-outs. Pre-chain
+  field access is provided through the new `ManifestRead` trait
+  (`publisher_pubkey`, `origin`, `state_policy`, `navigation`,
+  `min_refresh_interval`, `updated`) on all three wrapper types;
+  `canary()` is exposed directly on `ManifestCanaryChecked` and
+  `ManifestOriginBound`. The trait is sealed (cannot be implemented
+  outside the crate) so its surface cannot be widened to smuggle out a
+  `&Manifest`. This closes a structural gap identified in the
+  post-Phase-9 audit: the previous `manifest()` accessor combined with
+  `Manifest: Clone` allowed
+  `parse_and_verify_manifest(...)?.manifest().clone()` to obtain a bare
+  `Manifest` without traversing Stage 8 / Stage 9, contradicting the
+  crate-level claim that the chain is enforced "at compile time".
+  (AUDIT-2026-05 follow-up #2.)
 
 ## [0.2.0] - 2026-05-07
 

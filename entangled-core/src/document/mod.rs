@@ -14,6 +14,13 @@
 //! [`ManifestCanaryChecked::verify_origin`], or to opt out via the
 //! corresponding `skip_*` methods. Stage 7 (trust state) remains the
 //! caller's responsibility, applied after the chain completes.
+//!
+//! The wrappers do not expose the bare [`crate::types::Manifest`]; only
+//! field-level accessors are exposed via the [`ManifestRead`] trait
+//! pre-canary, with [`crate::types::Canary`] access available
+//! post-canary. To obtain a `Manifest` value, callers must complete the
+//! chain via [`ManifestOriginBound::into_parts`] or explicitly opt out
+//! of further stages via `skip_canary_check` / `skip_origin_check`.
 
 pub mod builder;
 pub mod envelope;
@@ -29,4 +36,4 @@ pub use parser::{
     parse_and_verify_content, parse_and_verify_manifest, parse_and_verify_transaction,
 };
 pub use unsigned::{UnsignedContent, UnsignedManifest, UnsignedTransaction};
-pub use verified::{ManifestCanaryChecked, ManifestOriginBound, ManifestSigVerified};
+pub use verified::{ManifestCanaryChecked, ManifestOriginBound, ManifestRead, ManifestSigVerified};

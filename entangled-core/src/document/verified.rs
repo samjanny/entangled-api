@@ -14,6 +14,16 @@
 //! Stage 7 (trust state machine) remains entirely the caller's
 //! responsibility, after the chain has been completed.
 //!
+//! The [`Manifest`] type itself is not accessible through the wrappers;
+//! only field-level accessors are exposed via the [`ManifestRead`] trait
+//! pre-canary, with [`Canary`] access available post-canary. To obtain a
+//! `Manifest` value, callers must complete the chain via
+//! [`ManifestOriginBound::into_parts`] or explicitly opt out of further
+//! stages via [`ManifestSigVerified::skip_canary_check`] /
+//! [`ManifestCanaryChecked::skip_origin_check`]. This closes the
+//! `manifest().clone()` bypass that an earlier draft of the wrappers
+//! permitted.
+//!
 //! For callers who already hold a [`Manifest`] obtained from a source
 //! other than `parse_and_verify_manifest` (test harnesses, conformance
 //! corpus runners, mock servers), the standalone helpers
@@ -23,14 +33,112 @@
 //! escape hatch.
 
 use crate::tor::verify_origin_binding;
+use crate::types::canary::Canary;
+use crate::types::keys::PublisherPubkey;
+use crate::types::manifest::{NavEntry, Origin};
+use crate::types::state::StatePolicyEntry;
 use crate::types::{EntangledTimestamp, Manifest, OnionAddress};
 use crate::validation::canary::{compute_canary_state, validate_canary_structure, CanaryState};
 use crate::validation::diagnostic::Diagnostic;
+
+mod sealed {
+    use crate::types::Manifest;
+
+    /// Sealed supertrait for [`super::ManifestRead`]: only types declared
+    /// in this module can implement it, so third-party crates cannot widen
+    /// the trait surface or smuggle out a bare `&Manifest`.
+    pub trait HasManifest {
+        fn manifest_ref(&self) -> &Manifest;
+    }
+}
+
+/// Field-level read access shared by the three manifest type-state
+/// wrappers. The trait is sealed: it cannot be implemented outside this
+/// crate, and it deliberately does not expose a `&Manifest` accessor —
+/// callers obtain a bare [`Manifest`] only by completing the chain via
+/// [`ManifestOriginBound::into_parts`] or by explicitly opting out via
+/// [`ManifestSigVerified::skip_canary_check`] /
+/// [`ManifestCanaryChecked::skip_origin_check`].
+///
+/// # `manifest().clone()` bypass is structurally impossible
+///
+/// The wrappers used to expose a `manifest(&self) -> &Manifest`
+/// accessor; combined with `Manifest: Clone`, that allowed a caller to
+/// short-circuit the chain via
+/// `parse_and_verify_manifest(...)?.manifest().clone()` and obtain a
+/// bare `Manifest` without ever running Stage 8 / Stage 9. The accessor
+/// is gone. The three doctests below assert that each wrapper rejects
+/// the call at compile time:
+///
+/// ```compile_fail
+/// use entangled_core::document::parse_and_verify_manifest;
+/// use entangled_core::types::{EntangledTimestamp, Manifest};
+/// # fn _f(bytes: &[u8], now: &EntangledTimestamp) {
+/// let v = parse_and_verify_manifest(bytes, now).unwrap();
+/// let _: &Manifest = v.manifest(); // ERROR: no method named `manifest`
+/// # }
+/// ```
+///
+/// ```compile_fail
+/// use entangled_core::document::parse_and_verify_manifest;
+/// use entangled_core::types::{EntangledTimestamp, Manifest};
+/// # fn _f(bytes: &[u8], now: &EntangledTimestamp) {
+/// let v = parse_and_verify_manifest(bytes, now)
+///     .unwrap()
+///     .verify_canary(now)
+///     .unwrap();
+/// let _: &Manifest = v.manifest(); // ERROR: no method named `manifest`
+/// # }
+/// ```
+///
+/// ```compile_fail
+/// use entangled_core::document::parse_and_verify_manifest;
+/// use entangled_core::types::{EntangledTimestamp, Manifest, OnionAddress};
+/// # fn _f(bytes: &[u8], now: &EntangledTimestamp, addr: &OnionAddress) {
+/// let v = parse_and_verify_manifest(bytes, now)
+///     .unwrap()
+///     .verify_canary(now)
+///     .unwrap()
+///     .verify_origin(addr)
+///     .unwrap();
+/// let _: &Manifest = v.manifest(); // ERROR: no method named `manifest`
+/// # }
+/// ```
+pub trait ManifestRead: sealed::HasManifest {
+    /// Publisher long-term Ed25519 public key (§02 / §05).
+    fn publisher_pubkey(&self) -> &PublisherPubkey {
+        &self.manifest_ref().publisher_pubkey
+    }
+    /// Transport-carrier binding for this manifest (§02 / §05).
+    fn origin(&self) -> &Origin {
+        &self.manifest_ref().origin
+    }
+    /// Closed list of state-policy entries the publisher exposes (§07).
+    fn state_policy(&self) -> &[StatePolicyEntry] {
+        &self.manifest_ref().state_policy
+    }
+    /// Navigation entries surfaced in client UI (§02).
+    fn navigation(&self) -> &[NavEntry] {
+        &self.manifest_ref().navigation
+    }
+    /// Minimum interval (seconds) between manifest re-fetches the client
+    /// should observe (§02).
+    fn min_refresh_interval(&self) -> u32 {
+        self.manifest_ref().min_refresh_interval
+    }
+    /// Time at which the manifest was last updated (§02).
+    fn updated(&self) -> &EntangledTimestamp {
+        &self.manifest_ref().updated
+    }
+}
 
 /// Manifest after Stage 6 (signature verification) succeeded.
 ///
 /// The caller MUST proceed to Stage 8 via [`Self::verify_canary`] or
 /// MUST opt out via [`Self::skip_canary_check`].
+///
+/// Field-level reads are available via the [`ManifestRead`] trait. The
+/// bare [`Manifest`] is intentionally unreachable at this stage.
 ///
 /// # Must-use canary
 ///
@@ -63,16 +171,6 @@ impl ManifestSigVerified {
     /// from [`crate::document::parse_and_verify_manifest`].
     pub(crate) fn new(inner: Manifest) -> Self {
         Self { inner }
-    }
-
-    /// Read-only access to the verified manifest fields.
-    ///
-    /// This does not consume the wrapper. Use it to read
-    /// `publisher_pubkey`, `state_policy`, etc. while the chain is still
-    /// in progress (e.g. to initialize a state store with the policy
-    /// before completing canary and origin checks).
-    pub fn manifest(&self) -> &Manifest {
-        &self.inner
     }
 
     /// Stage 8: structural canary validation and state classification.
@@ -108,10 +206,22 @@ impl ManifestSigVerified {
     }
 }
 
+impl sealed::HasManifest for ManifestSigVerified {
+    fn manifest_ref(&self) -> &Manifest {
+        &self.inner
+    }
+}
+impl ManifestRead for ManifestSigVerified {}
+
 /// Manifest after Stages 6 and 8 succeeded.
 ///
 /// The caller MUST proceed to Stage 9 via [`Self::verify_origin`] or
 /// MUST opt out via [`Self::skip_origin_check`].
+///
+/// Field-level reads are available via the [`ManifestRead`] trait; the
+/// canary is additionally exposed via [`Self::canary`]. The bare
+/// [`Manifest`] remains unreachable until the chain completes (or is
+/// explicitly opted out of).
 #[derive(Debug)]
 #[must_use = "manifest verification is incomplete; call verify_origin or skip_origin_check"]
 pub struct ManifestCanaryChecked {
@@ -120,9 +230,9 @@ pub struct ManifestCanaryChecked {
 }
 
 impl ManifestCanaryChecked {
-    /// Read-only access to the verified manifest fields.
-    pub fn manifest(&self) -> &Manifest {
-        &self.inner
+    /// Borrow the validated canary block.
+    pub fn canary(&self) -> &Canary {
+        &self.inner.canary
     }
 
     /// Computed canary state (Fresh, NearExpiration, or Expired).
@@ -158,11 +268,23 @@ impl ManifestCanaryChecked {
     }
 }
 
+impl sealed::HasManifest for ManifestCanaryChecked {
+    fn manifest_ref(&self) -> &Manifest {
+        &self.inner
+    }
+}
+impl ManifestRead for ManifestCanaryChecked {}
+
 /// Manifest after Stages 6, 8, and 9 succeeded.
 ///
 /// This is the fully verified state. Stage 7 (trust state machine) and
 /// Stage 10 (rendering) remain the caller's responsibility, with this
 /// crate offering no further enforcement.
+///
+/// Field-level reads are available via the [`ManifestRead`] trait, plus
+/// [`Self::canary`] and [`Self::canary_state`]. To obtain the bare
+/// [`Manifest`] for downstream Stage 7 / Stage 10 handling, consume the
+/// wrapper via [`Self::into_parts`].
 #[derive(Debug)]
 pub struct ManifestOriginBound {
     inner: Manifest,
@@ -170,9 +292,9 @@ pub struct ManifestOriginBound {
 }
 
 impl ManifestOriginBound {
-    /// Read-only access to the verified manifest fields.
-    pub fn manifest(&self) -> &Manifest {
-        &self.inner
+    /// Borrow the validated canary block.
+    pub fn canary(&self) -> &Canary {
+        &self.inner.canary
     }
 
     /// Computed canary state (Fresh, NearExpiration, or Expired).
@@ -186,3 +308,10 @@ impl ManifestOriginBound {
         (self.inner, self.canary_state)
     }
 }
+
+impl sealed::HasManifest for ManifestOriginBound {
+    fn manifest_ref(&self) -> &Manifest {
+        &self.inner
+    }
+}
+impl ManifestRead for ManifestOriginBound {}

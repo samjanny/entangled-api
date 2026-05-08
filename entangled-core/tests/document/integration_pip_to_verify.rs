@@ -2,7 +2,7 @@
 //! pubkey and verify a manifest signature, with no external trust anchor.
 
 use entangled_core::crypto::{derive_pip, pip_to_pubkey, SigningKey};
-use entangled_core::document::{build_manifest, parse_and_verify_manifest};
+use entangled_core::document::{build_manifest, parse_and_verify_manifest, ManifestRead};
 
 use super::fixtures::unsigned_manifest_with_publisher;
 use crate::common::fixed_now;
@@ -30,7 +30,7 @@ fn pip_round_trip_to_verified_manifest() {
     // the type-state wrapper without consuming it.
     let parsed = parse_and_verify_manifest(&bytes, &now).expect("parse_and_verify");
     assert_eq!(
-        parsed.manifest().publisher_pubkey.as_bytes(),
+        parsed.publisher_pubkey().as_bytes(),
         recovered.as_bytes(),
         "verified manifest pubkey must equal PIP-recovered pubkey",
     );
