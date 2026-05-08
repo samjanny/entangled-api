@@ -2,14 +2,19 @@
 //!
 //! [`crate::document::parse_and_verify_manifest`] returns
 //! [`ManifestSigVerified`], not a bare [`Manifest`]. To extract the bare
-//! `Manifest`, the caller must traverse the pipeline explicitly via
+//! `Manifest`, the caller may complete the pipeline explicitly via
 //! [`ManifestSigVerified::verify_canary`] and
 //! [`ManifestCanaryChecked::verify_origin`], or opt out of further stages
 //! explicitly via [`ManifestSigVerified::skip_canary_check`] or
 //! [`ManifestCanaryChecked::skip_origin_check`].
 //!
-//! This pattern enforces structurally — at compile time — that every
-//! caller has considered every applicable stage of §10. It does not
+//! This pattern structurally prevents extraction of a bare `Manifest` from
+//! incomplete-stage states. A caller obtains a `Manifest` value only by
+//! completing the chain via `into_parts` or by an explicit
+//! `skip_canary_check` / `skip_origin_check` opt-out. Per-field reads
+//! through `ManifestRead` remain available on incomplete states because
+//! Stage 7 (trust state lookup, §10) precedes Stage 8 and may need them.
+//! It does not
 //! introduce trust storage, UI, or transport concerns into this crate;
 //! Stage 7 (trust state machine) remains entirely the caller's
 //! responsibility, after the chain has been completed.
@@ -142,11 +147,10 @@ pub trait ManifestRead: sealed::HasManifest {
 ///
 /// # Must-use canary
 ///
-/// `#[must_use]` makes the wrapper a compile-time canary against the
-/// "forgot Stage 8" foot-gun: dropping the result of
-/// [`crate::document::parse_and_verify_manifest`] without traversing the
-/// chain (or explicitly opting out via `skip_canary_check`) is a hard
-/// error under `-D warnings` (which CI enforces).
+/// `#[must_use]` warns when a wrapper is silently dropped without being
+/// used, catching the trivial "called but ignored" case. It does not
+/// prevent reading fields via `ManifestRead` and then dropping the
+/// wrapper — that flow is permitted by design.
 ///
 /// ```compile_fail
 /// #![deny(unused_must_use)]

@@ -50,6 +50,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   crate-level claim that the chain is enforced "at compile time".
   (AUDIT-2026-05 follow-up #2.)
 
+### Documentation
+
+- Documentation precision: clarified that the type-state pattern
+  structurally prevents extraction of a bare `Manifest` from
+  incomplete-stage states (via removal of the `manifest()` accessor),
+  but does not on its own force the caller to consider every Stage
+  8/9 outcome — `#[must_use]` only catches the trivial "called but
+  ignored" case. Per-field reads via `ManifestRead` are permitted on
+  incomplete states because Stage 7 (trust state lookup, §10)
+  precedes Stage 8. (AUDIT-2026-05 follow-up #3.)
+
 ## [0.2.0] - 2026-05-07
 
 ### Fixed (pre-release audit, AUDIT-2026-05)

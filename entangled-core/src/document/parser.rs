@@ -55,8 +55,10 @@
 //! extract a bare `Manifest`, the caller traverses the chain via
 //! `verify_canary` and
 //! `verify_origin`, or opts out explicitly via the corresponding `skip_*`
-//! methods. This forces the caller to consider Stage 8 and Stage 9 of §10
-//! at compile time.
+//! methods. The bare `Manifest` is reachable only by completing the chain
+//! (`into_parts`) or by explicit `skip_canary_check` / `skip_origin_check`
+//! opt-out, making Stage 8 / Stage 9 omission a deliberate choice rather
+//! than an oversight.
 //!
 //! The `Manifest` type itself is not accessible through the wrappers;
 //! only field-level accessors are exposed via the
@@ -115,9 +117,13 @@ use super::verified::ManifestSigVerified;
 /// [`super::verified::ManifestCanaryChecked::verify_origin`] (Stage 9), or
 /// opt out explicitly via [`ManifestSigVerified::skip_canary_check`] /
 /// [`super::verified::ManifestCanaryChecked::skip_origin_check`]. The
-/// `#[must_use]` annotation on each wrapper produces a compile-time
-/// warning when the chain is dropped without being either advanced or
-/// explicitly skipped.
+/// `#[must_use]` annotation on each wrapper warns when a wrapper value
+/// is silently dropped without being used, catching the trivial
+/// "called but ignored" omission case. It does NOT prevent a caller from
+/// reading individual fields via `ManifestRead` and then dropping the
+/// wrapper without completing the chain — that pattern is permitted
+/// because per-field reads on incomplete states are needed for Stage 7
+/// (trust state lookup, §10) which precedes Stage 8.
 ///
 /// The verification key is `manifest.publisher_pubkey` — the parser
 /// performs "Stage 6 self-verification" only. Stage 7 trust-state

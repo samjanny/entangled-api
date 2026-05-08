@@ -8,11 +8,10 @@
 //!
 //! For manifests, [`parse_and_verify_manifest`] returns a
 //! [`ManifestSigVerified`] type-state wrapper rather than a bare
-//! [`crate::types::Manifest`], forcing the caller at compile time to
-//! traverse Stages 8 (canary) and 9 (origin binding) explicitly via
-//! [`ManifestSigVerified::verify_canary`] and
-//! [`ManifestCanaryChecked::verify_origin`], or to opt out via the
-//! corresponding `skip_*` methods. Stage 7 (trust state) remains the
+//! [`crate::types::Manifest`], structurally preventing extraction of the
+//! bare type from incomplete-stage states. The bare `Manifest` is
+//! obtainable only via complete chain (`into_parts`) or explicit
+//! `skip_*` opt-out. Stage 7 (trust state) remains the
 //! caller's responsibility, applied after the chain completes.
 //!
 //! The wrappers do not expose the bare [`crate::types::Manifest`]; only

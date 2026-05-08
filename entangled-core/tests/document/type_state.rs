@@ -5,13 +5,17 @@
 //! tests in `tests/canary/structure.rs` and `tests/tor/origin_binding.rs`.
 //!
 //! The `#[must_use]` attribute on `ManifestSigVerified` and
-//! `ManifestCanaryChecked` is what closes the foot-gun: a caller cannot
-//! silently drop the wrapper without either traversing the chain or
-//! explicitly calling `skip_*`. We assert that here at runtime by walking
-//! every supported chain shape; the *compile-time* enforcement is a
-//! warning under `#[warn(unused_must_use)]` (and a hard error in CI under
-//! `-D warnings`). See the `compile_fail` doctest in
-//! `entangled-core/src/document/verified.rs` for the must_use canary.
+//! `ManifestCanaryChecked` warns when a wrapper value is silently dropped
+//! without being used, catching the trivial "called but ignored" case.
+//! It does not prevent a caller from reading fields via `ManifestRead`
+//! and then dropping the wrapper — that flow is permitted by design,
+//! since per-field reads on incomplete states are needed for Stage 7
+//! (trust state lookup, §10) which precedes Stage 8. We assert chain
+//! shape here at runtime by walking every supported chain shape; the
+//! *compile-time* check that the bare `Manifest` cannot be extracted
+//! from incomplete-stage states is verified separately by the
+//! compile_fail doctests on `ManifestRead` in
+//! `entangled-core/src/document/verified.rs`.
 //!
 //! Closing the related `manifest().clone()` bypass — i.e. the
 //! short-circuit that previously let a caller obtain a bare `Manifest`
