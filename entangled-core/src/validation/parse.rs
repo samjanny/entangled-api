@@ -56,8 +56,112 @@ pub fn parse_with_limits(s: &str) -> Result<Value, Diagnostic> {
     let value: Value = serde_json::from_str::<DedupedValue>(s)
         .map(|d| d.0)
         .map_err(classify_serde_error)?;
+    enforce_integer_grammar(s)?;
     walk_limits(&value)?;
     Ok(value)
+}
+
+/// Lexically enforce the §04 integer grammar
+/// (`integer = "0" / non-zero-digit *digit`) by scanning the raw input
+/// bytes outside of JSON strings.
+///
+/// `serde_json` already rejects JSON syntax errors (so leading-zero forms
+/// like `01` never reach this step) and `schema_prepass` rejects `f64`
+/// numbers in parsed `Value`s. This pass closes the remaining gaps that
+/// neither catches:
+///
+/// * `-0` — silently parsed as `0` by typical JSON readers, which would
+///   conflate negative zero with positive zero.
+/// * any negative integer — Entangled has no signed integer fields; a
+///   value like `-1` outside a typed deserializer would slip through.
+/// * any integer whose decimal value exceeds `2^63 − 1` — fits in
+///   `serde_json::Number::PosInt(u64)` but is out of the protocol-wide
+///   range.
+/// * float-shaped tokens (`1.0`, `1e0`, `1E1`) as a defence-in-depth
+///   layer; `schema_prepass` reaches the same verdict on the parsed
+///   `Value`, but catching them here keeps the lexical contract explicit.
+///
+/// The scanner is a tiny state machine: it skips JSON string contents
+/// (handling backslash escapes) and treats every numeric run starting
+/// with `-` or an ASCII digit as a token to validate.
+fn enforce_integer_grammar(input: &str) -> Result<(), Diagnostic> {
+    let bytes = input.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        let b = bytes[i];
+        match b {
+            b'"' => {
+                i += 1;
+                while i < bytes.len() {
+                    match bytes[i] {
+                        b'\\' if i + 1 < bytes.len() => i += 2,
+                        b'"' => {
+                            i += 1;
+                            break;
+                        }
+                        _ => i += 1,
+                    }
+                }
+            }
+            b'-' | b'0'..=b'9' => {
+                let start = i;
+                i += 1;
+                while i < bytes.len()
+                    && matches!(
+                        bytes[i],
+                        b'0'..=b'9' | b'.' | b'e' | b'E' | b'+' | b'-'
+                    )
+                {
+                    i += 1;
+                }
+                check_integer_token(&input[start..i])?;
+            }
+            _ => i += 1,
+        }
+    }
+    Ok(())
+}
+
+/// Validate a single numeric token against §04's integer grammar.
+fn check_integer_token(token: &str) -> Result<(), Diagnostic> {
+    if token
+        .bytes()
+        .any(|b| matches!(b, b'.' | b'e' | b'E' | b'+'))
+    {
+        return Err(Diagnostic::new(
+            DiagnosticCode::ESchemaNonInteger,
+            DocumentKindLabel::None,
+            format!("non-integer numeric token {token:?}"),
+        ));
+    }
+    if let Some(rest) = token.strip_prefix('-') {
+        return Err(Diagnostic::new(
+            DiagnosticCode::ESchemaFieldRange,
+            DocumentKindLabel::None,
+            if rest == "0" {
+                format!("negative-zero numeric token {token:?} is not in the integer grammar")
+            } else {
+                format!(
+                    "negative integer {token:?} is not in the protocol range [0, 2^63 - 1]"
+                )
+            },
+        ));
+    }
+    let value: u64 = token.parse().map_err(|_| {
+        Diagnostic::new(
+            DiagnosticCode::ESchemaFieldRange,
+            DocumentKindLabel::None,
+            format!("integer token {token:?} exceeds the protocol range [0, 2^63 - 1]"),
+        )
+    })?;
+    if value > i64::MAX as u64 {
+        return Err(Diagnostic::new(
+            DiagnosticCode::ESchemaFieldRange,
+            DocumentKindLabel::None,
+            format!("integer {value} exceeds the protocol range [0, 2^63 - 1]"),
+        ));
+    }
+    Ok(())
 }
 
 /// Map a `serde_json` deserialization error to a Stage 3 diagnostic.

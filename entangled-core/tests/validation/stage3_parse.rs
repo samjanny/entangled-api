@@ -98,6 +98,64 @@ fn duplicate_object_key_nested_rejected() {
     assert_eq!(details["object_path"].as_str(), Some("/outer"));
 }
 
+// -- §04 integer grammar (v1.0-rc.5) -----------------------------------------
+
+#[test]
+fn negative_zero_token_rejected() {
+    // §04 v1.0-rc.5: `-0` is not in the grammar `"0" / non-zero-digit *digit`
+    // and conflates with positive zero in many JSON readers. Reject lexically.
+    let err = parse_with_limits(r#"{"v": -0}"#).unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::ESchemaFieldRange);
+}
+
+#[test]
+fn negative_integer_token_rejected() {
+    // No Entangled wire-format field accepts negative integers; the grammar
+    // pins the value range to [0, 2^63 - 1].
+    let err = parse_with_limits(r#"{"v": -42}"#).unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::ESchemaFieldRange);
+}
+
+#[test]
+fn integer_above_i64_max_rejected() {
+    // 2^63 fits in u64 but exceeds the protocol range [0, 2^63 - 1].
+    let err = parse_with_limits(r#"{"v": 9223372036854775808}"#).unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::ESchemaFieldRange);
+}
+
+#[test]
+fn integer_at_i64_max_accepted() {
+    // 2^63 - 1 is the inclusive upper bound.
+    parse_with_limits(r#"{"v": 9223372036854775807}"#).expect("i64::MAX must be accepted");
+}
+
+#[test]
+fn large_integer_above_2_to_53_accepted_without_precision_loss() {
+    // 2^53 + 1 is the smallest integer that loses precision when parsed
+    // through IEEE 754 binary64. Conforming parsers must keep it exact.
+    parse_with_limits(r#"{"v": 9007199254740993}"#)
+        .expect("2^53 + 1 must round-trip without precision loss");
+}
+
+#[test]
+fn float_token_rejected_lexically() {
+    // §04 v1.0-rc.5: tokens like `1.0` or `1e0` aren't integers. The
+    // parse-time pre-pass rejects them with E_SCHEMA_NON_INTEGER, even
+    // before the schema-level f64 walk would.
+    let err = parse_with_limits(r#"{"v": 1.0}"#).unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::ESchemaNonInteger);
+
+    let err = parse_with_limits(r#"{"v": 1e0}"#).unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::ESchemaNonInteger);
+}
+
+#[test]
+fn negative_lookalike_inside_string_value_accepted() {
+    // The lexical scan must skip JSON string contents — a `-0` inside a
+    // string value is just text, not a numeric token.
+    parse_with_limits(r#"{"v": "-0"}"#).expect("strings are not numeric tokens");
+}
+
 #[test]
 fn lone_leading_surrogate_classified_as_malformed_unicode() {
     // §11: `E_SCHEMA_MALFORMED_UNICODE` covers isolated surrogates and
