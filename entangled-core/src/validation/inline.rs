@@ -4,6 +4,7 @@ use std::collections::HashSet;
 
 use crate::types::inline::{InlineContent, InlineElement};
 use crate::types::link::LinkTarget;
+use crate::types::manifest::{Carrier, OnionAddress};
 
 use super::diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel};
 use super::limits::{
@@ -137,36 +138,81 @@ pub fn validate_link_target(target: &LinkTarget) -> Result<(), Diagnostic> {
         ));
     }
 
-    if let LinkTarget::Citation { url } = target {
-        validate_citation_url(url)?;
+    match target {
+        LinkTarget::Citation { url } => validate_citation_url(url),
+        LinkTarget::Carrier { carrier, url } => validate_carrier_url(*carrier, url),
+        // SameSite and Entangled are validated structurally by the inner newtypes.
+        _ => Ok(()),
     }
-    // SameSite and Entangled are validated structurally by the inner newtypes.
-    Ok(())
 }
 
 fn validate_citation_url(url: &str) -> Result<(), Diagnostic> {
+    validate_url_common("citation", url, "https://")
+}
+
+/// Validate a `kind: "carrier"` link target URL (§03).
+///
+/// Same byte-cap, control-char, and RFC 3986 rules as citation, but the
+/// scheme MUST be `http://` (the carrier provides confidentiality at the
+/// rendezvous layer; cf. §09 on plain HTTP over Tor v3) and the host MUST
+/// be a valid carrier address for the declared `carrier` — for `tor-v3`,
+/// the 56-character lowercase base32 onion body followed by `.onion`.
+fn validate_carrier_url(carrier: Carrier, url: &str) -> Result<(), Diagnostic> {
+    validate_url_common("carrier", url, "http://")?;
+    let after_scheme = &url["http://".len()..];
+    let host = extract_authority_host(after_scheme).ok_or_else(|| {
+        Diagnostic::new(
+            DiagnosticCode::ESchemaFieldSyntax,
+            DocumentKindLabel::None,
+            "carrier url has no host component",
+        )
+    })?;
+    match carrier {
+        Carrier::TorV3 => {
+            OnionAddress::try_from(host).map_err(|e| {
+                Diagnostic::new(
+                    DiagnosticCode::ESchemaFieldSyntax,
+                    DocumentKindLabel::None,
+                    format!(
+                        "carrier url host {host:?} is not a valid tor-v3 .onion address: {e}"
+                    ),
+                )
+            })?;
+        }
+    }
+    Ok(())
+}
+
+/// Shared URL syntax check for `citation` and `carrier` link target URLs:
+/// 1 KiB byte cap, mandatory `required_scheme` prefix, no control chars,
+/// RFC 3986 unreserved/reserved characters with valid `%HH` triplets.
+fn validate_url_common(
+    kind_label: &'static str,
+    url: &str,
+    required_scheme: &'static str,
+) -> Result<(), Diagnostic> {
     if url.len() > CITATION_URL_MAX_BYTES {
         return Err(Diagnostic::new(
             DiagnosticCode::ESchemaFieldLength,
             DocumentKindLabel::None,
             format!(
-                "citation url of {} bytes exceeds cap of {CITATION_URL_MAX_BYTES}",
+                "{kind_label} url of {} bytes exceeds cap of {CITATION_URL_MAX_BYTES}",
                 url.len()
             ),
         ));
     }
-    if !url.starts_with("https://") {
+    if !url.starts_with(required_scheme) {
         return Err(Diagnostic::new(
             DiagnosticCode::ESchemaFieldSyntax,
             DocumentKindLabel::None,
-            "citation url must begin with https://",
+            format!("{kind_label} url must begin with {required_scheme}"),
         ));
     }
     if !no_control_chars(url, false) {
         return Err(Diagnostic::new(
             DiagnosticCode::ESchemaFieldSyntax,
             DocumentKindLabel::None,
-            "citation url contains control characters",
+            format!("{kind_label} url contains control characters"),
         ));
     }
     // RFC 3986: only unreserved / gen-delims / sub-delims / pct-encoded are
@@ -189,7 +235,7 @@ fn validate_citation_url(url: &str) -> Result<(), Diagnostic> {
                     return Err(Diagnostic::new(
                         DiagnosticCode::ESchemaFieldSyntax,
                         DocumentKindLabel::None,
-                        "citation url contains malformed percent-encoded triplet",
+                        format!("{kind_label} url contains malformed percent-encoded triplet"),
                     ));
                 }
             }
@@ -198,12 +244,40 @@ fn validate_citation_url(url: &str) -> Result<(), Diagnostic> {
             return Err(Diagnostic::new(
                 DiagnosticCode::ESchemaFieldSyntax,
                 DocumentKindLabel::None,
-                "citation url contains characters outside RFC 3986 unreserved/reserved set",
+                format!(
+                    "{kind_label} url contains characters outside RFC 3986 unreserved/reserved set"
+                ),
             ));
         }
         i += 1;
     }
     Ok(())
+}
+
+/// Extract the host component from the authority part of a URI.
+///
+/// Given the URL slice **after** the `scheme://` prefix, finds the end of
+/// the authority (first `/`, `?`, or `#`), strips optional userinfo
+/// (anything before `@`), and strips an optional port (anything after the
+/// last `:`). Returns `None` if the result is empty.
+fn extract_authority_host(after_scheme: &str) -> Option<&str> {
+    let end = after_scheme
+        .find(|c: char| c == '/' || c == '?' || c == '#')
+        .unwrap_or(after_scheme.len());
+    let authority = &after_scheme[..end];
+    let host_port = match authority.rfind('@') {
+        Some(at) => &authority[at + 1..],
+        None => authority,
+    };
+    let host = match host_port.rfind(':') {
+        Some(colon) => &host_port[..colon],
+        None => host_port,
+    };
+    if host.is_empty() {
+        None
+    } else {
+        Some(host)
+    }
 }
 
 /// Returns true if `b` is an unreserved/reserved URI byte per RFC 3986

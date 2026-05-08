@@ -5,8 +5,8 @@ use entangled_core::validation::{
 use serde_json::{json, Value};
 
 use crate::common::{
-    fixed_now, minimal_canary, minimal_content_doc, minimal_manifest, KEY_ZEROS,
-    REQUEST_ID_ZEROS, SHA256_PREFIXED_ZEROS, SIG_ZEROS,
+    fixed_now, minimal_canary, minimal_content_doc, minimal_manifest, REQUEST_ID_ZEROS,
+    SHA256_PREFIXED_ZEROS, SIG_ZEROS,
 };
 
 fn manifest_value() -> Value {
@@ -371,6 +371,137 @@ fn t20_citation_url_with_ftp_scheme_rejected() {
             "kind": "link",
             "label": [{ "kind": "text", "value": "src", "marks": [] }],
             "target": { "kind": "citation", "url": "ftp://x" }
+        }
+    ]);
+    let err = parse_and_validate_content(&manifest_bytes(&v)).unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
+}
+
+// -- §03 carrier link target -------------------------------------------------
+
+const CARRIER_ONION: &str = "abcdefghijklmnopqrstuvwxyz234567abcdefghijklmnopqrstuvwx.onion";
+
+#[test]
+fn t27_carrier_link_with_valid_onion_url_accepted() {
+    // §03: kind:"carrier" routes a non-Entangled service (e.g. a foreign
+    // onion site) over an already-supported carrier. Plain http:// over
+    // a 62-char onion host is the canonical valid form.
+    let mut v = content_value();
+    let blocks = v.as_object_mut().unwrap().get_mut("blocks").unwrap();
+    *blocks = json!([
+        {
+            "kind": "link",
+            "label": [{ "kind": "text", "value": "src", "marks": [] }],
+            "target": {
+                "kind": "carrier",
+                "carrier": "tor-v3",
+                "url": format!("http://{CARRIER_ONION}/wiki")
+            }
+        }
+    ]);
+    parse_and_validate_content(&manifest_bytes(&v))
+        .expect("valid carrier link target must pass Stage 5");
+}
+
+#[test]
+fn t27a_carrier_link_with_https_scheme_rejected() {
+    // §03: carrier links are http-only. The carrier (Tor v3 here) provides
+    // the rendezvous-layer crypto; a TLS layer on top is unnecessary and
+    // currently disallowed for v1 conformance.
+    let mut v = content_value();
+    let blocks = v.as_object_mut().unwrap().get_mut("blocks").unwrap();
+    *blocks = json!([
+        {
+            "kind": "link",
+            "label": [{ "kind": "text", "value": "src", "marks": [] }],
+            "target": {
+                "kind": "carrier",
+                "carrier": "tor-v3",
+                "url": format!("https://{CARRIER_ONION}/wiki")
+            }
+        }
+    ]);
+    let err = parse_and_validate_content(&manifest_bytes(&v)).unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
+}
+
+#[test]
+fn t27b_carrier_link_with_clearnet_host_rejected() {
+    // §03: a tor-v3 carrier link MUST point at a 62-char onion host.
+    // A clearnet host fails the host-validation step.
+    let mut v = content_value();
+    let blocks = v.as_object_mut().unwrap().get_mut("blocks").unwrap();
+    *blocks = json!([
+        {
+            "kind": "link",
+            "label": [{ "kind": "text", "value": "src", "marks": [] }],
+            "target": {
+                "kind": "carrier",
+                "carrier": "tor-v3",
+                "url": "http://example.org/x"
+            }
+        }
+    ]);
+    let err = parse_and_validate_content(&manifest_bytes(&v)).unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
+}
+
+#[test]
+fn t27c_carrier_link_with_unknown_carrier_rejected() {
+    // The Carrier enum is closed (only "tor-v3" in v1); an unknown carrier
+    // value is rejected at deserialize time.
+    let mut v = content_value();
+    let blocks = v.as_object_mut().unwrap().get_mut("blocks").unwrap();
+    *blocks = json!([
+        {
+            "kind": "link",
+            "label": [{ "kind": "text", "value": "src", "marks": [] }],
+            "target": {
+                "kind": "carrier",
+                "carrier": "i2p",
+                "url": format!("http://{CARRIER_ONION}/x")
+            }
+        }
+    ]);
+    parse_and_validate_content(&manifest_bytes(&v)).expect_err("unknown carrier must reject");
+}
+
+#[test]
+fn t27d_carrier_link_with_expected_publisher_pubkey_field_rejected() {
+    // §03: the carrier kind is for non-Entangled destinations and does
+    // NOT carry expected_publisher_pubkey. deny_unknown_fields catches a
+    // stray Entangled-style key on the carrier target.
+    let mut v = content_value();
+    let blocks = v.as_object_mut().unwrap().get_mut("blocks").unwrap();
+    *blocks = json!([
+        {
+            "kind": "link",
+            "label": [{ "kind": "text", "value": "src", "marks": [] }],
+            "target": {
+                "kind": "carrier",
+                "carrier": "tor-v3",
+                "url": format!("http://{CARRIER_ONION}/x"),
+                "expected_publisher_pubkey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            }
+        }
+    ]);
+    let err = parse_and_validate_content(&manifest_bytes(&v)).unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::ESchemaUnknownField);
+}
+
+#[test]
+fn t27e_carrier_link_url_with_control_char_rejected() {
+    let mut v = content_value();
+    let blocks = v.as_object_mut().unwrap().get_mut("blocks").unwrap();
+    *blocks = json!([
+        {
+            "kind": "link",
+            "label": [{ "kind": "text", "value": "src", "marks": [] }],
+            "target": {
+                "kind": "carrier",
+                "carrier": "tor-v3",
+                "url": format!("http://{CARRIER_ONION}/path\u{0001}with-ctrl")
+            }
         }
     ]);
     let err = parse_and_validate_content(&manifest_bytes(&v)).unwrap_err();
