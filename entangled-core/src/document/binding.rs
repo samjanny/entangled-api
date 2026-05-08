@@ -11,6 +11,17 @@
 //! * `request_hash` MUST equal the SHA-256 digest of the JCS-canonical
 //!   submit body the client sent (`E_BIND_REQUEST_HASH`, §11).
 //!
+//! ## Scope (§02 v1.0-rc.6)
+//!
+//! These checks bind the signed transaction *response* to the specific
+//! submit body the client sent. They are NOT a general anti-replay
+//! mechanism against a malicious or compromised publisher backend, which
+//! may still receive, store, or reuse submit bodies and sign transaction
+//! responses for any submit body it accepts. The guarantee is end-to-end
+//! between client and `K_runtime`: a transaction binding success means
+//! "this signed response acknowledges the exact bytes I sent to this
+//! path", nothing stronger.
+//!
 //! Mirrors [`crate::tor::verify_origin_binding`] for manifests:
 //! single entry point, byte-exact comparisons, no I/O. The diagnostics it
 //! emits carry structured `details = { expected, received }` for the

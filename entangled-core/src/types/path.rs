@@ -8,11 +8,23 @@ use thiserror::Error;
 
 const PATH_MAX_LEN: usize = 256;
 
+/// Path reserved by the protocol for the carrier-level manifest fetch
+/// (§02 v1.0-rc.6). It MUST NOT appear as a content document `path`,
+/// transaction `in_response_to`, image `src`, submit endpoint, or
+/// inline-link target.
+const RESERVED_MANIFEST_PATH: &str = "/manifest.json";
+
 /// An absolute, normalized Entangled path (§02).
 ///
 /// Syntax: starts with `/`, length 1..=256 bytes, characters drawn from
 /// `[A-Za-z0-9._~/-]`, no consecutive `/`, no `.` or `..` segments. The root
 /// path `"/"` is the only single-character form.
+///
+/// `/manifest.json` is reserved at the protocol level (§02 v1.0-rc.6) and
+/// is rejected here regardless of where it would appear: content `path`,
+/// transaction `in_response_to`, image `src`, submit endpoint, or
+/// inline-link target. The carrier-level manifest fetch uses the same
+/// literal at the transport layer, which is out of scope for this crate.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct EntangledPath(String);
 
@@ -34,6 +46,9 @@ pub enum PathError {
     /// A path segment equals `.` or `..`.
     #[error("path contains '.' or '..' segment")]
     DotSegment,
+    /// Path equals the protocol-reserved `/manifest.json` (§02).
+    #[error("path /manifest.json is reserved at the protocol level")]
+    ReservedManifestPath,
 }
 
 impl EntangledPath {
@@ -93,6 +108,10 @@ impl<'a> TryFrom<&'a str> for EntangledPath {
             if segment == "." || segment == ".." {
                 return Err(PathError::DotSegment);
             }
+        }
+
+        if value == RESERVED_MANIFEST_PATH {
+            return Err(PathError::ReservedManifestPath);
         }
 
         Ok(Self(value.to_owned()))

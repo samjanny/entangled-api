@@ -1,4 +1,7 @@
-use entangled_core::types::{path::EntangledPath, slug::Slug};
+use entangled_core::types::{
+    path::{EntangledPath, PathError},
+    slug::Slug,
+};
 
 #[test]
 fn valid_paths_accepted() {
@@ -27,6 +30,37 @@ fn invalid_paths_rejected() {
         assert!(
             EntangledPath::try_from(p).is_err(),
             "expected `{p}` to be rejected"
+        );
+    }
+}
+
+#[test]
+fn reserved_manifest_path_rejected() {
+    // §02 v1.0-rc.6: /manifest.json is reserved at the protocol level for the
+    // carrier-level manifest fetch and MUST NOT appear as a content path,
+    // transaction in_response_to, image src, submit endpoint, or link target.
+    assert_eq!(
+        EntangledPath::try_from("/manifest.json").unwrap_err(),
+        PathError::ReservedManifestPath
+    );
+}
+
+#[test]
+fn paths_resembling_manifest_but_distinct_accepted() {
+    // The reservation is byte-exact `/manifest.json`, not a prefix or
+    // case-insensitive match.
+    for p in [
+        "/manifest.json/",
+        "/Manifest.json",
+        "/manifest.JSON",
+        "/manifest_json",
+        "/manifest.json.bak",
+        "/api/manifest.json",
+        "/manifest",
+    ] {
+        assert!(
+            EntangledPath::try_from(p).is_ok(),
+            "expected `{p}` to remain valid"
         );
     }
 }
