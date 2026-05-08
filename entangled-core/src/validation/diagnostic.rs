@@ -71,6 +71,10 @@ pub enum DiagnosticCode {
     ETransportUnavailable,
     #[serde(rename = "E_TRANSPORT_BAD_REQUEST")]
     ETransportBadRequest,
+    #[serde(rename = "E_TRANSPORT_CONTENT_ENCODING")]
+    ETransportContentEncoding,
+    #[serde(rename = "E_TRANSPORT_TRANSFER_ENCODING")]
+    ETransportTransferEncoding,
 
     // Stage 2 — Input
     #[serde(rename = "E_INPUT_BYTE_CAP")]
@@ -261,7 +265,9 @@ impl DiagnosticCode {
             | ETransportMethodNotAllowed
             | ETransportPayloadTooLarge
             | ETransportUnavailable
-            | ETransportBadRequest => 1,
+            | ETransportBadRequest
+            | ETransportContentEncoding
+            | ETransportTransferEncoding => 1,
 
             // Stage 2 — Input.
             EInputByteCap | EInputUtf8 | EInputBom => 2,

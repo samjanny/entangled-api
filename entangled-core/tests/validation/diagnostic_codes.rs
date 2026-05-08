@@ -20,6 +20,8 @@ fn all_codes_round_trip_via_json() {
         DiagnosticCode::ETransportPayloadTooLarge,
         DiagnosticCode::ETransportUnavailable,
         DiagnosticCode::ETransportBadRequest,
+        DiagnosticCode::ETransportContentEncoding,
+        DiagnosticCode::ETransportTransferEncoding,
         DiagnosticCode::EInputByteCap,
         DiagnosticCode::EInputUtf8,
         DiagnosticCode::EInputBom,
@@ -183,4 +185,35 @@ fn state_duplicate_serializes_exactly() {
 fn image_budget_serializes_exactly() {
     let s = serde_json::to_string(&DiagnosticCode::WImageBudget).unwrap();
     assert_eq!(s, "\"W_IMAGE_BUDGET\"");
+}
+
+#[test]
+fn transport_content_encoding_is_stage_1_error() {
+    // §09 / §11 v1.0-rc.4: forbidden HTTP-stack header on Entangled responses.
+    assert_eq!(DiagnosticCode::ETransportContentEncoding.stage(), 1);
+    assert_eq!(
+        DiagnosticCode::ETransportContentEncoding.severity(),
+        Severity::Error
+    );
+}
+
+#[test]
+fn transport_transfer_encoding_is_stage_1_error() {
+    assert_eq!(DiagnosticCode::ETransportTransferEncoding.stage(), 1);
+    assert_eq!(
+        DiagnosticCode::ETransportTransferEncoding.severity(),
+        Severity::Error
+    );
+}
+
+#[test]
+fn transport_content_encoding_serializes_exactly() {
+    let s = serde_json::to_string(&DiagnosticCode::ETransportContentEncoding).unwrap();
+    assert_eq!(s, "\"E_TRANSPORT_CONTENT_ENCODING\"");
+}
+
+#[test]
+fn transport_transfer_encoding_serializes_exactly() {
+    let s = serde_json::to_string(&DiagnosticCode::ETransportTransferEncoding).unwrap();
+    assert_eq!(s, "\"E_TRANSPORT_TRANSFER_ENCODING\"");
 }

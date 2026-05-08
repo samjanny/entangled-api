@@ -205,9 +205,13 @@ impl VerifyingKey {
 
     /// Verify a signature on an arbitrary input.
     ///
-    /// Uses ed25519-dalek's `verify_strict`, which rejects malleable signatures
-    /// (non-canonical S scalar and small-order public keys) per RFC 8032 §5.1.7
-    /// strict verification.
+    /// Implements the §05 Ed25519 verification profile (v1.0-rc.4): public
+    /// keys MUST be in canonical encoding and MUST NOT be small-order;
+    /// signatures MUST use canonical `R` and canonical `S` (`0 ≤ S < L`);
+    /// verification uses the cofactorless equation `[S]B = R + [k]A`.
+    /// `ed25519-dalek`'s `verify_strict` enforces exactly this set
+    /// (RFC 8032 §5.1.7 strict mode), so cofactored verification and
+    /// non-canonical encodings are not accepted.
     pub fn verify(&self, input: &[u8], sig: &Signature) -> Result<(), CryptoError> {
         let parsed = ed25519_dalek::Signature::from_bytes(sig.as_bytes());
         self.0
