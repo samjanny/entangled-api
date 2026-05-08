@@ -435,6 +435,45 @@ fn t26_citation_url_with_brace_rejected_as_field_syntax() {
 }
 
 #[test]
+fn t26a_citation_url_with_invalid_percent_triplet_rejected() {
+    // §03 / RFC 3986: `%` MUST introduce a complete `%HH` triplet of HEXDIGs.
+    for bad in [
+        "https://example.org/%zz",
+        "https://example.org/%2",
+        "https://example.org/%",
+    ] {
+        let mut v = content_value();
+        let blocks = v.as_object_mut().unwrap().get_mut("blocks").unwrap();
+        *blocks = json!([
+            {
+                "kind": "link",
+                "label": [{ "kind": "text", "value": "src", "marks": [] }],
+                "target": { "kind": "citation", "url": bad }
+            }
+        ]);
+        let err = parse_and_validate_content(&manifest_bytes(&v))
+            .err()
+            .unwrap_or_else(|| panic!("expected rejection for {bad}"));
+        assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax, "url={bad}");
+    }
+}
+
+#[test]
+fn t26b_citation_url_with_valid_percent_triplet_accepted() {
+    // §03 / RFC 3986: well-formed `%HH` triplets are permitted.
+    let mut v = content_value();
+    let blocks = v.as_object_mut().unwrap().get_mut("blocks").unwrap();
+    *blocks = json!([
+        {
+            "kind": "link",
+            "label": [{ "kind": "text", "value": "src", "marks": [] }],
+            "target": { "kind": "citation", "url": "https://example.org/a%20b/%2F%fF" }
+        }
+    ]);
+    parse_and_validate_content(&manifest_bytes(&v)).expect("valid pct-encoded url accepted");
+}
+
+#[test]
 fn t21_inline_link_nested_inside_link_label_rejected() {
     let mut v = content_value();
     let blocks = v.as_object_mut().unwrap().get_mut("blocks").unwrap();

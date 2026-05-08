@@ -72,3 +72,35 @@ fn malformed_json_unbalanced_brace_rejected() {
     let err = parse_with_limits(s).unwrap_err();
     assert_eq!(err.code, DiagnosticCode::EParseJson);
 }
+
+#[test]
+fn duplicate_object_key_rejected() {
+    // serde_json silently overwrites duplicates by default; the custom
+    // visitor in `parse_with_limits` must reject them so a hostile producer
+    // cannot smuggle a payload past the surviving key.
+    let s = r#"{"a": 1, "a": 2}"#;
+    let err = parse_with_limits(s).unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::EParseJson);
+    assert!(
+        err.message.contains("duplicate"),
+        "expected duplicate-key message, got {:?}",
+        err.message
+    );
+}
+
+#[test]
+fn duplicate_object_key_nested_rejected() {
+    let s = r#"{"outer": {"a": 1, "a": 2}}"#;
+    let err = parse_with_limits(s).unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::EParseJson);
+}
+
+#[test]
+fn lone_leading_surrogate_classified_as_malformed_unicode() {
+    // §11: `E_SCHEMA_MALFORMED_UNICODE` covers isolated surrogates and
+    // malformed `\uXXXX` escape sequences. serde_json reports these as
+    // syntax errors; the parse layer reclassifies them to the spec code.
+    let s = r#"{"v": "\uD800"}"#;
+    let err = parse_with_limits(s).unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::ESchemaMalformedUnicode);
+}
