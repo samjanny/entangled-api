@@ -11,3 +11,6 @@ entangled-core/tests/conformance/corpus/
 *.swo
 .DS_Store
 docs-spec/
+
+# Claude Code runtime state
+.claude/
