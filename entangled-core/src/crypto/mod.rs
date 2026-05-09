@@ -8,7 +8,7 @@ pub mod sha256;
 pub mod signing;
 
 pub use ed25519::{
-    validate_origin_pubkey_strict, validate_publisher_pubkey_strict, validate_pubkey_strict,
+    validate_origin_pubkey_strict, validate_pubkey_strict, validate_publisher_pubkey_strict,
     validate_runtime_pubkey_strict, CryptoError, PublisherSigningKey, RuntimeSigningKey,
     VerifyingKey,
 };

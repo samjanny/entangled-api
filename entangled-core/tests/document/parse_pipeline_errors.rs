@@ -131,10 +131,7 @@ fn stage6_small_order_publisher_pubkey_emits_sig_verification() {
     let mut value: Value = serde_json::from_slice(&bytes).unwrap();
     let zeros_pubkey = "A".repeat(43); // 43 base64url chars → 32 zero bytes.
     if let Value::Object(ref mut map) = value {
-        map.insert(
-            "publisher_pubkey".to_owned(),
-            Value::String(zeros_pubkey),
-        );
+        map.insert("publisher_pubkey".to_owned(), Value::String(zeros_pubkey));
     }
     let altered = serde_json::to_vec(&value).unwrap();
     let err = parse_and_verify_manifest(&altered, &fixed_now())

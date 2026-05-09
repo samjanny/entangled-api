@@ -121,7 +121,10 @@ fn small_order_runtime_pubkey_rejected_with_field_path_detail() {
     let err = validate_canary_structure(&c, &now).expect_err("small-order key rejected");
     assert_eq!(err.code, DiagnosticCode::ECanaryInvalid);
     let details = err.details.as_ref().expect("details payload");
-    assert_eq!(details["field_path"].as_str(), Some("canary.runtime_pubkey"));
+    assert_eq!(
+        details["field_path"].as_str(),
+        Some("canary.runtime_pubkey")
+    );
     assert_eq!(details["reason"].as_str(), Some("public_key_rejected"));
 
     // Strict-clean key fixes only the pubkey violation, leaving the canary
