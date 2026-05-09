@@ -217,8 +217,11 @@ pub fn parse_and_verify_content(
 /// # Errors
 ///
 /// Returns the first [`Diagnostic`] produced by Stage 2-6 validation:
-/// `E_INPUT_*`, `E_PARSE_*`, `E_KIND_*`, `E_SCHEMA_*`, `E_SIG_INVALID_KEY`,
-/// or `E_SIG_VERIFICATION` (see [`crate::validation::DiagnosticCode`]).
+/// `E_INPUT_*`, `E_PARSE_*`, `E_KIND_*`, `E_SCHEMA_*`, or
+/// `E_SIG_VERIFICATION` (see [`crate::validation::DiagnosticCode`]). A
+/// public key failing the §05 strict profile is rejected here as
+/// `E_SIG_VERIFICATION`; `E_SIG_INVALID_KEY` is emitted only by callers
+/// that detect "no verifying key is available" before reaching this stage.
 pub fn parse_and_verify_transaction(
     raw: &[u8],
     runtime_pubkey: &RuntimePubkey,
@@ -254,11 +257,19 @@ pub fn parse_and_verify_transaction(
 
 fn crypto_to_diagnostic(err: CryptoError, kind: DocumentKindLabel) -> Diagnostic {
     match err {
+        // §05 v1.0-rc.4: a public key that fails the strict profile (non-canonical
+        // encoding or small-order point) causes the document being verified under
+        // that key to be rejected as a signature failure, reported as
+        // E_SIG_VERIFICATION (§11) — not E_SIG_INVALID_KEY, which is reserved for
+        // "the expected verification key is not available".
         CryptoError::InvalidPublicKey => Diagnostic::new(
-            DiagnosticCode::ESigInvalidKey,
+            DiagnosticCode::ESigVerification,
             kind,
-            "Ed25519 public key is not a valid curve point",
-        ),
+            "Ed25519 public key fails the §05 strict profile (non-canonical or small-order)",
+        )
+        .with_details(serde_json::json!({
+            "reason": "public_key_rejected",
+        })),
         CryptoError::VerificationFailed => Diagnostic::new(
             DiagnosticCode::ESigVerification,
             kind,

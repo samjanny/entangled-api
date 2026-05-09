@@ -24,6 +24,21 @@ the shipping API surface, not deltas against a previous release.
   out-of-range values produce `CanonError::NumberOutOfRange`.
 - Ed25519 signing and verification, SHA-256 hashing, BIP-39 PIP
   derivation, OS-level random generation via `getrandom` (`crypto`).
+  The §05 v1.0-rc.4 strict profile (canonical encoding, non-small-order)
+  is enforced uniformly: at signature verification via `verify_strict`,
+  and at canary structure validation (`canary.runtime_pubkey`, Stage 8)
+  and origin binding (`origin.origin_pubkey`, Stage 9) via the
+  `validate_pubkey_strict` / `validate_runtime_pubkey_strict` /
+  `validate_origin_pubkey_strict` / `validate_publisher_pubkey_strict`
+  helpers exposed from the `crypto` module. A pubkey failing the strict
+  profile during ordinary signature verification is reported as
+  `E_SIG_VERIFICATION` with `details.reason: "public_key_rejected"`,
+  per §05 — `E_SIG_INVALID_KEY` is reserved for "expected verification
+  key not available". The same rejection on `canary.runtime_pubkey`
+  surfaces as `E_CANARY_INVALID` at Stage 8 with
+  `details.field_path: "canary.runtime_pubkey"`; on
+  `origin.origin_pubkey` as `E_BIND_ORIGIN` at Stage 9 with
+  `details.field_path: "origin.origin_pubkey"`.
 - Role-tagged signing keys: `PublisherSigningKey` signs manifests,
   `RuntimeSigningKey` signs content and transaction documents. The two
   types are not interconvertible at the public API; cross-role signing

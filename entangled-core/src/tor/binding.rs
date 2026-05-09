@@ -7,11 +7,17 @@
 //! 2. The fetched address byte-equals `origin.address`.
 //! 3. The address verifies strictly (correct version + checksum).
 //! 4. The pubkey embedded in the address matches `origin.origin_pubkey`.
+//! 5. `origin.origin_pubkey` satisfies the §05 Ed25519 strict profile
+//!    (canonical encoding, non-small-order). Without this check, a manifest
+//!    could declare a small-order origin pubkey that no other pipeline
+//!    stage rejects (the onion address binding is byte-equality, and
+//!    K_origin never verifies a signature in v1).
 //!
-//! All four checks emit `E_BIND_ORIGIN` on failure, attached to the manifest.
+//! All five checks emit `E_BIND_ORIGIN` on failure, attached to the manifest.
 
 use serde_json::json;
 
+use crate::crypto::validate_origin_pubkey_strict;
 use crate::types::manifest::{Carrier, OnionAddress, Origin};
 use crate::validation::diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel};
 
@@ -54,6 +60,23 @@ pub fn verify_origin_binding(
             DocumentKindLabel::Manifest,
             "origin_pubkey does not match key derived from .onion address",
         ));
+    }
+
+    // (5) §05 strict profile applies to K_origin.pub for Ed25519 carriers
+    // (Tor v3). The address-binding check above is byte-equality between two
+    // 32-byte values; it does not reject a small-order or non-canonical
+    // origin pubkey. K_origin never verifies a signature in v1, so this is
+    // the only stage at which the strict profile can be enforced for it.
+    if validate_origin_pubkey_strict(&manifest_origin.origin_pubkey).is_err() {
+        return Err(Diagnostic::new(
+            DiagnosticCode::EBindOrigin,
+            DocumentKindLabel::Manifest,
+            "origin.origin_pubkey fails the §05 strict profile (non-canonical or small-order)",
+        )
+        .with_details(json!({
+            "field_path": "origin.origin_pubkey",
+            "reason": "public_key_rejected",
+        })));
     }
 
     Ok(())

@@ -38,7 +38,7 @@ use entangled_core::validation::canary::CanaryState;
 use entangled_core::validation::DiagnosticCode;
 use sha3::{Digest, Sha3_256};
 
-use crate::common::{fixed_now, runtime_key_zero, ts};
+use crate::common::{fixed_now, runtime_key_real, ts};
 
 const ALT_ONION_ADDR: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.onion";
 
@@ -92,7 +92,7 @@ fn unsigned_manifest_with_consistent_origin(
             origin_pubkey: OriginPubkey::from_bytes(origin_pk_bytes),
         },
         canary: Canary {
-            runtime_pubkey: runtime_key_zero(),
+            runtime_pubkey: runtime_key_real(),
             issued_at: canary_issued_at,
             next_expected: canary_next_expected,
             statement: "All clear.".to_owned(),

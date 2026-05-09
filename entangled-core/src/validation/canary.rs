@@ -15,6 +15,7 @@
 //! String length caps for `statement` and `freshness_proof` are part of Stage
 //! 5 schema validation and are not duplicated here.
 
+use crate::crypto::validate_runtime_pubkey_strict;
 use crate::types::keys::RuntimePubkey;
 use crate::types::{Canary, EntangledTimestamp};
 use crate::validation::clock::{check_future_timestamp, CANARY_ISSUED_AT_FIELD};
@@ -117,6 +118,27 @@ pub fn validate_canary_structure(
                 "canary interval {interval}s exceeds the {CANARY_INTERVAL_MAX_SECS}s maximum (90 days)"
             ),
         ));
+    }
+
+    // (d) §05 strict-profile validation of the embedded runtime pubkey.
+    //
+    // The signature pipeline only validates K_runtime when actually verifying
+    // a content/transaction document under it (`verify_strict` rejects
+    // small-order keys). Without this defensive check, a manifest declaring a
+    // non-canonical or small-order runtime_pubkey would pass Stages 6/8/9
+    // and the spec violation would surface only on the first content fetch.
+    // Failing at canary structure time aligns the rejection point with
+    // manifest acceptance.
+    if validate_runtime_pubkey_strict(&canary.runtime_pubkey).is_err() {
+        return Err(Diagnostic::new(
+            DiagnosticCode::ECanaryInvalid,
+            DocumentKindLabel::Manifest,
+            "canary.runtime_pubkey fails the §05 strict profile (non-canonical or small-order)",
+        )
+        .with_details(serde_json::json!({
+            "field_path": "canary.runtime_pubkey",
+            "reason": "public_key_rejected",
+        })));
     }
 
     Ok(())

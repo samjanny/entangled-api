@@ -3,6 +3,7 @@
 
 #![allow(dead_code)]
 
+use entangled_core::crypto::{PublisherSigningKey, RuntimeSigningKey};
 use entangled_core::types::{
     blocks::{Block, FeedbackVariant},
     canary::Canary,
@@ -18,7 +19,10 @@ use entangled_core::types::{
     timestamp::EntangledTimestamp,
 };
 
-/// 43 zero base64url chars → 32 zero bytes.
+/// 43 zero base64url chars → 32 zero bytes. **Small-order point**: rejected by
+/// the §05 strict profile in `validate_canary_structure` and
+/// `verify_origin_binding`. Use [`runtime_key_real`] / [`origin_key_real`] /
+/// [`pubkey_real`] for fixtures that must clear strict validation.
 pub const KEY_ZEROS: &str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
 /// 51 ASCII chars: `sha-256:` + 43 zero base64url chars → 32 zero bytes.
@@ -43,6 +47,26 @@ pub fn origin_key_zero() -> OriginPubkey {
 
 pub fn runtime_key_zero() -> RuntimePubkey {
     RuntimePubkey::try_from(KEY_ZEROS).unwrap()
+}
+
+/// Strict-profile-clean publisher pubkey derived from a fixed seed. Use in
+/// fixtures where the manifest must pass §05 pubkey strict validation.
+pub fn pubkey_real() -> PublisherPubkey {
+    PublisherSigningKey::from_seed(&[0xA1; 32]).verifying_key()
+}
+
+/// Strict-profile-clean runtime pubkey derived from a fixed seed.
+pub fn runtime_key_real() -> RuntimePubkey {
+    RuntimeSigningKey::from_seed(&[0xB2; 32]).verifying_key()
+}
+
+/// Strict-profile-clean origin pubkey derived from a fixed seed. K_origin
+/// has no role-typed signing key in this crate (it never signs in v1), so
+/// the bytes come from a `RuntimeSigningKey` reinterpreted as an
+/// [`OriginPubkey`]; the strict-profile constraints are identical.
+pub fn origin_key_real() -> OriginPubkey {
+    let runtime = RuntimeSigningKey::from_seed(&[0xC3; 32]).verifying_key();
+    OriginPubkey::from_bytes(*runtime.as_bytes())
 }
 
 pub fn signature_zero() -> Signature {
@@ -83,7 +107,7 @@ pub fn onion() -> OnionAddress {
 
 pub fn minimal_canary() -> Canary {
     Canary {
-        runtime_pubkey: runtime_key_zero(),
+        runtime_pubkey: runtime_key_real(),
         issued_at: ts("2026-05-07T00:00:00Z"),
         next_expected: ts("2026-06-07T00:00:00Z"),
         statement: "All clear.".to_owned(),

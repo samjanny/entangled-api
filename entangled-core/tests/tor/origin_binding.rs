@@ -76,6 +76,34 @@ fn binding_fails_on_pubkey_mismatch() {
     assert_eq!(err.code, DiagnosticCode::EBindOrigin);
 }
 
+// -----------------------------------------------------------------------------
+// §05 strict-profile validation of `origin.origin_pubkey` (Stage 9).
+//
+// K_origin never verifies a signature in v1, so this is the only stage at
+// which the §05 strict-profile check can be enforced for it. Steps 1-4 of
+// `verify_origin_binding` all pass for an all-zero origin pubkey (it has a
+// well-defined onion-address derivation that round-trips); the rejection
+// must come from step 5, the strict pubkey check.
+// -----------------------------------------------------------------------------
+
+#[test]
+fn small_order_origin_pubkey_rejected_with_field_path_detail() {
+    // 32-zero-byte pubkey is a 4-torsion point on Ed25519 (small-order).
+    let weak = [0u8; 32];
+    let addr = OnionAddress::try_from(make_onion_address(&weak).as_str()).unwrap();
+    let origin = Origin {
+        carrier: Carrier::TorV3,
+        address: addr.clone(),
+        origin_pubkey: OriginPubkey::from_bytes(weak),
+    };
+    let err = verify_origin_binding(&addr, &origin).expect_err("small-order key rejected");
+    assert_eq!(err.code, DiagnosticCode::EBindOrigin);
+    assert_eq!(err.document_kind, DocumentKindLabel::Manifest);
+    let details = err.details.as_ref().expect("details payload");
+    assert_eq!(details["field_path"].as_str(), Some("origin.origin_pubkey"));
+    assert_eq!(details["reason"].as_str(), Some("public_key_rejected"));
+}
+
 /// `Carrier` is a closed enum with a single variant in v1.0, so the
 /// "wrong carrier" branch is currently unreachable through the public API.
 /// This test documents the pattern match.

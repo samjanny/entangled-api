@@ -68,7 +68,15 @@ impl DocumentError {
     ///   only triggered if the caller wires a non-normative context string,
     ///   which is impossible through the public API).
     /// - [`CryptoError::VerificationFailed`] → `E_SIG_VERIFICATION`.
-    /// - [`CryptoError::InvalidPublicKey`] → `E_SIG_INVALID_KEY`.
+    /// - [`CryptoError::InvalidPublicKey`] → `E_SIG_VERIFICATION` with
+    ///   `details.reason: "public_key_rejected"`. Per §05 v1.0-rc.4, a
+    ///   public key failing the strict profile (non-canonical encoding
+    ///   or small-order point) causes the document being verified under
+    ///   that key to be rejected as a signature failure.
+    ///   `E_SIG_INVALID_KEY` is reserved for "expected verification key
+    ///   not available" (e.g. no manifest from which to resolve a
+    ///   runtime pubkey) and is emitted by higher-layer callers, not by
+    ///   this mapping.
     /// - [`DocumentError::Serialization`] → `E_PARSE_JSON`.
     pub fn into_diagnostic(self, kind: DocumentKindLabel) -> Diagnostic {
         match self {
@@ -100,10 +108,13 @@ impl DocumentError {
                 "Ed25519 signature verification failed",
             ),
             Self::Crypto(CryptoError::InvalidPublicKey) => Diagnostic::new(
-                DiagnosticCode::ESigInvalidKey,
+                DiagnosticCode::ESigVerification,
                 kind,
-                "invalid public key encoding",
-            ),
+                "Ed25519 public key fails the §05 strict profile (non-canonical or small-order)",
+            )
+            .with_details(serde_json::json!({
+                "reason": "public_key_rejected",
+            })),
             Self::Signing(_) => unreachable!(
                 "From<SigningError> flattens into Canon/Crypto variants before reaching this point"
             ),

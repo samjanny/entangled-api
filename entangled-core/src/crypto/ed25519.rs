@@ -25,13 +25,65 @@ use crate::types::{OriginPubkey, PublisherPubkey, RuntimePubkey, Signature};
 /// Errors produced by Ed25519 verification.
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum CryptoError {
-    /// The 32-byte public key did not decode to a valid Ed25519 point.
-    #[error("invalid Ed25519 public key encoding")]
+    /// The 32-byte public key fails the §05 strict profile: either it does
+    /// not decode to a canonical Ed25519 curve point, or it decodes to a
+    /// small-order point (order divides the cofactor 8).
+    ///
+    /// Per §05, both rejection causes mean "the document being verified
+    /// under that key is rejected as a signature failure". Higher-level
+    /// callers therefore map this variant to `E_SIG_VERIFICATION` (§11),
+    /// not `E_SIG_INVALID_KEY` — the latter is reserved for "the expected
+    /// verification key is not available" (e.g. no manifest from which to
+    /// resolve `runtime_pubkey`).
+    #[error("Ed25519 public key fails the §05 strict profile (non-canonical or small-order)")]
     InvalidPublicKey,
     /// Strict signature verification failed (forged, tampered, or
     /// wrong-key signature).
     #[error("Ed25519 signature verification failed")]
     VerificationFailed,
+}
+
+/// Strict §05 public-key validation: canonical encoding **and** non-small-order.
+///
+/// `ed25519_dalek::VerifyingKey::from_bytes` checks that the 32 bytes
+/// decompress to a valid curve point under the canonical compressed
+/// encoding. The §05 strict profile additionally requires the point to be
+/// non-small-order (order does not divide the cofactor 8); this rejection
+/// is enforced here via `VerifyingKey::is_weak`.
+///
+/// Use this helper when the strict profile must hold at a pipeline stage
+/// other than ordinary signature verification — for example, validating
+/// `canary.runtime_pubkey` at Stage 8 or `origin.origin_pubkey` at
+/// Stage 9. For ordinary signature verification, [`VerifyingKey::verify`]
+/// already invokes the equivalent check via `verify_strict`.
+pub fn validate_pubkey_strict(bytes: &[u8; 32]) -> Result<(), CryptoError> {
+    let vk = ed25519_dalek::VerifyingKey::from_bytes(bytes)
+        .map_err(|_| CryptoError::InvalidPublicKey)?;
+    if vk.is_weak() {
+        return Err(CryptoError::InvalidPublicKey);
+    }
+    Ok(())
+}
+
+/// Strict-profile validation specialized for [`PublisherPubkey`].
+///
+/// See [`validate_pubkey_strict`] for the contract.
+pub fn validate_publisher_pubkey_strict(pk: &PublisherPubkey) -> Result<(), CryptoError> {
+    validate_pubkey_strict(pk.as_bytes())
+}
+
+/// Strict-profile validation specialized for [`RuntimePubkey`].
+///
+/// See [`validate_pubkey_strict`] for the contract.
+pub fn validate_runtime_pubkey_strict(pk: &RuntimePubkey) -> Result<(), CryptoError> {
+    validate_pubkey_strict(pk.as_bytes())
+}
+
+/// Strict-profile validation specialized for [`OriginPubkey`].
+///
+/// See [`validate_pubkey_strict`] for the contract.
+pub fn validate_origin_pubkey_strict(pk: &OriginPubkey) -> Result<(), CryptoError> {
+    validate_pubkey_strict(pk.as_bytes())
 }
 
 /// An Ed25519 signing key (private key + cached verifying key).
@@ -198,9 +250,12 @@ impl VerifyingKey {
     }
 
     fn from_pubkey_bytes(bytes: &[u8; 32]) -> Result<Self, CryptoError> {
-        ed25519_dalek::VerifyingKey::from_bytes(bytes)
-            .map(VerifyingKey)
-            .map_err(|_| CryptoError::InvalidPublicKey)
+        let vk = ed25519_dalek::VerifyingKey::from_bytes(bytes)
+            .map_err(|_| CryptoError::InvalidPublicKey)?;
+        if vk.is_weak() {
+            return Err(CryptoError::InvalidPublicKey);
+        }
+        Ok(VerifyingKey(vk))
     }
 
     /// Verify a signature on an arbitrary input.

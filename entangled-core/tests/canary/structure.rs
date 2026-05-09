@@ -6,7 +6,7 @@ use entangled_core::types::timestamp::EntangledTimestamp;
 use entangled_core::validation::canary::validate_canary_structure;
 use entangled_core::validation::DiagnosticCode;
 
-use super::common::KEY_ZEROS;
+use super::common::{runtime_key_real, KEY_ZEROS};
 
 fn ts(s: &str) -> EntangledTimestamp {
     EntangledTimestamp::try_from(s).unwrap()
@@ -14,7 +14,10 @@ fn ts(s: &str) -> EntangledTimestamp {
 
 fn canary_with(issued: EntangledTimestamp, expected: EntangledTimestamp) -> Canary {
     Canary {
-        runtime_pubkey: RuntimePubkey::try_from(KEY_ZEROS).unwrap(),
+        // Strict-profile-clean runtime_pubkey; structural canary tests want
+        // to exercise interval / ordering / future-skew without tripping the
+        // §05 pubkey check.
+        runtime_pubkey: runtime_key_real(),
         issued_at: issued,
         next_expected: expected,
         statement: "All clear.".to_owned(),
@@ -90,4 +93,40 @@ fn interval_max_boundary_accepted() {
     // Exactly 90 days = 7776000s.
     let c = canary_with(ts("2026-02-06T00:00:00Z"), ts("2026-05-07T00:00:00Z"));
     validate_canary_structure(&c, &now).expect("90-day boundary accepted");
+}
+
+// -----------------------------------------------------------------------------
+// §05 strict-profile validation of `canary.runtime_pubkey` (Stage 8).
+//
+// The pubkey check fires after timestamps and interval clear; a canary that
+// is structurally fine in every other respect but declares a small-order
+// runtime pubkey must still be rejected as `E_CANARY_INVALID`. Without this
+// test, a regression that drops the strict check could only be caught at
+// first content fetch (where `verify_strict` would surface the same key as
+// `E_SIG_VERIFICATION`).
+// -----------------------------------------------------------------------------
+
+#[test]
+fn small_order_runtime_pubkey_rejected_with_field_path_detail() {
+    let now = ts("2026-05-07T00:00:00Z");
+    // 32-zero-byte pubkey is a 4-torsion point on Ed25519 (small-order).
+    let weak = RuntimePubkey::try_from(KEY_ZEROS).unwrap();
+    let mut c = Canary {
+        runtime_pubkey: weak,
+        issued_at: ts("2026-05-01T00:00:00Z"),
+        next_expected: ts("2026-05-31T00:00:00Z"),
+        statement: "All clear.".to_owned(),
+        freshness_proof: None,
+    };
+    let err = validate_canary_structure(&c, &now).expect_err("small-order key rejected");
+    assert_eq!(err.code, DiagnosticCode::ECanaryInvalid);
+    let details = err.details.as_ref().expect("details payload");
+    assert_eq!(details["field_path"].as_str(), Some("canary.runtime_pubkey"));
+    assert_eq!(details["reason"].as_str(), Some("public_key_rejected"));
+
+    // Strict-clean key fixes only the pubkey violation, leaving the canary
+    // otherwise unchanged. Confirms the rejection above was specifically the
+    // pubkey check, not a side effect of one of the earlier conditions.
+    c.runtime_pubkey = runtime_key_real();
+    validate_canary_structure(&c, &now).expect("strict-clean key passes");
 }

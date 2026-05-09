@@ -118,3 +118,28 @@ fn stage6_well_formed_sig_but_wrong_signature_rejected() {
     let err = parse_and_verify_manifest(&altered, &fixed_now()).expect_err("must reject");
     assert_eq!(err.code, DiagnosticCode::ESigVerification);
 }
+
+#[test]
+fn stage6_small_order_publisher_pubkey_emits_sig_verification() {
+    // §05 v1.0-rc.4: a public key failing the strict profile (non-canonical
+    // encoding or small-order point) causes the document being verified
+    // under that key to be rejected as a signature failure, reported as
+    // E_SIG_VERIFICATION (not E_SIG_INVALID_KEY, which is reserved for
+    // "expected verification key not available"). 32-zero-byte pubkey is a
+    // 4-torsion point on Ed25519 (small-order).
+    let bytes = build_valid_manifest_bytes();
+    let mut value: Value = serde_json::from_slice(&bytes).unwrap();
+    let zeros_pubkey = "A".repeat(43); // 43 base64url chars → 32 zero bytes.
+    if let Value::Object(ref mut map) = value {
+        map.insert(
+            "publisher_pubkey".to_owned(),
+            Value::String(zeros_pubkey),
+        );
+    }
+    let altered = serde_json::to_vec(&value).unwrap();
+    let err = parse_and_verify_manifest(&altered, &fixed_now())
+        .expect_err("small-order publisher pubkey must reject");
+    assert_eq!(err.code, DiagnosticCode::ESigVerification);
+    let details = err.details.as_ref().expect("details payload");
+    assert_eq!(details["reason"].as_str(), Some("public_key_rejected"));
+}
