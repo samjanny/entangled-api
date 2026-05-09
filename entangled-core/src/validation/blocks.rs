@@ -334,10 +334,14 @@ pub fn validate_form_fields(fields: &[FormField]) -> Result<(), Diagnostic> {
         };
         if !seen_names.insert(name) {
             return Err(Diagnostic::new(
-                DiagnosticCode::ESchemaFieldSyntax,
+                DiagnosticCode::ESchemaDuplicateEntry,
                 DocumentKindLabel::None,
                 format!("duplicate field name {:?}", name.as_str()),
-            ));
+            )
+            .with_details(serde_json::json!({
+                "field_path": "submit_form.fields[].name",
+                "duplicate_value": name.as_str(),
+            })));
         }
 
         let label = match f {
@@ -407,10 +411,14 @@ fn validate_select_options(options: &[SelectOption]) -> Result<(), Diagnostic> {
     for opt in options {
         if !seen_values.insert(&opt.value) {
             return Err(Diagnostic::new(
-                DiagnosticCode::ESchemaFieldSyntax,
+                DiagnosticCode::ESchemaDuplicateEntry,
                 DocumentKindLabel::None,
                 format!("duplicate select option value {:?}", opt.value.as_str()),
-            ));
+            )
+            .with_details(serde_json::json!({
+                "field_path": "submit_form.fields[].options[].value",
+                "duplicate_value": opt.value.as_str(),
+            })));
         }
         if opt.label.len() > FORM_FIELD_LABEL_MAX_BYTES {
             return Err(Diagnostic::new(

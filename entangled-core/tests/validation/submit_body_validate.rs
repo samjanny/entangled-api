@@ -176,6 +176,38 @@ fn distinct_keys_in_same_namespace_accepted() {
 }
 
 #[test]
+fn request_state_value_above_4096_bytes_rejected() {
+    // §09 (rc.10): each `request_state[].value` MUST be a UTF-8 string not
+    // exceeding 4096 bytes — the protocol's absolute state-value ceiling
+    // restated for the submit-body schema.
+    let body = SubmitBody {
+        fields: BTreeMap::new(),
+        request_state: vec![RequestStateItem {
+            namespace: slug("session"),
+            key: slug("auth"),
+            value: "x".repeat(4097),
+        }],
+        request_id: rid_zero(),
+    };
+    let err = validate_submit_body(&body).unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::ESchemaFieldLength);
+}
+
+#[test]
+fn request_state_value_at_4096_bytes_accepted() {
+    let body = SubmitBody {
+        fields: BTreeMap::new(),
+        request_state: vec![RequestStateItem {
+            namespace: slug("session"),
+            key: slug("auth"),
+            value: "x".repeat(4096),
+        }],
+        request_id: rid_zero(),
+    };
+    validate_submit_body(&body).expect("4096-byte value sits exactly on the cap");
+}
+
+#[test]
 fn round_trip_serialize_then_validate_bytes() {
     let mut fields = BTreeMap::new();
     fields.insert("name".to_owned(), "alice".to_owned());

@@ -38,12 +38,19 @@ fn updated_at_exact_skew_boundary_accepted() {
 }
 
 #[test]
-fn updated_beyond_skew_rejected_as_field_range() {
+fn updated_beyond_skew_rejected_as_field_syntax() {
+    // §10 (rc.10): future-skew rejection on `manifest.updated` is a
+    // temporal-domain syntax violation; details carry `reason`.
     let mut m = minimal_manifest();
     m.updated = ts("2026-05-07T00:06:40Z"); // +400s
     let now = ts("2026-05-07T00:00:00Z");
     let err = check_manifest_clock_skew(&m, &now).expect_err("must reject");
-    assert_eq!(err.code, DiagnosticCode::ESchemaFieldRange);
+    assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
+    let details = err.details.as_ref().expect("details payload");
+    assert_eq!(
+        details["reason"].as_str(),
+        Some("future_beyond_skew_tolerance")
+    );
 }
 
 #[test]
@@ -72,7 +79,7 @@ fn validate_manifest_rejects_updated_beyond_tolerance() {
     m.updated = ts("2026-05-07T00:06:40Z"); // +400s
     let now = ts("2026-05-07T00:00:00Z");
     let err = validate_manifest(&m, &now).expect_err("Stage 5 must reject");
-    assert_eq!(err.code, DiagnosticCode::ESchemaFieldRange);
+    assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
 }
 
 // -----------------------------------------------------------------------------
@@ -95,7 +102,7 @@ fn parse_and_validate_manifest_rejects_future_updated() {
     let bytes = manifest_bytes_with_updated(ts("2026-05-07T00:16:40Z")); // +1000s
     let err = parse_and_validate_manifest(&bytes, &now)
         .expect_err("manifest with updated 1000s in the future must be rejected");
-    assert_eq!(err.code, DiagnosticCode::ESchemaFieldRange);
+    assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
     assert!(
         err.message.contains("manifest.updated"),
         "diagnostic should name the offending field, got {}",
@@ -118,6 +125,20 @@ fn unsigned_manifest_for_clock_skew_canary(
     publisher_pk: entangled_core::types::keys::PublisherPubkey,
     updated: entangled_core::types::EntangledTimestamp,
 ) -> UnsignedManifest {
+    unsigned_manifest_with_dates(
+        publisher_pk,
+        updated,
+        ts("2026-05-07T00:00:00Z"),
+        ts("2026-06-07T00:00:00Z"),
+    )
+}
+
+fn unsigned_manifest_with_dates(
+    publisher_pk: entangled_core::types::keys::PublisherPubkey,
+    updated: entangled_core::types::EntangledTimestamp,
+    canary_issued_at: entangled_core::types::EntangledTimestamp,
+    canary_next_expected: entangled_core::types::EntangledTimestamp,
+) -> UnsignedManifest {
     UnsignedManifest {
         spec_version: SpecVersion,
         publisher_pubkey: publisher_pk,
@@ -131,8 +152,8 @@ fn unsigned_manifest_for_clock_skew_canary(
         },
         canary: Canary {
             runtime_pubkey: RuntimePubkey::try_from(KEY_ZEROS).unwrap(),
-            issued_at: ts("2026-05-07T00:00:00Z"),
-            next_expected: ts("2026-06-07T00:00:00Z"),
+            issued_at: canary_issued_at,
+            next_expected: canary_next_expected,
             statement: "All clear.".to_owned(),
             freshness_proof: None,
         },
@@ -169,13 +190,94 @@ fn integration_canary_parse_and_verify_rejects_future_dated_manifest() {
         .expect_err("future-dated manifest must be rejected before signature verification");
     assert_eq!(
         err.code,
-        DiagnosticCode::ESchemaFieldRange,
+        DiagnosticCode::ESchemaFieldSyntax,
         "expected Stage 5 clock-skew rejection, got {err}",
     );
+    let details = err.details.as_ref().expect("details payload");
+    assert_eq!(
+        details["reason"].as_str(),
+        Some("future_beyond_skew_tolerance")
+    );
+    assert_eq!(details["field_path"].as_str(), Some("manifest.updated"));
     assert!(
         err.message.contains("manifest.updated"),
         "diagnostic should name `manifest.updated`, got {}",
         err.message,
+    );
+}
+
+// -----------------------------------------------------------------------------
+// Discrimination + precedence: §10 (rc.10) treats `manifest.updated` and
+// `canary.issued_at` as separate clock-skew sites with separate diagnostic
+// codes. The pair below pins the discriminator behavior of `clock.rs` against
+// any future regression that would unify them.
+// -----------------------------------------------------------------------------
+
+#[test]
+fn integration_future_canary_issued_at_emits_canary_invalid_via_pipeline() {
+    // Only `canary.issued_at` is in the future; `manifest.updated` is fine.
+    // §10 routes this to Stage 8 (`E_CANARY_INVALID`). It surfaces from
+    // `verify_canary`, not from the schema phase.
+    let publisher_key = PublisherSigningKey::from_seed(&[0xA1; 32]);
+    let publisher_pk = publisher_key.verifying_key();
+    let verifier_now = ts("2026-05-07T00:00:00Z");
+
+    let updated = verifier_now;
+    // +400s ahead of `now` -> beyond the 300s tolerance.
+    let canary_issued = ts("2026-05-07T00:06:40Z");
+    let canary_next = ts("2026-06-07T00:06:40Z");
+
+    // Build under a `signing_now` that lets the future-issued canary pass
+    // the builder's own clock-skew gate.
+    let signing_now = canary_issued;
+    let unsigned = unsigned_manifest_with_dates(publisher_pk, updated, canary_issued, canary_next);
+    let (_signed, bytes) =
+        build_manifest(&unsigned, &publisher_key, &signing_now).expect("build_manifest");
+
+    // Stage 5 (`manifest.updated`) must accept; Stage 8 (`canary.issued_at`)
+    // must reject with E_CANARY_INVALID.
+    let sig_verified = parse_and_verify_manifest(&bytes, &verifier_now)
+        .expect("Stages 2-6 must clear when only canary.issued_at is in the future");
+    let err = sig_verified
+        .verify_canary(&verifier_now)
+        .expect_err("Stage 8 must reject canary.issued_at +400s in the future");
+    assert_eq!(err.code, DiagnosticCode::ECanaryInvalid);
+    assert!(
+        err.message.contains("canary.issued_at"),
+        "diagnostic should name `canary.issued_at`, got {}",
+        err.message,
+    );
+}
+
+#[test]
+fn integration_both_future_resolves_to_field_syntax_by_pipeline_precedence() {
+    // §10 first-failing-stage precedence: when both `manifest.updated` and
+    // `canary.issued_at` are in the future, Stage 5 fires first and the
+    // surfaced diagnostic is `E_SCHEMA_FIELD_SYNTAX`. Stage 8's
+    // `E_CANARY_INVALID` is never reached.
+    let publisher_key = PublisherSigningKey::from_seed(&[0xA2; 32]);
+    let publisher_pk = publisher_key.verifying_key();
+    let verifier_now = ts("2026-05-07T00:00:00Z");
+
+    // Both timestamps are +1000s relative to verifier_now.
+    let future = ts("2026-05-07T00:16:40Z");
+    let canary_next = ts("2026-06-07T00:16:40Z");
+
+    let unsigned = unsigned_manifest_with_dates(publisher_pk, future, future, canary_next);
+    let (_signed, bytes) =
+        build_manifest(&unsigned, &publisher_key, &future).expect("build_manifest");
+
+    let err = parse_and_verify_manifest(&bytes, &verifier_now)
+        .expect_err("manifest.updated future-skew must trip Stage 5 first");
+    assert_eq!(
+        err.code,
+        DiagnosticCode::ESchemaFieldSyntax,
+        "Stage 5 must precede Stage 8 — got {err}",
+    );
+    let details = err.details.as_ref().expect("details payload");
+    assert_eq!(
+        details["reason"].as_str(),
+        Some("future_beyond_skew_tolerance")
     );
 }
 

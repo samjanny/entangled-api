@@ -121,6 +121,8 @@ pub enum DiagnosticCode {
     ESchemaFieldSyntax,
     #[serde(rename = "E_SCHEMA_ENUM_VIOLATION")]
     ESchemaEnumViolation,
+    #[serde(rename = "E_SCHEMA_DUPLICATE_ENTRY")]
+    ESchemaDuplicateEntry,
     #[serde(rename = "E_SCHEMA_FIELD_LENGTH")]
     ESchemaFieldLength,
     #[serde(rename = "E_SCHEMA_NULL_VALUE")]
@@ -203,6 +205,8 @@ pub enum DiagnosticCode {
     EHistoricalTrustBlocked,
     #[serde(rename = "W_HISTORICAL_RENDERED")]
     WHistoricalRendered,
+    #[serde(rename = "W_HISTORICAL_RUNTIME_AMBIGUOUS")]
+    WHistoricalRuntimeAmbiguous,
 
     // Image resource (off-pipeline; warnings)
     #[serde(rename = "W_IMAGE_HASH_MISMATCH")]
@@ -232,6 +236,7 @@ impl DiagnosticCode {
             | WCanaryGap
             | WCanaryUnavailable
             | WHistoricalRendered
+            | WHistoricalRuntimeAmbiguous
             | WImageHashMismatch
             | WImageOversize
             | WImageContentType
@@ -289,17 +294,24 @@ impl DiagnosticCode {
             | ESchemaFieldRange
             | ESchemaFieldSyntax
             | ESchemaEnumViolation
+            | ESchemaDuplicateEntry
             | ESchemaFieldLength
             | ESchemaNullValue
             | ESchemaNonInteger
             | ESchemaMalformedUnicode => 5,
 
-            // Stage 6 — Signature.
-            ESigVerification | ESigInvalidKey | ESigMalformed => 6,
+            // Stage 6 — Signature, plus the manifest identity pre-check
+            // detected during Stage 6 per §11 (rc.10): `E_TRUST_MISMATCH`
+            // takes precedence over `E_SIG_VERIFICATION` and is reported
+            // with `stage: 6`. `E_TRUST_USER_REJECTED` accompanies the same
+            // pre-check when the user rejects the presented identity.
+            ESigVerification | ESigInvalidKey | ESigMalformed | ETrustMismatch
+            | ETrustUserRejected => 6,
 
-            // Stage 7 — Trust state.
-            ETrustMismatch | ETrustUserRejected | ITrustFirstContact | ITrustTofuPinned
-            | ITrustVerified => 7,
+            // Stage 7 — Trust state transitions only (First contact /
+            // TOFU pinning / external verification). The mismatch /
+            // user-rejected codes moved to Stage 6 in rc.10.
+            ITrustFirstContact | ITrustTofuPinned | ITrustVerified => 7,
 
             // Stage 8 — Canary.
             ECanaryInvalid
@@ -325,6 +337,7 @@ impl DiagnosticCode {
             | EHistoricalNoAuthorization
             | EHistoricalTrustBlocked
             | WHistoricalRendered
+            | WHistoricalRuntimeAmbiguous
             | WImageHashMismatch
             | WImageOversize
             | WImageContentType

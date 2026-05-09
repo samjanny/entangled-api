@@ -17,7 +17,8 @@ use crate::types::slug::Slug;
 use super::diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel};
 use super::input::{check_input, InputKind};
 use super::limits::{
-    SUBMIT_FIELDS_MAX_PAIRS, SUBMIT_FIELD_VALUE_MAX_BYTES, SUBMIT_REQUEST_STATE_MAX_ENTRIES,
+    STATE_VALUE_MAX_BYTES, SUBMIT_FIELDS_MAX_PAIRS, SUBMIT_FIELD_VALUE_MAX_BYTES,
+    SUBMIT_REQUEST_STATE_MAX_ENTRIES,
 };
 use super::parse::parse_with_limits;
 
@@ -65,8 +66,22 @@ pub fn validate_submit_body(body: &SubmitBody) -> Result<(), Diagnostic> {
         ));
     }
     // RequestStateItem.namespace / key are already `Slug` (validated at
-    // deserialize). §09 places no per-entry cap on `value`; the policy
-    // `max_size` (≤ 4096) was enforced at `set` time.
+    // deserialize). §09 (rc.10) places a 4096-byte schema cap on each
+    // `value` — the protocol's absolute state-value ceiling restated for the
+    // submit body. Per-policy `max_size` (≤ 4096) was enforced at `set`
+    // time; this cap is the wire-side defence-in-depth check.
+    for entry in &body.request_state {
+        if entry.value.len() > STATE_VALUE_MAX_BYTES {
+            return Err(Diagnostic::new(
+                DiagnosticCode::ESchemaFieldLength,
+                DocumentKindLabel::None,
+                format!(
+                    "submit body request_state value of {} bytes exceeds cap of {STATE_VALUE_MAX_BYTES}",
+                    entry.value.len()
+                ),
+            ));
+        }
+    }
 
     // §09: each (namespace, key) pair appears at most once. Publishers MUST
     // reject submit bodies containing duplicate request_state entries

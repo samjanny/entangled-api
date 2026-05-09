@@ -44,10 +44,15 @@ pub fn validate_state_policy(policy: &[StatePolicyEntry]) -> Result<(), Diagnost
     for e in policy {
         if !seen.insert((&e.namespace, &e.key)) {
             return Err(Diagnostic::new(
-                DiagnosticCode::ESchemaFieldSyntax,
+                DiagnosticCode::ESchemaDuplicateEntry,
                 DocumentKindLabel::Manifest,
                 "duplicate (namespace, key) in state_policy",
-            ));
+            )
+            .with_details(serde_json::json!({
+                "field_path": "state_policy",
+                "duplicate_namespace": e.namespace.as_str(),
+                "duplicate_key": e.key.as_str(),
+            })));
         }
         if !STATE_MAX_SIZE_RANGE.contains(&e.max_size) {
             return Err(Diagnostic::new(

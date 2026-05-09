@@ -41,6 +41,7 @@ fn all_codes_round_trip_via_json() {
         DiagnosticCode::ESchemaFieldRange,
         DiagnosticCode::ESchemaFieldSyntax,
         DiagnosticCode::ESchemaEnumViolation,
+        DiagnosticCode::ESchemaDuplicateEntry,
         DiagnosticCode::ESchemaFieldLength,
         DiagnosticCode::ESchemaNullValue,
         DiagnosticCode::ESchemaNonInteger,
@@ -76,6 +77,7 @@ fn all_codes_round_trip_via_json() {
         DiagnosticCode::EHistoricalNoAuthorization,
         DiagnosticCode::EHistoricalTrustBlocked,
         DiagnosticCode::WHistoricalRendered,
+        DiagnosticCode::WHistoricalRuntimeAmbiguous,
         DiagnosticCode::WImageHashMismatch,
         DiagnosticCode::WImageOversize,
         DiagnosticCode::WImageContentType,
@@ -205,6 +207,58 @@ fn transport_transfer_encoding_is_stage_1_error() {
         DiagnosticCode::ETransportTransferEncoding.severity(),
         Severity::Error
     );
+}
+
+#[test]
+fn trust_mismatch_is_stage_6_error_per_rc_10() {
+    // §11 (rc.10): `E_TRUST_MISMATCH` is detected during the Stage 6
+    // manifest identity pre-check and takes precedence over
+    // `E_SIG_VERIFICATION`. Stage attribution moved from 7 to 6.
+    assert_eq!(DiagnosticCode::ETrustMismatch.stage(), 6);
+    assert_eq!(DiagnosticCode::ETrustUserRejected.stage(), 6);
+    assert_eq!(DiagnosticCode::ETrustMismatch.severity(), Severity::Error);
+}
+
+#[test]
+fn trust_state_transitions_remain_stage_7() {
+    // The First-contact / TOFU-pinned / externally-verified transitions
+    // are emitted as part of Stage 7 trust-state resolution.
+    assert_eq!(DiagnosticCode::ITrustFirstContact.stage(), 7);
+    assert_eq!(DiagnosticCode::ITrustTofuPinned.stage(), 7);
+    assert_eq!(DiagnosticCode::ITrustVerified.stage(), 7);
+}
+
+#[test]
+fn schema_duplicate_entry_is_stage_5_error() {
+    assert_eq!(DiagnosticCode::ESchemaDuplicateEntry.stage(), 5);
+    assert_eq!(
+        DiagnosticCode::ESchemaDuplicateEntry.severity(),
+        Severity::Error
+    );
+}
+
+#[test]
+fn schema_duplicate_entry_serializes_exactly() {
+    let s = serde_json::to_string(&DiagnosticCode::ESchemaDuplicateEntry).unwrap();
+    assert_eq!(s, "\"E_SCHEMA_DUPLICATE_ENTRY\"");
+}
+
+#[test]
+fn historical_runtime_ambiguous_is_off_pipeline_warning() {
+    // §11 (rc.10): warning-severity historical-content diagnostic; document
+    // is rejected per §10 but the condition does not invalidate other
+    // content for the same publisher.
+    assert_eq!(DiagnosticCode::WHistoricalRuntimeAmbiguous.stage(), 0);
+    assert_eq!(
+        DiagnosticCode::WHistoricalRuntimeAmbiguous.severity(),
+        Severity::Warning
+    );
+}
+
+#[test]
+fn historical_runtime_ambiguous_serializes_exactly() {
+    let s = serde_json::to_string(&DiagnosticCode::WHistoricalRuntimeAmbiguous).unwrap();
+    assert_eq!(s, "\"W_HISTORICAL_RUNTIME_AMBIGUOUS\"");
 }
 
 #[test]

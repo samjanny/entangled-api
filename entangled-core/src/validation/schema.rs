@@ -38,7 +38,8 @@ use crate::types::blocks::Block;
 ///
 /// `now` is the local wall-clock time used for the §06 / §10 clock-skew
 /// check on `manifest.updated`: a manifest dated more than 300 seconds ahead
-/// of `now` is rejected with `E_SCHEMA_FIELD_RANGE`.
+/// of `now` is rejected with `E_SCHEMA_FIELD_SYNTAX` carrying
+/// `reason: "future_beyond_skew_tolerance"` in `details` (§10 rc.10).
 ///
 /// # Errors
 ///

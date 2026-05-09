@@ -95,7 +95,13 @@ fn t05_state_policy_duplicate_namespace_key_rejected() {
         .unwrap()
         .insert("state_policy".to_owned(), json!([entry, entry]));
     let err = parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now()).unwrap_err();
-    assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
+    // §11 (rc.10): within-array uniqueness violations report
+    // E_SCHEMA_DUPLICATE_ENTRY, not E_SCHEMA_FIELD_SYNTAX.
+    assert_eq!(err.code, DiagnosticCode::ESchemaDuplicateEntry);
+    let details = err.details.as_ref().expect("details payload");
+    assert_eq!(details["field_path"].as_str(), Some("state_policy"));
+    assert_eq!(details["duplicate_namespace"].as_str(), Some("session"));
+    assert_eq!(details["duplicate_key"].as_str(), Some("auth"));
 }
 
 #[test]
@@ -115,7 +121,7 @@ fn t06_form_with_duplicate_field_name_rejected() {
         }
     ]);
     let err = parse_and_validate_content(&manifest_bytes(&v)).unwrap_err();
-    assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
+    assert_eq!(err.code, DiagnosticCode::ESchemaDuplicateEntry);
 }
 
 #[test]
@@ -143,7 +149,7 @@ fn t07_select_with_duplicate_option_value_rejected() {
         }
     ]);
     let err = parse_and_validate_content(&manifest_bytes(&v)).unwrap_err();
-    assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
+    assert_eq!(err.code, DiagnosticCode::ESchemaDuplicateEntry);
 }
 
 #[test]
@@ -159,7 +165,7 @@ fn t08_inline_marks_with_duplicate_bold_rejected() {
         }
     ]);
     let err = parse_and_validate_content(&manifest_bytes(&v)).unwrap_err();
-    assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
+    assert_eq!(err.code, DiagnosticCode::ESchemaDuplicateEntry);
 }
 
 #[test]
@@ -516,6 +522,29 @@ fn t22_content_with_empty_blocks_array_rejected() {
     *blocks = json!([]);
     let err = parse_and_validate_content(&manifest_bytes(&v)).unwrap_err();
     assert_eq!(err.code, DiagnosticCode::ESchemaRequiredField);
+}
+
+#[test]
+fn t22a_image_alt_empty_string_accepted() {
+    // §03 (rc.10): `alt` MAY be the empty string for purely decorative
+    // images, in contrast to `caption` where the empty string is forbidden.
+    // Pinning the asymmetry against an over-eager future refactor that
+    // would add `is_empty()` and break conformance.
+    let mut v = content_value();
+    let blocks = v.as_object_mut().unwrap().get_mut("blocks").unwrap();
+    *blocks = json!([
+        {
+            "kind": "image",
+            "src": "/a.png",
+            "sha256": SHA256_PREFIXED_ZEROS,
+            "media_type": "image/png",
+            "width": 800,
+            "height": 600,
+            "alt": ""
+        }
+    ]);
+    parse_and_validate_content(&manifest_bytes(&v))
+        .expect("decorative image with empty alt must validate");
 }
 
 #[test]

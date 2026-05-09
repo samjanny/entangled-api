@@ -35,7 +35,11 @@ pub const CANARY_ISSUED_AT_FIELD: &str = "canary.issued_at";
 /// closest-fit code for the field being checked:
 ///
 /// * `canary.issued_at` → `E_CANARY_INVALID` (Stage 8 — canary integrity).
-/// * any other field → `E_SCHEMA_FIELD_RANGE` (Stage 5 — value out of range).
+/// * any other field → `E_SCHEMA_FIELD_SYNTAX` (Stage 5 — temporal-domain
+///   failure). For `manifest.updated` the structured `details` SHOULD carry
+///   `reason: "future_beyond_skew_tolerance"` plus the offending timestamp,
+///   to distinguish this temporal-domain rejection from lexical RFC 3339
+///   violations (§10 rc.10).
 pub fn check_future_timestamp(
     ts: &EntangledTimestamp,
     now: &EntangledTimestamp,
@@ -47,19 +51,29 @@ pub fn check_future_timestamp(
         return Ok(());
     }
 
-    let code = if field_name == CANARY_ISSUED_AT_FIELD {
-        DiagnosticCode::ECanaryInvalid
-    } else {
-        DiagnosticCode::ESchemaFieldRange
-    };
+    if field_name == CANARY_ISSUED_AT_FIELD {
+        return Err(Diagnostic::new(
+            DiagnosticCode::ECanaryInvalid,
+            document_kind,
+            format!(
+                "{field_name} is {delta}s in the future, exceeds clock-skew tolerance of {CLOCK_SKEW_TOLERANCE_SECS}s"
+            ),
+        ));
+    }
 
     Err(Diagnostic::new(
-        code,
+        DiagnosticCode::ESchemaFieldSyntax,
         document_kind,
         format!(
             "{field_name} is {delta}s in the future, exceeds clock-skew tolerance of {CLOCK_SKEW_TOLERANCE_SECS}s"
         ),
-    ))
+    )
+    .with_details(serde_json::json!({
+        "field_path": field_name,
+        "reason": "future_beyond_skew_tolerance",
+        "timestamp": ts.to_string(),
+        "skew_tolerance_seconds": CLOCK_SKEW_TOLERANCE_SECS,
+    })))
 }
 
 /// Reject a manifest whose `updated` timestamp is more than
@@ -72,8 +86,9 @@ pub fn check_future_timestamp(
 ///
 /// # Errors
 ///
-/// Returns `E_SCHEMA_FIELD_RANGE` when `manifest.updated` exceeds the
-/// tolerance.
+/// Returns `E_SCHEMA_FIELD_SYNTAX` when `manifest.updated` exceeds the
+/// tolerance, with `details` carrying
+/// `reason: "future_beyond_skew_tolerance"` per §10 rc.10.
 pub fn check_manifest_clock_skew(
     manifest: &Manifest,
     now: &EntangledTimestamp,

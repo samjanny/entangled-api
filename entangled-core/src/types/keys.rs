@@ -321,6 +321,14 @@ impl RequestId {
     }
 
     /// Build from raw 16 bytes (no validation).
+    ///
+    /// This constructor accepts arbitrary bytes; it does NOT enforce the
+    /// §09 / §10 no-reuse contract. The caller is responsible for ensuring
+    /// the bytes come from a fresh CSPRNG draw and are never reused across
+    /// submits — neither cross-temporally (subsequent submits, including
+    /// retries) nor concurrently (multiple in-flight submits to distinct
+    /// publishers). Reuse is a normative MUST violation; the type cannot
+    /// detect it because doing so would require session-wide state.
     pub fn from_bytes(bytes: [u8; REQUEST_ID_BYTES]) -> Self {
         Self(bytes)
     }

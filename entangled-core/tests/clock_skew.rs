@@ -35,7 +35,11 @@ fn at_exact_tolerance_boundary_passes() {
 }
 
 #[test]
-fn beyond_tolerance_for_manifest_field_emits_field_range() {
+fn beyond_tolerance_for_manifest_field_emits_field_syntax() {
+    // §10 (rc.10): a `manifest.updated` future-skew rejection is
+    // `E_SCHEMA_FIELD_SYNTAX` (temporal-domain syntax), with structured
+    // `details` carrying `reason: "future_beyond_skew_tolerance"` to
+    // distinguish it from lexical RFC 3339 violations.
     let now = ts("2026-05-07T00:00:00Z");
     let later = ts("2026-05-07T00:05:01Z"); // +301s
     let err = check_future_timestamp(
@@ -45,7 +49,13 @@ fn beyond_tolerance_for_manifest_field_emits_field_range() {
         DocumentKindLabel::Manifest,
     )
     .expect_err("must reject");
-    assert_eq!(err.code, DiagnosticCode::ESchemaFieldRange);
+    assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
+    let details = err.details.as_ref().expect("details payload");
+    assert_eq!(
+        details["reason"].as_str(),
+        Some("future_beyond_skew_tolerance")
+    );
+    assert_eq!(details["field_path"].as_str(), Some("manifest.updated"));
 }
 
 #[test]

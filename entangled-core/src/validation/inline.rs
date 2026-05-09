@@ -109,10 +109,13 @@ fn check_marks_unique<T: std::hash::Hash + Eq>(marks: &[T]) -> Result<(), Diagno
     for m in marks {
         if !seen.insert(m) {
             return Err(Diagnostic::new(
-                DiagnosticCode::ESchemaFieldSyntax,
+                DiagnosticCode::ESchemaDuplicateEntry,
                 DocumentKindLabel::None,
                 "duplicate text mark",
-            ));
+            )
+            .with_details(serde_json::json!({
+                "field_path": "inline[].marks",
+            })));
         }
     }
     Ok(())
