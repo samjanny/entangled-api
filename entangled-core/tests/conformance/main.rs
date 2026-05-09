@@ -9,6 +9,12 @@
 //!
 //! The single integration test below — `corpus_vectors_match_spec` — fails
 //! on the first divergence with a message naming the vector id.
+//!
+//! The corpus is distributed separately from this crate (see top-level
+//! `.gitignore`). When it is not present on disk the test is skipped with
+//! a printed notice rather than failing, so a checkout without the spec
+//! repository alongside still produces a green test run. Set
+//! `ENTANGLED_CORPUS_PATH` to point at an alternative location.
 
 mod corpus;
 mod runner;
@@ -18,7 +24,13 @@ use runner::{run_vector, VectorOutcome};
 
 #[test]
 fn corpus_vectors_match_spec() {
-    let corpus = Corpus::load();
+    let Some(corpus) = Corpus::try_load() else {
+        eprintln!(
+            "conformance corpus not found at docs-spec/corpus/ \
+             (set ENTANGLED_CORPUS_PATH to override); skipping."
+        );
+        return;
+    };
 
     assert_eq!(
         corpus.spec_version_target, "1.0",

@@ -5,6 +5,7 @@
 //! in the corpus are tolerated so a corpus update that adds metadata does
 //! not require a code change here.
 
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -61,18 +62,25 @@ pub struct Context {
 }
 
 impl Corpus {
-    /// Load `docs-spec/corpus/corpus.json` resolved relative to the crate
-    /// root, panicking with a clear message on failure (a missing or
-    /// malformed corpus is a harness bug, not a vector failure).
-    pub fn load() -> Self {
+    /// Try to load `corpus.json`, returning `None` when the corpus is not
+    /// present on disk. The corpus is distributed separately from this
+    /// crate (see top-level `.gitignore`); a checkout that does not include
+    /// it is the expected case on CI runners that have not vendored the
+    /// upstream spec repository.
+    ///
+    /// A malformed corpus or a missing required field is still a harness
+    /// bug rather than a vector failure, so those cases panic.
+    pub fn try_load() -> Option<Self> {
         let root = Self::corpus_root();
         let index_path = root.join("corpus.json");
-        let raw = fs::read_to_string(&index_path).unwrap_or_else(|e| {
-            panic!(
+        let raw = match fs::read_to_string(&index_path) {
+            Ok(s) => s,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return None,
+            Err(e) => panic!(
                 "failed to read corpus index at {}: {e}",
                 index_path.display()
-            )
-        });
+            ),
+        };
         let mut corpus: Self = serde_json::from_str(&raw).unwrap_or_else(|e| {
             panic!(
                 "failed to parse corpus index at {}: {e}",
@@ -84,14 +92,20 @@ impl Corpus {
             "corpus missing required top-level `clock_now` field"
         );
         corpus.root = root;
-        corpus
+        Some(corpus)
     }
 
-    /// Resolve `docs-spec/corpus/` relative to `CARGO_MANIFEST_DIR` (the
-    /// `entangled-core` crate root). The corpus lives one directory up,
-    /// under the workspace's `docs-spec/` mirror of the upstream spec
-    /// repository.
+    /// Resolve the corpus root.
+    ///
+    /// Honours `ENTANGLED_CORPUS_PATH` when set (a CI runner that has
+    /// vendored the upstream spec repository points this at the
+    /// checked-out `corpus/` directory). Otherwise falls back to the
+    /// workspace-local `docs-spec/corpus/` mirror — the layout used by
+    /// developers who clone the spec repo alongside this one.
     fn corpus_root() -> PathBuf {
+        if let Some(p) = env::var_os("ENTANGLED_CORPUS_PATH") {
+            return PathBuf::from(p);
+        }
         let crate_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
         crate_dir
             .parent()

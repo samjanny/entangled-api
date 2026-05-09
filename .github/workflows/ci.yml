@@ -23,6 +23,12 @@ jobs:
             rust: beta
     steps:
       - uses: actions/checkout@v4
+      - name: Checkout spec corpus
+        uses: actions/checkout@v4
+        with:
+          repository: samjanny/entangled
+          ref: v1.0-rc.12
+          path: docs-spec
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
