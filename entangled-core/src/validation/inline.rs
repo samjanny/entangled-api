@@ -263,7 +263,7 @@ fn validate_url_common(
 /// last `:`). Returns `None` if the result is empty.
 fn extract_authority_host(after_scheme: &str) -> Option<&str> {
     let end = after_scheme
-        .find(|c: char| c == '/' || c == '?' || c == '#')
+        .find(['/', '?', '#'])
         .unwrap_or(after_scheme.len());
     let authority = &after_scheme[..end];
     let host_port = match authority.rfind('@') {
