@@ -218,6 +218,27 @@ pub struct RetainedManifestRecord {
 /// new payload hash differs from the retained one. The diagnostic carries
 /// `details = { issued_at, retained_runtime_pubkey, presented_runtime_pubkey }`
 /// (§11).
+///
+/// # Reframing under §08 v1.0-rc.13
+///
+/// `E_CANARY_CONFLICT` is a **fault condition on the publisher
+/// identity**, not a recoverable transient error. The client MUST NOT
+/// pick a deterministic "winner" between conflicting manifests by
+/// lexicographic comparison, payload size, `runtime_pubkey` value, or
+/// any other tiebreaker over manifest content: a deterministic
+/// tiebreaker is gameable by an attacker holding `K_publisher_priv`
+/// and would mask the underlying fault.
+///
+/// The expected handling is:
+/// * the retained pre-conflict manifest stays in place for current
+///   rendering and anti-downgrade evaluation;
+/// * the conflict is surfaced as a prominent chrome warning analogous
+///   to Changed/mismatch, with an option to abandon the retained
+///   publisher identity;
+/// * the warning persists until the user explicitly resolves it.
+///
+/// Resolution is a chrome / trust-state concern outside this crate's
+/// scope; this helper only emits the diagnostic.
 pub fn check_canary_conflict(
     new_issued_at: &EntangledTimestamp,
     new_runtime_pubkey: &RuntimePubkey,

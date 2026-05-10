@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (spec v1.0-rc.13 alignment)
+
+- **§04 Unicode NFC for user-visible strings**: schema validation now
+  rejects non-NFC values in `canary.statement`, `meta.title`,
+  `navigation[].label`, `state_policy[].purpose`, every inline `value`
+  (Text and Link), `code_block.content`, `image.alt`, `image.caption`,
+  `note.title`, `submit_form` field labels, `submit_form` select-option
+  labels, and `submit_form.submit_label` with `E_SCHEMA_FIELD_SYNTAX`
+  carrying `details.field_path` and `reason: "non_nfc_string"`. The
+  crate does not silently re-normalize: re-normalization would alter
+  the JCS canonical bytes and break the publisher's signature. New
+  `crate::validation::strings::check_nfc` helper. New dependency on
+  `unicode-normalization`.
+- **§06 `migration_pointer`**: optional top-level manifest field
+  (`Option<MigrationPointer>` on `Manifest` and `UnsignedManifest`)
+  carrying `successor_origin` and `announced_at`. Stage 5 schema
+  validation enforces the three §06 structural rules with
+  `E_MIGRATION_INVALID` (self-pointing address, carrier mismatch,
+  `announced_at` after `updated`). Public function
+  `validation::validate_migration_pointer`.
+- **`verify_migration_announcement`** (§10 Stage 9): publisher-identity
+  continuity check across an announcing manifest and the successor it
+  declares. Mismatch emits `E_MIGRATION_MISMATCH` with `details`
+  carrying both pubkeys and the announced successor address. Lives at
+  `validation::verify_migration_announcement`.
+- **§11 diagnostic codes**: `E_MIGRATION_MISMATCH` and
+  `E_MIGRATION_INVALID` added to `DiagnosticCode` at Stage 9.
+
+### Changed (spec v1.0-rc.13 alignment)
+
+- **§08 `E_CANARY_CONFLICT` is now a fault condition**, not a
+  recoverable transient error. Documented on `check_canary_conflict`:
+  the client MUST NOT pick a deterministic winner by lexicographic
+  comparison or any other tiebreaker over manifest content (gameable
+  by an attacker holding `K_publisher_priv`). The retained
+  pre-conflict manifest stays in place for current rendering and
+  anti-downgrade; resolution is a chrome / trust-state concern outside
+  this crate's scope. Behavior of the helper itself is unchanged; only
+  the framing on the docstring updated.
+- **Conformance runner** now invokes `check_anti_downgrade` before
+  `check_canary_conflict` when the corpus pre-loads a previously
+  verified manifest as context. The two checks are mutually exclusive
+  per §08 and are applied in stage order. The standalone
+  `check_anti_downgrade` helper was already public; only the harness
+  wiring is new.
+- **CI conformance corpus pinned to `v1.0-rc.13`** in
+  `.github/workflows/ci.yml`. The local `docs-spec/` mirror is at
+  rc.13; both rc.13 vectors that exercise new behavior (181
+  anti-downgrade, 190 NFD statement) pass alongside the existing 30,
+  for a total of 32/32 corpus vectors green. rc.12 vectors 154
+  (non-canonical R) and 155 (non-canonical A) were already passing
+  under the §05 strict-profile fixes from the v0.1.0 cycle.
+
 ## [0.1.0] - 2026-05-09
 
 Initial public release. The crate has gone through an internal audit
