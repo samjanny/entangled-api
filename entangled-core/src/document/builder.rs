@@ -62,6 +62,9 @@ pub fn build_manifest(
         &unsigned.updated,
         now,
     )?;
+    if let Some(mp) = &unsigned.migration_pointer {
+        crate::validation::validate_migration_pointer(mp, &unsigned.origin, &unsigned.updated)?;
+    }
 
     let signed_payload = unsigned.to_signed_payload()?;
     let sig = sign_manifest_payload(&signed_payload, publisher_key)?;
@@ -75,6 +78,7 @@ pub fn build_manifest(
         navigation: unsigned.navigation.clone(),
         min_refresh_interval: unsigned.min_refresh_interval,
         updated: unsigned.updated,
+        migration_pointer: unsigned.migration_pointer.clone(),
         sig,
     };
 

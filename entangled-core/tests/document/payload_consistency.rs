@@ -33,6 +33,7 @@ fn manifest_unsigned_and_signed_produce_byte_identical_payload() {
         navigation: unsigned.navigation.clone(),
         min_refresh_interval: unsigned.min_refresh_interval,
         updated: unsigned.updated,
+        migration_pointer: unsigned.migration_pointer.clone(),
         sig: signature_zero(),
     };
 

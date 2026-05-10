@@ -10,7 +10,7 @@ use serde_json::Value;
 
 use crate::types::canary::Canary;
 use crate::types::document::{ContentDocument, Document, TransactionDocument};
-use crate::types::manifest::{Manifest, NavEntry};
+use crate::types::manifest::{Manifest, MigrationPointer, NavEntry, Origin};
 use crate::types::meta::Meta;
 use crate::types::state::{StatePolicyEntry, StateUpdateOp};
 use crate::types::timestamp::EntangledTimestamp;
@@ -146,7 +146,11 @@ pub fn validate_manifest(manifest: &Manifest, now: &EntangledTimestamp) -> Resul
         &manifest.canary,
         &manifest.updated,
         now,
-    )
+    )?;
+    if let Some(mp) = &manifest.migration_pointer {
+        validate_migration_pointer(mp, &manifest.origin, &manifest.updated)?;
+    }
+    Ok(())
 }
 
 /// Run Stage 5 schema/range/syntax checks on a typed [`ContentDocument`].
@@ -293,6 +297,65 @@ pub(crate) fn validate_manifest_fields(
         }
     }
 
+    Ok(())
+}
+
+/// Validate a manifest's `migration_pointer` block (§06 v1.0-rc.13).
+///
+/// Per §06 the announcement is structurally well-formed if and only if:
+///
+/// * `successor_origin.address` differs from the announcing
+///   `origin.address` (no self-pointing migration);
+/// * `successor_origin.carrier` equals the announcing `origin.carrier`
+///   (cross-carrier migration is out of scope for v1.0; in v1.0 only
+///   `tor-v3` exists, so this is automatic for well-formed manifests but
+///   the rule is normative);
+/// * `announced_at` is not later than the announcing manifest's `updated`
+///   (the publisher cannot retroactively post-date an announcement).
+///
+/// All three failures are reported as `E_MIGRATION_INVALID` (§11
+/// rc.13). The structural well-formedness check fires before
+/// `verify_migration_announcement`, which compares publisher pubkeys
+/// across the announcing and successor manifests after both have cleared
+/// their own pipeline.
+pub fn validate_migration_pointer(
+    mp: &MigrationPointer,
+    announcing_origin: &Origin,
+    announcing_updated: &EntangledTimestamp,
+) -> Result<(), Diagnostic> {
+    if mp.successor_origin.address == announcing_origin.address {
+        return Err(Diagnostic::new(
+            DiagnosticCode::EMigrationInvalid,
+            DocumentKindLabel::Manifest,
+            "migration_pointer.successor_origin.address must differ from origin.address",
+        )
+        .with_details(serde_json::json!({
+            "field_path": "migration_pointer.successor_origin.address",
+            "reason": "self_pointing_migration",
+        })));
+    }
+    if mp.successor_origin.carrier != announcing_origin.carrier {
+        return Err(Diagnostic::new(
+            DiagnosticCode::EMigrationInvalid,
+            DocumentKindLabel::Manifest,
+            "migration_pointer.successor_origin.carrier must equal origin.carrier",
+        )
+        .with_details(serde_json::json!({
+            "field_path": "migration_pointer.successor_origin.carrier",
+            "reason": "carrier_mismatch",
+        })));
+    }
+    if mp.announced_at > *announcing_updated {
+        return Err(Diagnostic::new(
+            DiagnosticCode::EMigrationInvalid,
+            DocumentKindLabel::Manifest,
+            "migration_pointer.announced_at must not be later than manifest.updated",
+        )
+        .with_details(serde_json::json!({
+            "field_path": "migration_pointer.announced_at",
+            "reason": "announced_after_updated",
+        })));
+    }
     Ok(())
 }
 

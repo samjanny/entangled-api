@@ -41,7 +41,7 @@ use serde_json::Value;
 use crate::types::blocks::Block;
 use crate::types::canary::Canary;
 use crate::types::keys::{PublisherPubkey, RequestHash, RequestId, SpecVersion};
-use crate::types::manifest::{NavEntry, Origin};
+use crate::types::manifest::{MigrationPointer, NavEntry, Origin};
 use crate::types::meta::Meta;
 use crate::types::path::EntangledPath;
 use crate::types::state::{StatePolicyEntry, StateUpdateOp};
@@ -72,6 +72,11 @@ pub struct UnsignedManifest {
     pub min_refresh_interval: u32,
     /// Time at which the manifest was last updated.
     pub updated: EntangledTimestamp,
+    /// Optional publisher-initiated origin-migration announcement (§06
+    /// rc.13). Absent for the steady-state case; encoded by omission per
+    /// §04 closed-schema discipline.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub migration_pointer: Option<MigrationPointer>,
 }
 
 /// Unsigned counterpart of [`crate::types::ContentDocument`].

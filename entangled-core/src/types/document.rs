@@ -84,6 +84,15 @@ pub struct TransactionDocument {
 ///
 /// Wire form: a JSON object with a `kind` discriminator (`"manifest"`,
 /// `"content"`, `"transaction"`) plus the kind-specific fields inlined.
+///
+/// `Manifest` is the largest variant — `Manifest` itself is ~400 bytes
+/// because of the optional `migration_pointer` (an inlined `Origin` plus a
+/// timestamp). We deliberately do not box it: this enum is only
+/// constructed transiently during deserialization, immediately
+/// destructured back into the typed Manifest/Content/Transaction value,
+/// and never stored long-term, so boxing would only add an allocation
+/// for the common path with no end-state benefit.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Document {

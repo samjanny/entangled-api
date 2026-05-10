@@ -16,6 +16,7 @@ pub mod inline;
 pub mod input;
 pub mod kind;
 pub mod limits;
+pub mod migration;
 pub mod parse;
 pub mod policy_check;
 pub mod schema;
@@ -27,8 +28,9 @@ pub use clock::{check_future_timestamp, check_manifest_clock_skew};
 pub use diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel, Severity};
 pub use input::{check_input, InputKind};
 pub use kind::{discriminate_kind, DocumentKind};
+pub use migration::verify_migration_announcement;
 pub use parse::parse_with_limits;
 pub use schema::{
     parse_and_validate_content, parse_and_validate_manifest, parse_and_validate_transaction,
-    validate_content, validate_manifest, validate_transaction,
+    validate_content, validate_manifest, validate_migration_pointer, validate_transaction,
 };

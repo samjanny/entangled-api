@@ -705,6 +705,84 @@ fn nfc_meta_title_in_nfd_rejected() {
     assert_eq!(details["reason"].as_str(), Some("non_nfc_string"));
 }
 
+// -----------------------------------------------------------------------------
+// §06 v1.0-rc.13 migration_pointer schema validation. Stage 5 rejects
+// structurally invalid announcements with E_MIGRATION_INVALID before
+// signature verification. The publisher-identity continuity check across
+// announcing and successor manifests (E_MIGRATION_MISMATCH) is exercised
+// separately in tests/validation/migration.rs.
+// -----------------------------------------------------------------------------
+
+fn manifest_value_with_migration_pointer(mp: serde_json::Value) -> Value {
+    let mut v = manifest_value();
+    v.as_object_mut()
+        .unwrap()
+        .insert("migration_pointer".to_owned(), mp);
+    v
+}
+
+#[test]
+fn migration_pointer_self_pointing_address_rejected() {
+    // successor_origin.address equal to the announcing origin.address.
+    let same_origin = json!({
+        "carrier": "tor-v3",
+        "address": "abcdefghijklmnopqrstuvwxyz234567abcdefghijklmnopqrstuvwx.onion",
+        "origin_pubkey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    });
+    let mp = json!({
+        "successor_origin": same_origin,
+        "announced_at": "2026-05-07T00:00:00Z",
+    });
+    let v = manifest_value_with_migration_pointer(mp);
+    let err = parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now())
+        .expect_err("self-pointing migration must reject");
+    assert_eq!(err.code, DiagnosticCode::EMigrationInvalid);
+    let details = err.details.as_ref().expect("details payload");
+    assert_eq!(details["reason"].as_str(), Some("self_pointing_migration"));
+}
+
+#[test]
+fn migration_pointer_announced_after_updated_rejected() {
+    // announced_at strictly later than updated.
+    let mp = json!({
+        "successor_origin": {
+            "carrier": "tor-v3",
+            "address": "ssssssssssssssssssssssssssssssssssssssssssssssssssssssss.onion",
+            "origin_pubkey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        },
+        "announced_at": "2026-06-01T00:00:00Z",
+    });
+    let v = manifest_value_with_migration_pointer(mp);
+    let err = parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now())
+        .expect_err("announced_at after updated must reject");
+    assert_eq!(err.code, DiagnosticCode::EMigrationInvalid);
+    let details = err.details.as_ref().expect("details payload");
+    assert_eq!(details["reason"].as_str(), Some("announced_after_updated"));
+}
+
+#[test]
+fn migration_pointer_omitted_field_accepted() {
+    // The default fixture has no migration_pointer; verify it still validates.
+    let v = manifest_value();
+    parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now())
+        .expect("manifest without migration_pointer accepted");
+}
+
+#[test]
+fn migration_pointer_well_formed_accepted_at_schema_level() {
+    let mp = json!({
+        "successor_origin": {
+            "carrier": "tor-v3",
+            "address": "ssssssssssssssssssssssssssssssssssssssssssssssssssssssss.onion",
+            "origin_pubkey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        },
+        "announced_at": "2026-05-06T12:00:00Z",
+    });
+    let v = manifest_value_with_migration_pointer(mp);
+    parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now())
+        .expect("well-formed migration_pointer must pass schema validation");
+}
+
 #[test]
 fn t21_inline_link_nested_inside_link_label_rejected() {
     let mut v = content_value();

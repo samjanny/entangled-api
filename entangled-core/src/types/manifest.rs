@@ -126,11 +126,43 @@ pub struct NavEntry {
     pub path: EntangledPath,
 }
 
+/// Optional `migration_pointer` block (§06 v1.0-rc.13).
+///
+/// Publisher-initiated, in-band announcement of a successor carrier
+/// endpoint operated under the same `K_publisher`. A client supporting
+/// publisher profiles uses this to discover the new origin authentically.
+///
+/// Schema constraints enforced at Stage 5 by
+/// [`crate::validation::manifest::validate_migration_pointer`]:
+///
+/// - `successor_origin.address` MUST differ from the announcing manifest's
+///   `origin.address`.
+/// - `successor_origin.carrier` MUST equal the announcing
+///   `origin.carrier` (v1.0 has only `tor-v3`, so this is automatic for
+///   well-formed manifests but the rule is normative).
+/// - `announced_at` MUST NOT be later than the announcing manifest's
+///   `updated`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MigrationPointer {
+    /// Successor carrier endpoint, mirroring the [`Origin`] schema.
+    pub successor_origin: Origin,
+    /// Time at which the publisher signed this announcement. Per §06
+    /// v1.0-rc.13, MUST NOT be later than the announcing manifest's
+    /// `updated`.
+    pub announced_at: EntangledTimestamp,
+}
+
 /// Top-level manifest object (§02).
 ///
 /// The manifest is the root of trust for a publisher: it carries the
 /// publisher pubkey, origin binding, canary, state policy, and navigation,
 /// signed by the publisher's long-term Ed25519 key.
+///
+/// `migration_pointer` (rc.13) is optional: absent for the steady-state
+/// case, present only when the publisher is announcing an origin migration.
+/// Per §04 / §02 closed-schema discipline, absent is encoded by omitting
+/// the field, never by `null`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Manifest {
@@ -151,6 +183,10 @@ pub struct Manifest {
     pub min_refresh_interval: u32,
     /// Time at which the manifest was last updated.
     pub updated: EntangledTimestamp,
+    /// Optional publisher-initiated origin-migration announcement (§06
+    /// rc.13). Absent when no migration is announced.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub migration_pointer: Option<MigrationPointer>,
     /// Ed25519 signature by `publisher_pubkey` over the manifest signature
     /// input (§04).
     pub sig: Signature,

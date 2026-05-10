@@ -10,6 +10,7 @@ mod diagnostic_codes;
 mod error_precedence;
 mod limits;
 mod manifest_clock_skew;
+mod migration;
 mod policy_check;
 mod stage2_input;
 mod stage3_parse;
