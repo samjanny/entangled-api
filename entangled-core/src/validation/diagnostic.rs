@@ -179,6 +179,18 @@ pub enum DiagnosticCode {
     EBindRequestHash,
     #[serde(rename = "E_BIND_ORIGIN")]
     EBindOrigin,
+    /// §11 (rc.13). The `successor_origin.publisher_pubkey` resolved during
+    /// origin migration does not match the announcing manifest's
+    /// `publisher_pubkey`. Reported by the migration helper after the
+    /// successor manifest has cleared its own Stage 6 self-verification.
+    #[serde(rename = "E_MIGRATION_MISMATCH")]
+    EMigrationMismatch,
+    /// §11 (rc.13). The announcing manifest's `migration_pointer` is
+    /// structurally well-formed but semantically invalid (successor address
+    /// equals announcing address, `announced_at` after `updated`, or carrier
+    /// mismatch).
+    #[serde(rename = "E_MIGRATION_INVALID")]
+    EMigrationInvalid,
 
     // State (off-pipeline)
     #[serde(rename = "E_STATE_UNDECLARED")]
@@ -322,8 +334,9 @@ impl DiagnosticCode {
             | WCanaryGap
             | WCanaryUnavailable => 8,
 
-            // Stage 9 — Binding.
-            EBindPath | EBindResponsePath | EBindRequestId | EBindRequestHash | EBindOrigin => 9,
+            // Stage 9 — Binding (incl. origin-migration codes from rc.13).
+            EBindPath | EBindResponsePath | EBindRequestId | EBindRequestHash | EBindOrigin
+            | EMigrationMismatch | EMigrationInvalid => 9,
 
             // Off-pipeline (state, historical, image).
             EStateUndeclared

@@ -19,7 +19,7 @@ use super::limits::{
     MAX_STATE_POLICY_ENTRIES, MAX_STATE_UPDATES, STATE_MAX_LIFETIME_RANGE, STATE_MAX_SIZE_RANGE,
     STATE_PURPOSE_MAX_BYTES, STATE_TTL_HARD_RANGE, STATE_VALUE_MAX_BYTES,
 };
-use super::strings::no_control_chars;
+use super::strings::{check_nfc, no_control_chars};
 
 /// Validate a manifest's `state_policy` array (Stage 5).
 ///
@@ -97,6 +97,12 @@ pub fn validate_state_policy(policy: &[StatePolicyEntry]) -> Result<(), Diagnost
                 "state_policy.purpose contains control characters",
             ));
         }
+        // §04 (rc.13): user-visible strings MUST be NFC.
+        check_nfc(
+            &e.purpose,
+            "state_policy.purpose",
+            DocumentKindLabel::Manifest,
+        )?;
     }
     Ok(())
 }

@@ -653,6 +653,58 @@ fn t26b_citation_url_with_valid_percent_triplet_accepted() {
     parse_and_validate_content(&manifest_bytes(&v)).expect("valid pct-encoded url accepted");
 }
 
+// -----------------------------------------------------------------------------
+// §04 v1.0-rc.13 NFC normalization. User-visible strings MUST be in NFC.
+// Non-NFC values rejected at schema time with E_SCHEMA_FIELD_SYNTAX +
+// details.reason "non_nfc_string". Implementations MUST NOT silently
+// re-normalize: re-normalization would alter the JCS canonical bytes and
+// break the publisher's signature.
+// -----------------------------------------------------------------------------
+
+#[test]
+fn nfc_canary_statement_in_nfd_rejected() {
+    // "Café" in NFD: 'C' 'a' 'f' 'e' + U+0301 (combining acute accent).
+    let nfd_statement = "Cafe\u{0301}";
+    let mut v = manifest_value();
+    let canary = v.as_object_mut().unwrap().get_mut("canary").unwrap();
+    canary
+        .as_object_mut()
+        .unwrap()
+        .insert("statement".to_owned(), json!(nfd_statement));
+    let err = parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now())
+        .expect_err("NFD statement must reject");
+    assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
+    let details = err.details.as_ref().expect("details payload");
+    assert_eq!(details["field_path"].as_str(), Some("canary.statement"));
+    assert_eq!(details["reason"].as_str(), Some("non_nfc_string"));
+}
+
+#[test]
+fn nfc_meta_title_in_nfc_accepted() {
+    // Precomposed "Café": all single codepoints, trivially NFC.
+    let mut v = content_value();
+    let meta = v.as_object_mut().unwrap().get_mut("meta").unwrap();
+    meta.as_object_mut()
+        .unwrap()
+        .insert("title".to_owned(), json!("Caf\u{00E9}"));
+    parse_and_validate_content(&manifest_bytes(&v)).expect("NFC title accepted");
+}
+
+#[test]
+fn nfc_meta_title_in_nfd_rejected() {
+    let mut v = content_value();
+    let meta = v.as_object_mut().unwrap().get_mut("meta").unwrap();
+    meta.as_object_mut()
+        .unwrap()
+        .insert("title".to_owned(), json!("Cafe\u{0301}"));
+    let err =
+        parse_and_validate_content(&manifest_bytes(&v)).expect_err("NFD meta.title must reject");
+    assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
+    let details = err.details.as_ref().expect("details payload");
+    assert_eq!(details["field_path"].as_str(), Some("meta.title"));
+    assert_eq!(details["reason"].as_str(), Some("non_nfc_string"));
+}
+
 #[test]
 fn t21_inline_link_nested_inside_link_label_rejected() {
     let mut v = content_value();

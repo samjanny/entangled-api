@@ -66,6 +66,8 @@ fn all_codes_round_trip_via_json() {
         DiagnosticCode::EBindRequestId,
         DiagnosticCode::EBindRequestHash,
         DiagnosticCode::EBindOrigin,
+        DiagnosticCode::EMigrationMismatch,
+        DiagnosticCode::EMigrationInvalid,
         DiagnosticCode::EStateUndeclared,
         DiagnosticCode::EStateValueSize,
         DiagnosticCode::EStateTtl,

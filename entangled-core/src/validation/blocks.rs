@@ -16,7 +16,7 @@ use super::limits::{
     NOTE_TITLE_MAX_BYTES, PARAGRAPH_CONTENT_MAX_BYTES, QUOTE_ATTRIBUTION_MAX_BYTES,
     QUOTE_CONTENT_MAX_BYTES, SELECT_OPTIONS_MAX, SUBMIT_LABEL_MAX_BYTES,
 };
-use super::strings::no_control_chars;
+use super::strings::{check_nfc, no_control_chars};
 
 fn doc_kind_label(doc_kind: DocumentKind) -> DocumentKindLabel {
     match doc_kind {
@@ -145,6 +145,8 @@ fn validate_code_block_content(content: &str) -> Result<(), Diagnostic> {
             "code_block content contains control characters other than line feed",
         ));
     }
+    // §04 (rc.13): code_block.content is rendered to the user; NFC required.
+    check_nfc(content, "code_block.content", DocumentKindLabel::None)?;
     Ok(())
 }
 
@@ -233,6 +235,9 @@ fn validate_image_fields(
             "image.alt contains control characters",
         ));
     }
+    // §04 (rc.13): image.alt rendered to the user (assistive UI); NFC required.
+    // The empty string is permitted for purely decorative images and trivially NFC.
+    check_nfc(alt, "image.alt", DocumentKindLabel::None)?;
     if let Some(c) = caption {
         if c.is_empty() {
             return Err(Diagnostic::new(
@@ -258,6 +263,8 @@ fn validate_image_fields(
                 "image.caption contains control characters",
             ));
         }
+        // §04 (rc.13): image.caption rendered to the user; NFC required.
+        check_nfc(c, "image.caption", DocumentKindLabel::None)?;
     }
     Ok(())
 }
@@ -314,6 +321,12 @@ fn validate_submit_form(
             "submit_label contains control characters",
         ));
     }
+    // §04 (rc.13): submit_form.submit_label is user-visible; NFC required.
+    check_nfc(
+        submit_label,
+        "submit_form.submit_label",
+        DocumentKindLabel::None,
+    )?;
     validate_form_fields(fields)
 }
 
@@ -367,6 +380,8 @@ pub fn validate_form_fields(fields: &[FormField]) -> Result<(), Diagnostic> {
                 "form field label contains control characters",
             ));
         }
+        // §04 (rc.13): submit_form field labels are user-visible; NFC required.
+        check_nfc(label, "submit_form.fields[].label", DocumentKindLabel::None)?;
 
         match f {
             FormField::Text { max_length, .. } | FormField::Textarea { max_length, .. } => {
@@ -437,6 +452,12 @@ fn validate_select_options(options: &[SelectOption]) -> Result<(), Diagnostic> {
                 "select option label contains control characters",
             ));
         }
+        // §04 (rc.13): select option labels are user-visible; NFC required.
+        check_nfc(
+            &opt.label,
+            "submit_form.fields[].options[].label",
+            DocumentKindLabel::None,
+        )?;
     }
     Ok(())
 }
@@ -466,5 +487,7 @@ fn validate_note_title(title: &str) -> Result<(), Diagnostic> {
             "note.title contains control characters",
         ));
     }
+    // §04 (rc.13): note.title is user-visible; NFC required.
+    check_nfc(title, "note.title", DocumentKindLabel::None)?;
     Ok(())
 }

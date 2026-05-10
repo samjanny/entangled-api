@@ -11,7 +11,7 @@ use super::limits::{
     CITATION_URL_MAX_BYTES, INLINE_ARRAY_MAX_ELEMENTS, INLINE_VALUE_MAX_BYTES,
     LINK_TARGET_MAX_BYTES,
 };
-use super::strings::no_control_chars;
+use super::strings::{check_nfc, no_control_chars};
 
 /// Validates an inline content array against the inline grammar (§03) and
 /// the per-block aggregate byte cap declared by the containing block.
@@ -101,6 +101,10 @@ fn check_value(value: &str) -> Result<(), Diagnostic> {
             "inline value contains control characters (U+0000..=U+001F or U+007F)",
         ));
     }
+    // §04 (rc.13): every inline `value` is rendered to the user as text, so
+    // the NFC requirement applies. The owning document kind is fixed up by
+    // `fix_kind` in `validate_blocks`.
+    check_nfc(value, "inline[].value", DocumentKindLabel::None)?;
     Ok(())
 }
 

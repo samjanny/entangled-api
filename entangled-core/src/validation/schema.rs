@@ -27,7 +27,7 @@ use super::limits::{
 };
 use super::parse::parse_with_limits;
 use super::state::{validate_state_policy, validate_state_updates_standalone};
-use super::strings::no_control_chars;
+use super::strings::{check_nfc, no_control_chars};
 use crate::types::blocks::Block;
 
 // -----------------------------------------------------------------------------
@@ -235,6 +235,8 @@ pub(crate) fn validate_manifest_fields(
                 "navigation label contains control characters",
             ));
         }
+        // §04 (rc.13): user-visible strings MUST be NFC.
+        check_nfc(&nav.label, "navigation.label", DocumentKindLabel::Manifest)?;
     }
 
     validate_state_policy(state_policy)?;
@@ -258,6 +260,12 @@ pub(crate) fn validate_manifest_fields(
             "canary.statement contains control characters other than line feed",
         ));
     }
+    // §04 (rc.13): user-visible strings MUST be NFC.
+    check_nfc(
+        &canary.statement,
+        "canary.statement",
+        DocumentKindLabel::Manifest,
+    )?;
     if let Some(fp) = &canary.freshness_proof {
         if fp.is_empty() {
             return Err(Diagnostic::new(
@@ -306,6 +314,8 @@ pub(crate) fn validate_content_fields(meta: &Meta, blocks: &[Block]) -> Result<(
             "meta.title contains control characters",
         ));
     }
+    // §04 (rc.13): user-visible strings MUST be NFC.
+    check_nfc(&meta.title, "meta.title", DocumentKindLabel::Content)?;
 
     if blocks.is_empty() {
         return Err(Diagnostic::new(

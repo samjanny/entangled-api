@@ -20,7 +20,9 @@ use entangled_core::types::keys::RuntimePubkey;
 use entangled_core::types::manifest::OnionAddress;
 use entangled_core::types::path::EntangledPath;
 use entangled_core::types::timestamp::EntangledTimestamp;
-use entangled_core::validation::canary::{check_canary_conflict, RetainedManifestRecord};
+use entangled_core::validation::canary::{
+    check_anti_downgrade, check_canary_conflict, RetainedManifestRecord,
+};
 use entangled_core::validation::{Diagnostic, DiagnosticCode, DocumentKindLabel};
 
 use crate::corpus::{Corpus, Vector};
@@ -74,14 +76,23 @@ fn run_manifest(
         Err(d) => return Ok(Verdict::Reject(d.code)),
     };
 
-    // Stage 8 — equal-`issued_at` conflict check, when the corpus pre-loads
-    // a previously verified manifest as context. The retained record is
-    // always built from a fixture the corpus itself blessed as accept;
-    // anything that fails to load there is a harness bug, not a vector
-    // verdict.
+    // Stage 8 — anti-downgrade and equal-`issued_at` conflict, when the
+    // corpus pre-loads a previously verified manifest as context. The
+    // retained record is always built from a fixture the corpus itself
+    // blessed as accept; anything that fails to load there is a harness
+    // bug, not a vector verdict.
+    //
+    // §08 lists the two checks as mutually exclusive and applied in order:
+    // anti-downgrade rejects strictly older `issued_at` with
+    // `E_CANARY_DOWNGRADE`; the equal-`issued_at` conflict check then
+    // catches identical `issued_at` paired with a different signed payload
+    // (`E_CANARY_CONFLICT`).
     if let Some(prev_rel) = vector.context.previously_verified.as_deref() {
         let retained = build_retained_record(corpus, prev_rel, now)?;
         let canary = canary_checked.canary();
+        if let Err(d) = check_anti_downgrade(&canary.issued_at, Some(&retained.issued_at)) {
+            return Ok(Verdict::Reject(d.code));
+        }
         let new_payload_hash = manifest_payload_hash(raw)?;
         if let Err(d) = check_canary_conflict(
             &canary.issued_at,
