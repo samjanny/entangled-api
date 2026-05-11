@@ -1,4 +1,5 @@
-//! Stage 9 origin-migration and origin-not-after handling (§10 v1.0-rc.14).
+//! Stage 9 origin-migration and origin-not-after handling
+//! (§10 v1.0-rc.14; details schema extended in v1.0-rc.15).
 //!
 //! When an announcing manifest carries a `migration_pointer`, a client
 //! supporting publisher profiles fetches the successor manifest from
@@ -22,6 +23,21 @@
 //!   guard is a client-chrome concern (user-confirmation cadence, see
 //!   §10) and is out of scope for this crate.
 //!
+//! rc.15 extends the `E_MIGRATION_MISMATCH` `details` schema additively:
+//!
+//! * `mismatch_field` gains the value `"successor_stage9_failure"`,
+//!   reported when the successor manifest fails any Stage 1-9 check
+//!   independently of the migration-binding fields (publisher pubkey,
+//!   address, origin pubkey);
+//! * optional field `underlying_diagnostic` is attached only in that case
+//!   and carries the structured diagnostic the successor's own pipeline
+//!   would have raised in isolation;
+//! * `successor_publisher_pubkey` is scoped to cases where the
+//!   successor's own Stage 5 schema validation succeeded; for earlier
+//!   stages there is no validated key to report. Wrapping a Stage 1-9
+//!   failure into `E_MIGRATION_MISMATCH` is the job of
+//!   [`wrap_successor_stage9_failure`].
+//!
 //! Structural well-formedness of the announcing manifest's
 //! `migration_pointer` (self-pointing address, carrier mismatch,
 //! `announced_at` after `updated`, semantic constraints on `not_after`)
@@ -32,6 +48,9 @@
 
 use std::collections::HashSet;
 
+use serde_json::{Map, Value};
+
+use crate::types::keys::PublisherPubkey;
 use crate::types::manifest::{Manifest, MigrationPointer, OnionAddress};
 use crate::types::EntangledTimestamp;
 use crate::validation::diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel};
@@ -41,11 +60,17 @@ use crate::validation::limits::CLOCK_SKEW_TOLERANCE_SECS;
 /// `publisher_pubkey` MUST equal the announcing manifest's
 /// `publisher_pubkey`.
 ///
-/// Returns `E_MIGRATION_MISMATCH` (§11 rc.13) on divergence, with
-/// `details` carrying the announced successor address and the two
-/// pubkeys compared. Both manifests are expected to have already cleared
-/// their own Stages 1-9 pipelines; this helper performs only the
-/// publisher-identity continuity check.
+/// Returns `E_MIGRATION_MISMATCH` (§11 rc.13; `details` schema updated
+/// in rc.15) on divergence, with `details` carrying the announced
+/// successor address, the two publisher pubkeys, and
+/// `mismatch_field: "publisher_pubkey"`. Both manifests are expected
+/// to have already cleared their own Stages 1-9 pipelines; this helper
+/// performs only the publisher-identity continuity check.
+///
+/// For wrapping a successor Stage 1-9 failure into a migration-level
+/// rejection — for example, a successor whose own `origin.not_after`
+/// has passed, or whose signature fails verification — see
+/// [`wrap_successor_stage9_failure`].
 ///
 /// # Errors
 ///
@@ -62,23 +87,101 @@ pub fn verify_migration_announcement(
             "successor manifest publisher_pubkey does not match announcing publisher_pubkey",
         )
         .with_details(serde_json::json!({
-            "field_path": "successor.publisher_pubkey",
-            "reason": "publisher_identity_mismatch",
-            "announcing_pubkey": announcing.publisher_pubkey.to_string(),
-            "successor_pubkey": successor.publisher_pubkey.to_string(),
+            "mismatch_field": "publisher_pubkey",
             "announced_successor_address": successor.origin.address.as_str(),
+            "announcing_publisher_pubkey": announcing.publisher_pubkey.to_string(),
+            "successor_publisher_pubkey": successor.publisher_pubkey.to_string(),
         })));
     }
     Ok(())
 }
 
-/// Stage 9 expiry check for `origin.not_after` (§06 / §10 v1.0-rc.14).
+/// Wrap a successor-manifest Stage 1-9 failure into an
+/// `E_MIGRATION_MISMATCH` diagnostic (§11 v1.0-rc.15).
 ///
-/// Returns `E_ORIGIN_EXPIRED` when the manifest declares an
-/// `origin.not_after` that is strictly earlier than `now`, after applying
-/// the §10 clock-skew tolerance (`CLOCK_SKEW_TOLERANCE_SECS`, 300 s) in
-/// the publisher's favour. Manifests without `origin.not_after`, or whose
-/// declared `not_after` is still in the future, return `Ok(())`.
+/// When the successor manifest fetched from the announced address fails
+/// any check during its own Stages 1-9 — independently of the
+/// migration-binding facets (`publisher_pubkey`, `address`,
+/// `origin_pubkey`) — the migration is rejected at the announcement
+/// level as `E_MIGRATION_MISMATCH`, but the underlying cause is
+/// preserved in `details.underlying_diagnostic` so operators can tell
+/// "the successor address is wired to the wrong key" apart from "the
+/// successor manifest itself is broken" without an out-of-band lookup.
+///
+/// The returned diagnostic carries:
+///
+/// * `mismatch_field: "successor_stage9_failure"`;
+/// * `underlying_diagnostic`: the structured payload of the original
+///   failure (code, stage, severity, document_kind, message, details);
+/// * `announced_successor_address`: the address declared by
+///   `migration_pointer.successor_origin.address`;
+/// * `announcing_publisher_pubkey`: the announcing manifest's
+///   `publisher_pubkey`;
+/// * `successor_publisher_pubkey`: the successor manifest's
+///   `publisher_pubkey` — **only when supplied**, per rc.15. Callers
+///   that are wrapping a Stage 1-4 failure (the successor has not yet
+///   cleared schema validation, so no validated pubkey is available)
+///   MUST pass `None`; callers wrapping a Stage 5-9 failure pass the
+///   pubkey already read from the successor manifest.
+///
+/// The migration is rejected regardless of the underlying cause; the
+/// `underlying_diagnostic` field is informational only.
+pub fn wrap_successor_stage9_failure(
+    announcing: &Manifest,
+    announced_successor_address: &OnionAddress,
+    successor_publisher_pubkey: Option<&PublisherPubkey>,
+    underlying: &Diagnostic,
+) -> Diagnostic {
+    let mut details = Map::new();
+    details.insert(
+        "mismatch_field".to_owned(),
+        Value::String("successor_stage9_failure".to_owned()),
+    );
+    details.insert(
+        "announced_successor_address".to_owned(),
+        Value::String(announced_successor_address.as_str().to_owned()),
+    );
+    details.insert(
+        "announcing_publisher_pubkey".to_owned(),
+        Value::String(announcing.publisher_pubkey.to_string()),
+    );
+    if let Some(pk) = successor_publisher_pubkey {
+        details.insert(
+            "successor_publisher_pubkey".to_owned(),
+            Value::String(pk.to_string()),
+        );
+    }
+    details.insert(
+        "underlying_diagnostic".to_owned(),
+        serde_json::to_value(underlying)
+            .expect("Diagnostic is Serialize and contains only JSON-safe values"),
+    );
+
+    Diagnostic::new(
+        DiagnosticCode::EMigrationMismatch,
+        DocumentKindLabel::Manifest,
+        format!(
+            "successor manifest at {} failed its own Stage {} check ({}): migration rejected",
+            announced_successor_address.as_str(),
+            underlying.stage,
+            underlying.code,
+        ),
+    )
+    .with_details(Value::Object(details))
+}
+
+/// Stage 9 expiry check for `origin.not_after` (§06 / §10 v1.0-rc.14;
+/// symmetric clock-skew formula codified in v1.0-rc.15).
+///
+/// Returns `E_ORIGIN_EXPIRED` when `now > not_after +
+/// CLOCK_SKEW_TOLERANCE_SECS`. §10 rc.15 makes the past-bound
+/// tolerance an explicit mirror of the future-bound tolerance already
+/// applied to `manifest.updated` and `canary.issued_at`: a 300-second
+/// margin in the publisher's favour absorbs both client clocks running
+/// slightly fast and the publishing delay of a successor manifest near
+/// the declared instant. Manifests without `origin.not_after`, or
+/// whose declared `not_after` is still in the future (modulo
+/// tolerance), return `Ok(())`.
 ///
 /// The Stage 9 ordering rule applies: callers MUST run this check only
 /// after [`crate::tor::verify_origin_binding`] has cleared carrier origin
@@ -104,9 +207,10 @@ pub fn check_origin_not_after(
         return Ok(());
     };
 
-    // §06: "strictly later than the declared instant" after applying the
-    // §10 clock-skew tolerance in the publisher's favour. A `now` within
-    // `+CLOCK_SKEW_TOLERANCE_SECS` of `not_after` is still treated as
+    // §10 rc.15: rejection formula is `current_time > timestamp + 300s`,
+    // the symmetric past-bound counterpart of the future-bound check
+    // applied to `manifest.updated` and `canary.issued_at`. `now` within
+    // `+CLOCK_SKEW_TOLERANCE_SECS` of `not_after` is treated as
     // not-yet-expired.
     let delta = now.unix_timestamp() - not_after.unix_timestamp();
     if delta <= CLOCK_SKEW_TOLERANCE_SECS {

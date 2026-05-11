@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (spec v1.0-rc.15 alignment)
+
+- **§11 `E_MIGRATION_MISMATCH` `details` schema** updated to the rc.15
+  shape: `mismatch_field` (with values `publisher_pubkey`, `address`,
+  `origin_pubkey`, and the rc.15 addition `successor_stage9_failure`)
+  replaces the prior crate-local `reason` key; pubkey fields renamed
+  from `announcing_pubkey` / `successor_pubkey` to
+  `announcing_publisher_pubkey` / `successor_publisher_pubkey` to match
+  the §11 vocabulary. `verify_migration_announcement` emits the new
+  schema for the `publisher_pubkey` direct-mismatch path. Tests
+  updated; no consumers of the legacy keys remain.
+- **§10 rc.15 symmetric clock-skew formula** codified in the
+  `check_origin_not_after` docstring. Behavior unchanged: the
+  pre-existing implementation already evaluates `now > not_after +
+  CLOCK_SKEW_TOLERANCE_SECS`, which is the rc.15 normative formula.
+  The docstring now references the past-bound mirror of the future-bound
+  tolerance applied to `manifest.updated` and `canary.issued_at`.
+
+### Added (spec v1.0-rc.15 alignment)
+
+- **`wrap_successor_stage9_failure`** (§11 v1.0-rc.15): public helper
+  that wraps a successor manifest's Stage 1-9 failure into an
+  `E_MIGRATION_MISMATCH` diagnostic without losing the underlying
+  cause. The wrapper attaches `mismatch_field:
+  "successor_stage9_failure"`, the announced successor address, the
+  announcing publisher pubkey, and the original diagnostic verbatim as
+  `underlying_diagnostic`. `successor_publisher_pubkey` is scoped per
+  rc.15: present only when the caller supplies it (the successor
+  cleared its own Stage 5), omitted otherwise (failures at Stage 1-4
+  before a validated pubkey exists). Lives at
+  `validation::wrap_successor_stage9_failure`.
+- **CI conformance corpus pinned to `v1.0-rc.15`** in
+  `.github/workflows/ci.yml`. rc.15 is wire-compatible with rc.14
+  (no schema or canonicalization changes; the diagnostic-details
+  extension is additive); the existing 32 corpus vectors validate
+  identically byte-for-byte.
+
 ### Added (spec v1.0-rc.14 alignment)
 
 - **§06 `origin.not_after`**: optional `Option<EntangledTimestamp>` field

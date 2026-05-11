@@ -30,6 +30,7 @@ pub use input::{check_input, InputKind};
 pub use kind::{discriminate_kind, DocumentKind};
 pub use migration::{
     check_migration_chain_cycle, check_origin_not_after, verify_migration_announcement,
+    wrap_successor_stage9_failure,
 };
 pub use parse::parse_with_limits;
 pub use schema::{
