@@ -15,17 +15,14 @@
 
 use std::collections::HashSet;
 
-use entangled_core::types::manifest::{
-    Carrier, Manifest, MigrationPointer, OnionAddress, Origin,
-};
+use entangled_core::types::manifest::{Carrier, Manifest, MigrationPointer, OnionAddress, Origin};
 use entangled_core::validation::{
     check_migration_chain_cycle, check_origin_not_after, DiagnosticCode,
 };
 
 use super::common::{minimal_manifest, ts};
 
-const SUCCESSOR_ADDR: &str =
-    "ssssssssssssssssssssssssssssssssssssssssssssssssssssssss.onion";
+const SUCCESSOR_ADDR: &str = "ssssssssssssssssssssssssssssssssssssssssssssssssssssssss.onion";
 const ALT_ADDR: &str = "tttttttttttttttttttttttttttttttttttttttttttttttttttttttt.onion";
 
 fn manifest_with_not_after(not_after: Option<&str>) -> Manifest {
@@ -67,10 +64,7 @@ fn not_after_beyond_skew_rejected_with_e_origin_expired() {
     let details = err.details.as_ref().expect("details payload");
     assert_eq!(details["field_path"].as_str(), Some("origin.not_after"));
     assert_eq!(details["reason"].as_str(), Some("origin_expired"));
-    assert_eq!(
-        details["not_after"].as_str(),
-        Some("2026-05-07T00:00:00Z")
-    );
+    assert_eq!(details["not_after"].as_str(), Some("2026-05-07T00:00:00Z"));
     assert_eq!(details["now"].as_str(), Some("2026-05-07T00:05:01Z"));
 }
 

@@ -404,10 +404,7 @@ pub fn validate_migration_pointer(
 /// the §11 vocabulary (`not_after_not_after_issued_at` or
 /// `not_after_beyond_5y`), plus the offending `not_after` and the
 /// `canary.issued_at` it was compared against.
-pub fn validate_origin_not_after(
-    origin: &Origin,
-    canary: &Canary,
-) -> Result<(), Diagnostic> {
+pub fn validate_origin_not_after(origin: &Origin, canary: &Canary) -> Result<(), Diagnostic> {
     let Some(not_after) = origin.not_after else {
         return Ok(());
     };

@@ -147,12 +147,7 @@ fn wrap_successor_stage9_failure_omits_successor_pubkey_for_pre_schema_failure()
         "malformed JSON",
     );
 
-    let wrapped = wrap_successor_stage9_failure(
-        &announcing,
-        &successor_address,
-        None,
-        &underlying,
-    );
+    let wrapped = wrap_successor_stage9_failure(&announcing, &successor_address, None, &underlying);
 
     assert_eq!(wrapped.code, DiagnosticCode::EMigrationMismatch);
     let details = wrapped.details.as_ref().expect("details payload");
@@ -164,6 +159,9 @@ fn wrap_successor_stage9_failure_omits_successor_pubkey_for_pre_schema_failure()
         details.get("successor_publisher_pubkey").is_none(),
         "successor_publisher_pubkey must be omitted for Stage 1-4 failures"
     );
-    assert_eq!(details["underlying_diagnostic"]["code"].as_str(), Some("E_PARSE_JSON"));
+    assert_eq!(
+        details["underlying_diagnostic"]["code"].as_str(),
+        Some("E_PARSE_JSON")
+    );
     assert_eq!(details["underlying_diagnostic"]["stage"].as_u64(), Some(3));
 }
