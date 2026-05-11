@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (spec v1.0-rc.18 alignment — anticipating tag)
+
+The rc.18 tag is in soak on rc.17 at the time of this commit. The Lotto 7
+errata are textual clarifications and one diagnostic-precision
+constraint, all behaviorally compatible with rc.16 / rc.17 emitters.
+
+- **§11 `E_ORIGIN_EXPIRED.details.now` rounded down to minute precision**
+  (N18). `check_origin_not_after` now emits `details.now` as
+  `YYYY-MM-DDTHH:MM:00Z` so the diagnostic does not leak sub-minute
+  clock skew if forwarded to third parties (crash reports, support
+  channels). Minute-level resolution remains sufficient for clock-skew
+  troubleshooting. `details.not_after` is publisher-declared and
+  exposed as-is. New `minute_precision_utc` helper inside the module.
+- **§10 Cross-session migration history — module docs tightened to
+  rc.18 wording.** `validation/migration.rs` records the N30 rule
+  (Replacement events fire at every Adoption against the pre-Adoption
+  current origin, closing the `A → B → A → B` direction gap) and the
+  N31 365-day SHOULD-NOT-exceed upper bound (plus the
+  bounded-storage event-count alternative). Storage and confirmation
+  surface remain caller concerns; the crate adds no new types.
+- **§10 Chain depth and cycle prevention — post-rejection state
+  clarified** (N21). `check_migration_chain_cycle` docstring notes
+  that a cycle rejection invalidates only the new adoption: the most
+  recently verified successor stays the current origin and cached
+  manifests for visited origins remain usable under their refresh
+  policy. No behavior change; documentation only.
+
+### Changed (spec v1.0-rc.17 alignment)
+
+- **CI conformance corpus pinned to `v1.0-rc.17`** in
+  `.github/workflows/ci.yml`. rc.17 is wire-format and corpus-content
+  identical to rc.16 (the bump is to the spec-repo tag covering the
+  Lotto 6 operator playbook and README updates). No protocol or
+  crate-API surface changes; the corpus remains 34 vectors and all
+  pass byte-for-byte.
+
 ### Changed (spec v1.0-rc.16 alignment)
 
 - **§11 `E_MIGRATION_MISMATCH.details.underlying_diagnostic` →

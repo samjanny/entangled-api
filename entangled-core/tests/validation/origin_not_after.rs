@@ -64,8 +64,12 @@ fn not_after_beyond_skew_rejected_with_e_origin_expired() {
     let details = err.details.as_ref().expect("details payload");
     assert_eq!(details["field_path"].as_str(), Some("origin.not_after"));
     assert_eq!(details["reason"].as_str(), Some("origin_expired"));
+    // `not_after` is publisher-declared and exposed as-is.
     assert_eq!(details["not_after"].as_str(), Some("2026-05-07T00:00:00Z"));
-    assert_eq!(details["now"].as_str(), Some("2026-05-07T00:05:01Z"));
+    // §11 v1.0-rc.18 (N18): `details.now` is rounded down to minute
+    // precision so the diagnostic does not leak sub-minute clock skew
+    // if forwarded to third parties.
+    assert_eq!(details["now"].as_str(), Some("2026-05-07T00:05:00Z"));
 }
 
 #[test]
@@ -74,6 +78,19 @@ fn not_after_far_in_the_past_rejected() {
     let err = check_origin_not_after(&m, &ts("2026-05-07T00:00:00Z"))
         .expect_err("years-old not_after must reject");
     assert_eq!(err.code, DiagnosticCode::EOriginExpired);
+}
+
+#[test]
+fn details_now_rounds_down_at_seconds_59_boundary() {
+    // §11 v1.0-rc.18 (N18): `details.now` rounds *down* to minute
+    // precision. The same-minute boundary case — :59 truncated to :00 —
+    // is the one most likely to surface a bug if rounding were
+    // mis-implemented as nearest-minute or as truncation of the minute.
+    let m = manifest_with_not_after(Some("2026-05-07T00:00:00Z"));
+    let err = check_origin_not_after(&m, &ts("2026-05-07T00:10:59Z"))
+        .expect_err("10m59s past not_after must reject");
+    let details = err.details.as_ref().expect("details payload");
+    assert_eq!(details["now"].as_str(), Some("2026-05-07T00:10:00Z"));
 }
 
 fn pointer_to(addr: &str) -> MigrationPointer {

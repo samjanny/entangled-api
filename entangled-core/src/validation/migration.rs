@@ -53,25 +53,45 @@
 //! [`crate::validation::schema::validate_origin_not_after`], reported as
 //! `E_MIGRATION_INVALID` or `E_ORIGIN_INVALID` respectively.
 //!
-//! # Cross-session migration history (§10 v1.0-rc.16, N20)
+//! # Cross-session migration history (§10 v1.0-rc.16, N20; tightened
+//! in v1.0-rc.18, N30 & N31)
 //!
-//! rc.16 adds a SHOULD-level mitigation for cross-session migration
+//! rc.16 introduced a SHOULD-level mitigation for cross-session migration
 //! ping-pong cycles (`A → B` in one session, `B → A` in the next, with
 //! the per-flow `visited_origins` set freshly empty each navigation).
 //! Clients that maintain migration history per `K_publisher.pub` SHOULD
 //! consult that history when processing a new migration to a successor
 //! address, looking for prior replacement of that address within a recall
-//! window (recommended 30 days, configurable, 7-day minimum). When a
-//! successor is in the recall window as a previously-replaced address,
-//! the client SHOULD raise friction: surfacing the recall information in
-//! the existing user-confirmation dialog for **Externally verified** and
-//! **TOFU pinned**; requiring explicit confirmation for **First contact**
-//! where automatic adoption of one hop is otherwise permitted.
+//! window. When a successor is in the recall window as a previously-
+//! replaced address, the client SHOULD raise friction: surfacing the
+//! recall information in the existing user-confirmation dialog for
+//! **Externally verified** and **TOFU pinned**; requiring explicit
+//! confirmation for **First contact** where automatic adoption of one
+//! hop is otherwise permitted.
+//!
+//! rc.18 closes two gaps in the rc.16 rule:
+//!
+//! * **N30 — Replacement event covers the pre-Adoption current origin.**
+//!   The rc.16 wording recorded a `Replacement` event only when a
+//!   previously adopted successor was itself superseded, which left the
+//!   `A → B → A → B` ping-pong detectable in only one direction (the
+//!   original starting origin `A` was never marked replaced before the
+//!   first hop). Under rc.18 the `Replacement` event MUST also be
+//!   recorded at every Adoption against the pre-Adoption current origin
+//!   (the announcing origin), so a later announcement of `A` as a
+//!   successor triggers the recall check.
+//! * **N31 — recall-window upper bound.** The recommended 30-day window
+//!   gains an explicit SHOULD-NOT-exceed of 365 days. Clients with
+//!   bounded storage MAY enforce a smaller cap, whether by time or by
+//!   event count (e.g. the most recent 100 migration events per
+//!   publisher profile, evicting the oldest first), provided the cap
+//!   remains at or above the 7-day floor. Bounds migration-history
+//!   storage per publisher profile.
 //!
 //! This is a trust-state-machine concern (publisher history persistence,
 //! user dialog content) and remains the caller's responsibility; this
 //! crate does not maintain publisher history. v1.0 leaves the storage
-//! backend unspecified, and §00 documents the SHOULD-level scope as a
+//! backend unspecified and §00 documents the SHOULD-level scope as a
 //! v1.0 limitation. The per-flow [`check_migration_chain_cycle`] guard
 //! (MUST) and any per-publisher migration history (SHOULD) are
 //! independent mitigations: the former rejects intra-flow cycles
@@ -256,6 +276,13 @@ pub fn check_origin_not_after(
         return Ok(());
     }
 
+    // §11 v1.0-rc.18 (N18): `details.now` is rounded down to minute
+    // precision (`YYYY-MM-DDTHH:MM:00Z`). The constraint limits any
+    // clock-skew leak if the diagnostic is forwarded to third parties
+    // (crash reports, support channels) without compromising the
+    // diagnostic's usefulness for clock-skew troubleshooting, where
+    // minute-level resolution is sufficient. `not_after` is publisher-
+    // declared and already exposed on the wire, so no rounding applies.
     Err(Diagnostic::new(
         DiagnosticCode::EOriginExpired,
         DocumentKindLabel::Manifest,
@@ -267,12 +294,28 @@ pub fn check_origin_not_after(
         "field_path": "origin.not_after",
         "reason": "origin_expired",
         "not_after": not_after.to_string(),
-        "now": now.to_string(),
+        "now": minute_precision_utc(now),
         "skew_tolerance_seconds": CLOCK_SKEW_TOLERANCE_SECS,
     })))
 }
 
-/// Stage 9 chain-cycle guard for `migration_pointer` (§10 v1.0-rc.14).
+/// Format an [`EntangledTimestamp`] as RFC 3339 UTC with seconds zeroed
+/// (`YYYY-MM-DDTHH:MM:00Z`). Implements the §11 v1.0-rc.18 minute-
+/// precision constraint on `E_ORIGIN_EXPIRED.details.now`.
+fn minute_precision_utc(ts: &EntangledTimestamp) -> String {
+    let dt = ts.as_offset_date_time();
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:00Z",
+        dt.year(),
+        u8::from(dt.month()),
+        dt.day(),
+        dt.hour(),
+        dt.minute(),
+    )
+}
+
+/// Stage 9 chain-cycle guard for `migration_pointer` (§10 v1.0-rc.14;
+/// post-rejection state clarified in v1.0-rc.18, N21).
 ///
 /// A client supporting publisher profiles maintains, for the duration of
 /// a single migration-resolution flow, a `visited_origins` set containing
@@ -293,6 +336,13 @@ pub fn check_origin_not_after(
 /// (at most one hop without user re-confirmation) — is a client-chrome
 /// concern (user confirmation cadence, high-threat mode override) and is
 /// not enforced by this crate.
+///
+/// Per rc.18 (N21), a cycle rejection invalidates only the new
+/// adoption: the most recently verified successor adopted earlier in
+/// the same flow remains the current origin for the publisher profile,
+/// and any cached manifests held for origins in `visited_origins` MAY
+/// still be served from cache within their refresh policy. This helper
+/// rejects the new hop without touching the caller's existing state.
 ///
 /// # Errors
 ///
