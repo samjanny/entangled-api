@@ -7,13 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed (spec v1.0-rc.18 alignment — anticipating tag)
+## [0.3.0] - 2026-05-11
 
-The rc.18 tag is in soak on rc.17 at the time of this commit. The Lotto 7
-errata are textual clarifications and one diagnostic-precision
-constraint, all behaviorally compatible with rc.16 / rc.17 emitters.
-The Lotto 10 cryptographic-audit tranche adds one normative tightening
-in the crate's validation surface (canary interval ceiling).
+SEMVER MINOR in 0.x. Behavioral break driven by the spec v1.0-rc.18
+Lotto 10 cryptographic-audit tranche: the §08 canary interval ceiling
+narrows from 90 to 30 days. The rc.18 Lotto 7 clarifications
+(N18/N21/N30/N31) shipped in 0.2.0; this tag adds only the Lotto 10
+normative tightening.
+
+### Changed (spec v1.0-rc.18 alignment — Lotto 10)
 
 - **§08 Canary interval ceiling — 90 days → 30 days** (Lotto 10, N42).
   `CANARY_INTERVAL_MAX_SECS` drops from `90 * 86_400` (7,776,000 s) to
@@ -28,6 +30,41 @@ in the crate's validation surface (canary interval ceiling).
   `tests/document/type_state`) shrink their default canary intervals
   from 31 to 30 days. An rc.17 publisher emitting an interval in
   `(30, 90]` days is non-conformant under rc.18.
+
+## [0.2.1] - 2026-05-11
+
+### Fixed
+
+- Broken rustdoc intra-doc link for `validate_migration_pointer` that
+  would have failed `cargo doc` under `-D warnings` (CI doc job) and
+  similarly broken docs.rs (459ac26). No API or behavioral change.
+
+## [0.2.0] - 2026-05-11
+
+SEMVER MINOR in 0.x. Tagged after the rc.13 → rc.18 Lotto 7
+spec-alignment accumulation, a validator return-type change, and
+security-audit follow-ups. The detailed spec-alignment entries below
+were drafted under "Unreleased" as each rc landed and were not promoted
+into this versioned section when the tag was cut; they are reproduced
+here verbatim.
+
+### Changed
+
+- **Public API: `validate_state_updates_against_policy` return type**
+  changed from `Result<(), Diagnostic>` to
+  `Result<Vec<&StatePolicyEntry>, Diagnostic>` to eliminate the
+  `set_with_policy` panic-on-invariant by threading the matched policy
+  entries from the validator (1b6495d). This is the SEMVER MINOR break
+  that motivated the 0.1 → 0.2 bump.
+- **Security audit follow-ups** (3374b1d): `StoreKey` strongly typed at
+  the state-store boundary; `migration_pointer` null guard at parse.
+
+### Changed (spec v1.0-rc.18 alignment — Lotto 7, anticipating tag)
+
+The rc.18 tag was in soak on rc.17 at the time of this release. The
+Lotto 7 errata are textual clarifications and one diagnostic-precision
+constraint, all behaviorally compatible with rc.16 / rc.17 emitters.
+
 - **§11 `E_ORIGIN_EXPIRED.details.now` rounded down to minute precision**
   (N18). `check_origin_not_after` now emits `details.now` as
   `YYYY-MM-DDTHH:MM:00Z` so the diagnostic does not leak sub-minute
