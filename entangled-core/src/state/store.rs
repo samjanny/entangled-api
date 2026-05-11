@@ -14,7 +14,7 @@ use crate::types::slug::Slug;
 use crate::types::state::{StateMode, StatePolicyEntry, StateUpdateOp};
 use crate::types::timestamp::EntangledTimestamp;
 use crate::validation::diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel};
-use crate::validation::policy_check::validate_state_updates_against_policy;
+use crate::validation::policy_check::validate_state_update_against_policy;
 
 /// One state entry, as stored client-side. The `mode` is preserved from the
 /// time of commit and never silently rewritten when `state_policy` changes
@@ -272,26 +272,15 @@ impl StateStore {
         consent: ConsentDecision,
         now: &EntangledTimestamp,
     ) -> Result<SetOutcome, Diagnostic> {
-        let (ns, key) = match op {
-            StateUpdateOp::Set { namespace, key, .. } => (namespace, key),
-            StateUpdateOp::Delete { .. } => {
-                return Err(Diagnostic::new(
-                    DiagnosticCode::EStateOp,
-                    DocumentKindLabel::Transaction,
-                    "expected a set operation but got delete",
-                ));
-            }
-        };
-        validate_state_updates_against_policy(std::slice::from_ref(op), policy)?;
-        // Policy validation above guarantees that a matching entry exists
-        // (otherwise it would have raised `E_STATE_UNDECLARED`). The lookup
-        // here cannot miss; the `expect` documents that invariant.
-        let mode = policy
-            .iter()
-            .find(|p| p.namespace == *ns && p.key == *key)
-            .map(|p| p.mode)
-            .expect("policy entry present after validate_state_updates_against_policy");
-        self.set(publisher, op, mode, consent, now)
+        if matches!(op, StateUpdateOp::Delete { .. }) {
+            return Err(Diagnostic::new(
+                DiagnosticCode::EStateOp,
+                DocumentKindLabel::Transaction,
+                "expected a set operation but got delete",
+            ));
+        }
+        let entry = validate_state_update_against_policy(op, policy)?;
+        self.set(publisher, op, entry.mode, consent, now)
     }
 
     /// Commit a delete. Returns `Ok(false)` if no entry was present (no-op,
