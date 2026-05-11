@@ -150,7 +150,7 @@ pub struct NavEntry {
 /// publisher profiles uses this to discover the new origin authentically.
 ///
 /// Schema constraints enforced at Stage 5 by
-/// [`crate::validation::manifest::validate_migration_pointer`]:
+/// [`crate::validation::schema::validate_migration_pointer`]:
 ///
 /// - `successor_origin.address` MUST differ from the announcing manifest's
 ///   `origin.address`.
