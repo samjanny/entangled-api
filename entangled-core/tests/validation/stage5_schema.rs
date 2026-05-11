@@ -769,6 +769,25 @@ fn migration_pointer_omitted_field_accepted() {
 }
 
 #[test]
+fn migration_pointer_null_rejected_by_prepass() {
+    // §04 no-`null` discipline: absent is encoded by omission, never by null.
+    // Without the schema-prepass null sweep, `Option<MigrationPointer>::deserialize`
+    // would accept `null` as `None` and the subsequent round-trip
+    // (`to_value(&manifest)` with `skip_serializing_if = "Option::is_none"`)
+    // would omit the field, producing JCS bytes different from the wire input
+    // — a signature-input asymmetry. The prepass closes this gap at Stage 5
+    // before deserialization, so any future refactor that reorders the prepass
+    // breaks this test rather than the signature invariant.
+    let mut v = manifest_value();
+    v.as_object_mut()
+        .unwrap()
+        .insert("migration_pointer".to_owned(), json!(null));
+    let err = parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now())
+        .expect_err("null migration_pointer must reject under no-null discipline");
+    assert_eq!(err.code, DiagnosticCode::ESchemaNullValue);
+}
+
+#[test]
 fn migration_pointer_well_formed_accepted_at_schema_level() {
     let mp = json!({
         "successor_origin": {

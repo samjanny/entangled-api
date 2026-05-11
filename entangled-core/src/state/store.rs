@@ -83,16 +83,16 @@ pub enum SetOutcome {
 #[derive(Clone, Hash, PartialEq, Eq)]
 struct StoreKey {
     publisher: PublisherPubkey,
-    namespace: String,
-    key: String,
+    namespace: Slug,
+    key: Slug,
 }
 
 impl StoreKey {
     fn new(publisher: &PublisherPubkey, namespace: &Slug, key: &Slug) -> Self {
         Self {
             publisher: *publisher,
-            namespace: namespace.as_str().to_owned(),
-            key: key.as_str().to_owned(),
+            namespace: namespace.clone(),
+            key: key.clone(),
         }
     }
 }
@@ -343,15 +343,9 @@ impl StateStore {
             if !policy_declares(current_policy, &k.namespace, &k.key) {
                 continue;
             }
-            // Slug syntax was validated when the entry was inserted (the
-            // public API only accepts `&Slug`), so this conversion cannot
-            // fail.
-            let namespace =
-                Slug::try_from(k.namespace.as_str()).expect("namespace stored only via &Slug");
-            let key = Slug::try_from(k.key.as_str()).expect("key stored only via &Slug");
             out.push(super::submit::RequestStateItem {
-                namespace,
-                key,
+                namespace: k.namespace.clone(),
+                key: k.key.clone(),
                 value: e.value.clone(),
             });
         }
@@ -400,12 +394,12 @@ fn is_expired(entry: &StateEntry, now: &EntangledTimestamp) -> bool {
     *now >= entry.expires_at
 }
 
-fn entry_storage_bytes(namespace: &str, key: &str, value: &str) -> usize {
-    namespace.len() + key.len() + value.len()
+fn entry_storage_bytes(namespace: &Slug, key: &Slug, value: &str) -> usize {
+    namespace.as_str().len() + key.as_str().len() + value.len()
 }
 
-fn policy_declares(policy: &[StatePolicyEntry], namespace: &str, key: &str) -> bool {
+fn policy_declares(policy: &[StatePolicyEntry], namespace: &Slug, key: &Slug) -> bool {
     policy
         .iter()
-        .any(|p| p.namespace.as_str() == namespace && p.key.as_str() == key)
+        .any(|p| p.namespace == *namespace && p.key == *key)
 }
