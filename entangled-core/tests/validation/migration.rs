@@ -64,19 +64,25 @@ fn diverging_publisher_pubkey_rejected_with_rc15_details_schema() {
         details["announced_successor_address"].as_str(),
         Some(successor.origin.address.as_str())
     );
-    // No `underlying_diagnostic` for the direct-mismatch path.
+    // No `underlying_diagnostic_code` for the direct-mismatch path
+    // (only the wrap helper attaches it, per rc.16).
+    assert!(details.get("underlying_diagnostic_code").is_none());
+    // The rc.15 name (`underlying_diagnostic`, an object) is gone in
+    // rc.16; the wrapper now emits a string-keyed code identifier under
+    // a different field name.
     assert!(details.get("underlying_diagnostic").is_none());
-    // Legacy rc.13 keys must not appear under rc.15.
+    // Legacy rc.13 keys must not appear under rc.15+.
     assert!(details.get("reason").is_none());
     assert!(details.get("announcing_pubkey").is_none());
     assert!(details.get("successor_pubkey").is_none());
 }
 
 #[test]
-fn wrap_successor_stage9_failure_preserves_underlying_for_stage_5_plus() {
-    // §11 v1.0-rc.15: when the successor's own Stage 5 succeeded, the
-    // wrapper attaches `successor_publisher_pubkey` and embeds the
-    // underlying diagnostic verbatim under `underlying_diagnostic`.
+fn wrap_successor_stage9_failure_preserves_underlying_code_for_stage_5_plus() {
+    // §11 v1.0-rc.15 + rc.16: when the successor's own Stage 5
+    // succeeded, the wrapper attaches `successor_publisher_pubkey` and
+    // records the successor's diagnostic *code identifier* (a JSON
+    // string, not a nested record) under `underlying_diagnostic_code`.
     let announcing = manifest_with_publisher_seed(0xA1);
     let successor_address = alt_origin().address;
     let successor_pubkey = manifest_with_publisher_seed(0xA1).publisher_pubkey;
@@ -123,12 +129,16 @@ fn wrap_successor_stage9_failure_preserves_underlying_for_stage_5_plus() {
         Some(successor_pubkey.to_string().as_str())
     );
 
-    // The underlying diagnostic is preserved as a full structured object,
-    // not flattened or truncated.
-    let inner = &details["underlying_diagnostic"];
-    assert_eq!(inner["code"].as_str(), Some("E_ORIGIN_EXPIRED"));
-    assert_eq!(inner["stage"].as_u64(), Some(9));
-    assert_eq!(inner["details"]["reason"].as_str(), Some("origin_expired"));
+    // Code identifier only — rc.16 N22.
+    assert_eq!(
+        details["underlying_diagnostic_code"].as_str(),
+        Some("E_ORIGIN_EXPIRED")
+    );
+    // The successor's own structured `details` is NOT nested.
+    assert!(
+        details.get("underlying_diagnostic").is_none(),
+        "rc.15 nested-record key must not appear under rc.16"
+    );
 }
 
 #[test]
@@ -136,8 +146,8 @@ fn wrap_successor_stage9_failure_omits_successor_pubkey_for_pre_schema_failure()
     // §11 v1.0-rc.15: for failures before Stage 5 (parse, byte cap, kind
     // discrimination) the successor's `publisher_pubkey` is not yet
     // validated; callers MUST pass `None` and the wrapper MUST NOT emit
-    // the field. Operators reading the diagnostic can distinguish
-    // "successor has no validated key" from a Stage 5+ failure.
+    // the field. The `underlying_diagnostic_code` (rc.16) still records
+    // the §11 code identifier of the failure.
     let announcing = manifest_with_publisher_seed(0xA1);
     let successor_address = alt_origin().address;
 
@@ -160,8 +170,7 @@ fn wrap_successor_stage9_failure_omits_successor_pubkey_for_pre_schema_failure()
         "successor_publisher_pubkey must be omitted for Stage 1-4 failures"
     );
     assert_eq!(
-        details["underlying_diagnostic"]["code"].as_str(),
+        details["underlying_diagnostic_code"].as_str(),
         Some("E_PARSE_JSON")
     );
-    assert_eq!(details["underlying_diagnostic"]["stage"].as_u64(), Some(3));
 }

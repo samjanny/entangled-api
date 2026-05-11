@@ -43,6 +43,13 @@ pub struct Expected {
     pub verdict: String,
     #[serde(default)]
     pub diagnostic: Option<String>,
+    /// Structured `details` payload the corpus expects the implementation
+    /// to attach. Compared by subset: every key/value pair listed here
+    /// MUST appear in the implementation's diagnostic `details`. Used by
+    /// the rc.15+ migration vectors that verify `mismatch_field` and
+    /// `underlying_diagnostic_code`.
+    #[serde(default)]
+    pub diagnostic_details: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -59,6 +66,18 @@ pub struct Context {
     pub submit_body_path: Option<String>,
     #[serde(default)]
     pub previously_verified: Option<String>,
+    /// rc.16 migration vectors: address of the announced successor
+    /// origin, used as the carrier-binding target when running the
+    /// successor manifest through Stages 1-9.
+    #[serde(default)]
+    pub successor_origin_address: Option<String>,
+    /// rc.16 migration vectors: corpus-relative path of the successor
+    /// manifest fetched from `successor_origin_address`. When present,
+    /// the runner runs the successor through Stages 1-9 and wraps any
+    /// failure into `E_MIGRATION_MISMATCH` via
+    /// `wrap_successor_stage9_failure`.
+    #[serde(default)]
+    pub successor_manifest_path: Option<String>,
 }
 
 impl Corpus {

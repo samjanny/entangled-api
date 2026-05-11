@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (spec v1.0-rc.16 alignment)
+
+- **§11 `E_MIGRATION_MISMATCH.details.underlying_diagnostic` →
+  `underlying_diagnostic_code`** (N22). The field is renamed for
+  clarity: it carries only the §11 **code identifier string** (e.g.
+  `"E_ORIGIN_EXPIRED"`), not the full structured diagnostic record.
+  `wrap_successor_stage9_failure` now emits a JSON string under the new
+  key; the rc.15 nested-record shape is gone. Tests assert the new key
+  and the absence of the rc.15 key.
+- **Conformance harness — Stage 9 origin-not-after and migration
+  scenarios.** `tests/conformance/runner.rs` now invokes
+  `check_origin_not_after` after carrier origin binding for every
+  manifest vector, and adds a migration scenario branch driven by the
+  rc.16 corpus context (`successor_origin_address`,
+  `successor_manifest_path`). On a successor Stage 1-9 failure the
+  harness calls `wrap_successor_stage9_failure` and compares the
+  produced `details` against the corpus `diagnostic_details` (subset
+  match). `Verdict::Reject` now carries the full `Diagnostic` so
+  details can be compared.
+- **CI conformance corpus pinned to `v1.0-rc.16`**
+  (`.github/workflows/ci.yml`). Total vectors 34 (was 32) — new rc.16
+  vectors `006-manifest-valid-not-after` and
+  `200-migration-successor-origin-expired` exercise the rc.14
+  `origin.not_after` schema acceptance and the rc.15
+  `successor_stage9_failure` migration path respectively. All 34
+  vectors are green.
+
+### Added (spec v1.0-rc.16 alignment)
+
+- **Cross-session migration history (§10 v1.0-rc.16, N20) — caller-side
+  documentation.** New module-level note in
+  `entangled-core/src/validation/migration.rs` describing the rc.16
+  SHOULD-level mitigation: clients maintaining per-publisher migration
+  history (adoption / replacement events) should consult it within a
+  recall window (recommended 30 days; configurable, 7-day minimum)
+  and raise friction on a successor that was previously replaced.
+  Storage and the user-confirmation surface are caller concerns
+  (trust-state machine + chrome); the crate provides no
+  `MigrationHistory` type because v1.0 leaves the storage backend
+  unspecified. Documented as a v1.0 limitation.
+
 ### Changed (spec v1.0-rc.15 alignment)
 
 - **§11 `E_MIGRATION_MISMATCH` `details` schema** updated to the rc.15

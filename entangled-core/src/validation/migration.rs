@@ -23,15 +23,22 @@
 //!   guard is a client-chrome concern (user-confirmation cadence, see
 //!   §10) and is out of scope for this crate.
 //!
-//! rc.15 extends the `E_MIGRATION_MISMATCH` `details` schema additively:
+//! rc.15 extends the `E_MIGRATION_MISMATCH` `details` schema additively;
+//! rc.16 renames one field for clarity:
 //!
-//! * `mismatch_field` gains the value `"successor_stage9_failure"`,
+//! * `mismatch_field` gains the value `"successor_stage9_failure"` (rc.15),
 //!   reported when the successor manifest fails any Stage 1-9 check
 //!   independently of the migration-binding fields (publisher pubkey,
 //!   address, origin pubkey);
-//! * optional field `underlying_diagnostic` is attached only in that case
-//!   and carries the structured diagnostic the successor's own pipeline
-//!   would have raised in isolation;
+//! * optional field `underlying_diagnostic_code` (rc.16; the rc.15 field
+//!   `underlying_diagnostic` is renamed for clarity) is attached only in
+//!   that case and carries the **code identifier string** the successor's
+//!   own pipeline would have raised in isolation (e.g.
+//!   `"E_ORIGIN_EXPIRED"`, `"E_SIG_VERIFICATION"`). It does **not** nest
+//!   the successor's full structured diagnostic record; operators wanting
+//!   to inspect the successor's own `details` fetch the successor
+//!   manifest in isolation and observe the diagnostic produced by the
+//!   standard pipeline;
 //! * `successor_publisher_pubkey` is scoped to cases where the
 //!   successor's own Stage 5 schema validation succeeded; for earlier
 //!   stages there is no validated key to report. Wrapping a Stage 1-9
@@ -45,6 +52,32 @@
 //! [`crate::validation::schema::validate_migration_pointer`] and
 //! [`crate::validation::schema::validate_origin_not_after`], reported as
 //! `E_MIGRATION_INVALID` or `E_ORIGIN_INVALID` respectively.
+//!
+//! # Cross-session migration history (§10 v1.0-rc.16, N20)
+//!
+//! rc.16 adds a SHOULD-level mitigation for cross-session migration
+//! ping-pong cycles (`A → B` in one session, `B → A` in the next, with
+//! the per-flow `visited_origins` set freshly empty each navigation).
+//! Clients that maintain migration history per `K_publisher.pub` SHOULD
+//! consult that history when processing a new migration to a successor
+//! address, looking for prior replacement of that address within a recall
+//! window (recommended 30 days, configurable, 7-day minimum). When a
+//! successor is in the recall window as a previously-replaced address,
+//! the client SHOULD raise friction: surfacing the recall information in
+//! the existing user-confirmation dialog for **Externally verified** and
+//! **TOFU pinned**; requiring explicit confirmation for **First contact**
+//! where automatic adoption of one hop is otherwise permitted.
+//!
+//! This is a trust-state-machine concern (publisher history persistence,
+//! user dialog content) and remains the caller's responsibility; this
+//! crate does not maintain publisher history. v1.0 leaves the storage
+//! backend unspecified, and §00 documents the SHOULD-level scope as a
+//! v1.0 limitation. The per-flow [`check_migration_chain_cycle`] guard
+//! (MUST) and any per-publisher migration history (SHOULD) are
+//! independent mitigations: the former rejects intra-flow cycles
+//! outright; the latter raises friction without rejecting, since a
+//! publisher legitimately rotating between addresses must remain
+//! reachable.
 
 use std::collections::HashSet;
 
@@ -97,22 +130,29 @@ pub fn verify_migration_announcement(
 }
 
 /// Wrap a successor-manifest Stage 1-9 failure into an
-/// `E_MIGRATION_MISMATCH` diagnostic (§11 v1.0-rc.15).
+/// `E_MIGRATION_MISMATCH` diagnostic (§11 v1.0-rc.15; field name
+/// `underlying_diagnostic_code` per rc.16 clarification).
 ///
 /// When the successor manifest fetched from the announced address fails
 /// any check during its own Stages 1-9 — independently of the
 /// migration-binding facets (`publisher_pubkey`, `address`,
 /// `origin_pubkey`) — the migration is rejected at the announcement
-/// level as `E_MIGRATION_MISMATCH`, but the underlying cause is
-/// preserved in `details.underlying_diagnostic` so operators can tell
-/// "the successor address is wired to the wrong key" apart from "the
-/// successor manifest itself is broken" without an out-of-band lookup.
+/// level as `E_MIGRATION_MISMATCH`. The underlying failure's **code
+/// identifier** (e.g. `"E_ORIGIN_EXPIRED"`, `"E_SIG_VERIFICATION"`) is
+/// preserved in `details.underlying_diagnostic_code` so operators can
+/// tell "the successor address is wired to the wrong key" apart from
+/// "the successor manifest itself is broken" without an out-of-band
+/// lookup. The code identifier is reported as a JSON string, not as the
+/// full structured diagnostic record (rc.16 N22): an operator who needs
+/// the successor's own `details` fetches the successor manifest in
+/// isolation and observes the diagnostic produced by the standard
+/// pipeline.
 ///
 /// The returned diagnostic carries:
 ///
 /// * `mismatch_field: "successor_stage9_failure"`;
-/// * `underlying_diagnostic`: the structured payload of the original
-///   failure (code, stage, severity, document_kind, message, details);
+/// * `underlying_diagnostic_code`: the §11 code identifier of the
+///   successor's own diagnostic, as a JSON string;
 /// * `announced_successor_address`: the address declared by
 ///   `migration_pointer.successor_origin.address`;
 /// * `announcing_publisher_pubkey`: the announcing manifest's
@@ -125,7 +165,7 @@ pub fn verify_migration_announcement(
 ///   pubkey already read from the successor manifest.
 ///
 /// The migration is rejected regardless of the underlying cause; the
-/// `underlying_diagnostic` field is informational only.
+/// `underlying_diagnostic_code` field is informational only.
 pub fn wrap_successor_stage9_failure(
     announcing: &Manifest,
     announced_successor_address: &OnionAddress,
@@ -152,9 +192,8 @@ pub fn wrap_successor_stage9_failure(
         );
     }
     details.insert(
-        "underlying_diagnostic".to_owned(),
-        serde_json::to_value(underlying)
-            .expect("Diagnostic is Serialize and contains only JSON-safe values"),
+        "underlying_diagnostic_code".to_owned(),
+        Value::String(underlying.code.to_string()),
     );
 
     Diagnostic::new(
