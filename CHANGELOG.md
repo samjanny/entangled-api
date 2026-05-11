@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (spec v1.0-rc.14 alignment)
+
+- **§06 `origin.not_after`**: optional `Option<EntangledTimestamp>` field
+  on `Origin` (and therefore on `Manifest.origin` /
+  `UnsignedManifest.origin`). Absent in the closed-schema steady state;
+  encoded by omission per §04 no-`null` discipline. Stage 5 enforces the
+  two §06 `MUST` constraints — `not_after` strictly later than
+  `canary.issued_at`, and within a 5-year horizon
+  (`ORIGIN_NOT_AFTER_MAX_HORIZON_SECS = 5 * 365 * 86_400`) — and reports
+  violations as `E_ORIGIN_INVALID` with `details.reason` in the §11
+  vocabulary (`not_after_not_after_issued_at`, `not_after_beyond_5y`).
+  Public helper `validation::validate_origin_not_after`.
+- **Stage 9 `origin.not_after` expiry check (§10)**:
+  `validation::check_origin_not_after` rejects a manifest whose
+  declared `not_after` is past `now` beyond the §10 clock-skew
+  tolerance (300 s in the publisher's favour) with `E_ORIGIN_EXPIRED`.
+  Callers run it after `tor::verify_origin_binding` has cleared
+  carrier origin binding; the helper does not duplicate the Stage 5
+  semantic checks.
+- **Stage 9 migration chain-cycle guard (§10)**:
+  `validation::check_migration_chain_cycle` takes the per-flow
+  `visited_origins: HashSet<OnionAddress>` and the announcing
+  manifest's `MigrationPointer`; it rejects revisited successor
+  addresses as `E_MIGRATION_INVALID` with `details.reason =
+  "chain_cycle"` and inserts the successor on acceptance so the caller
+  can thread the set through the next hop. The complementary
+  automatic chain-depth limit (one hop without re-prompting; high-
+  threat mode) is a client-chrome concern and remains the caller's
+  responsibility.
+- **§11 diagnostic codes**: `E_ORIGIN_EXPIRED` and `E_ORIGIN_INVALID`
+  added to `DiagnosticCode`, both cataloged at Stage 9 alongside the
+  rest of the Binding family. `E_MIGRATION_INVALID` now additionally
+  covers `details.reason = "chain_cycle"` (visited-origin cycle) and
+  `details.reason = "successor_origin_not_after_present"` (a rc.14
+  successor-shape violation: the successor pointer schema does not
+  carry `not_after`; the successor manifest declares its own).
+- **CI conformance corpus pinned to `v1.0-rc.14`** in
+  `.github/workflows/ci.yml`. The local `docs-spec/` mirror is at
+  rc.14; the rc.14 schema and helper additions are all additive
+  (existing 32 corpus vectors validate identically byte-for-byte under
+  rc.14 since they omit `origin.not_after` and carry no migration
+  cycle), keeping the 32/32 green count.
+
 ### Added (spec v1.0-rc.13 alignment)
 
 - **§04 Unicode NFC for user-visible strings**: schema validation now

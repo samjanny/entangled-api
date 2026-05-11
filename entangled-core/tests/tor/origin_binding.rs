@@ -40,6 +40,7 @@ fn binding_succeeds_when_address_and_pubkey_align() {
         carrier: Carrier::TorV3,
         address: addr.clone(),
         origin_pubkey: OriginPubkey::from_bytes(pubkey),
+        not_after: None,
     };
     verify_origin_binding(&addr, &origin).expect("must succeed");
 }
@@ -54,6 +55,7 @@ fn binding_fails_on_address_mismatch() {
         carrier: Carrier::TorV3,
         address: addr_b,
         origin_pubkey: OriginPubkey::from_bytes(pubkey_b),
+        not_after: None,
     };
     let err = verify_origin_binding(&addr_a, &origin).expect_err("must fail");
     assert_eq!(err.code, DiagnosticCode::EBindOrigin);
@@ -71,6 +73,7 @@ fn binding_fails_on_pubkey_mismatch() {
         carrier: Carrier::TorV3,
         address: addr.clone(),
         origin_pubkey: OriginPubkey::from_bytes(pubkey_b),
+        not_after: None,
     };
     let err = verify_origin_binding(&addr, &origin).expect_err("must fail");
     assert_eq!(err.code, DiagnosticCode::EBindOrigin);
@@ -95,6 +98,7 @@ fn small_order_origin_pubkey_rejected_with_field_path_detail() {
         carrier: Carrier::TorV3,
         address: addr.clone(),
         origin_pubkey: OriginPubkey::from_bytes(weak),
+        not_after: None,
     };
     let err = verify_origin_binding(&addr, &origin).expect_err("small-order key rejected");
     assert_eq!(err.code, DiagnosticCode::EBindOrigin);
@@ -115,6 +119,7 @@ fn carrier_variant_is_exhaustive_in_v1() {
         carrier: Carrier::TorV3,
         address: addr.clone(),
         origin_pubkey: OriginPubkey::from_bytes(pubkey),
+        not_after: None,
     };
     // The match in `verify_origin_binding` is exhaustive; matching on the
     // single variant is enough to assert the branch is reachable.

@@ -103,7 +103,8 @@ pub enum Carrier {
     TorV3,
 }
 
-/// Origin object inside a manifest (§02 origin schema).
+/// Origin object inside a manifest (§02 origin schema; `not_after` added in
+/// §06 v1.0-rc.14).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Origin {
@@ -114,6 +115,22 @@ pub struct Origin {
     /// Ed25519 origin public key. Must equal the key encoded in `address`
     /// (§05 binding); the binding is verified by [`crate::tor::binding`].
     pub origin_pubkey: OriginPubkey,
+    /// Optional publisher-declared UTC instant after which this carrier
+    /// endpoint is no longer authoritative for the site under `K_publisher`
+    /// (§06 v1.0-rc.14). When present, Stage 5 enforces the semantic
+    /// constraints (strictly after `canary.issued_at`, within a 5-year
+    /// ceiling) and Stage 9 rejects the manifest as `E_ORIGIN_EXPIRED`
+    /// once `now` reaches the declared instant (subject to clock-skew
+    /// tolerance). Absent when no publisher-side expiration is declared;
+    /// per §04 no-`null` discipline, absent is encoded by omitting the
+    /// field, never by `null`.
+    ///
+    /// `not_after` is intentionally absent from the `successor_origin`
+    /// object inside [`MigrationPointer`]: the successor manifest
+    /// independently declares its own `origin.not_after` (if any) once
+    /// fetched at Stage 9 per §06.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub not_after: Option<EntangledTimestamp>,
 }
 
 /// One entry in the manifest's `navigation` array (§02).

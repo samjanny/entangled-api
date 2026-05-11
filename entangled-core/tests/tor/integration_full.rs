@@ -58,6 +58,7 @@ fn full_pillar_b_closure() {
             carrier: Carrier::TorV3,
             address: onion.clone(),
             origin_pubkey: OriginPubkey::from_bytes(origin_pk_bytes),
+            not_after: None,
         },
         canary: Canary {
             runtime_pubkey: runtime_pk,

@@ -28,9 +28,12 @@ pub use clock::{check_future_timestamp, check_manifest_clock_skew};
 pub use diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel, Severity};
 pub use input::{check_input, InputKind};
 pub use kind::{discriminate_kind, DocumentKind};
-pub use migration::verify_migration_announcement;
+pub use migration::{
+    check_migration_chain_cycle, check_origin_not_after, verify_migration_announcement,
+};
 pub use parse::parse_with_limits;
 pub use schema::{
     parse_and_validate_content, parse_and_validate_manifest, parse_and_validate_transaction,
-    validate_content, validate_manifest, validate_migration_pointer, validate_transaction,
+    validate_content, validate_manifest, validate_migration_pointer, validate_origin_not_after,
+    validate_transaction,
 };

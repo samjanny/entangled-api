@@ -188,9 +188,24 @@ pub enum DiagnosticCode {
     /// §11 (rc.13). The announcing manifest's `migration_pointer` is
     /// structurally well-formed but semantically invalid (successor address
     /// equals announcing address, `announced_at` after `updated`, or carrier
-    /// mismatch).
+    /// mismatch). Extended in rc.14 to cover the per-flow chain-cycle case
+    /// (a `successor_origin.address` already present in the
+    /// `visited_origins` set; `details.reason = "chain_cycle"`).
     #[serde(rename = "E_MIGRATION_INVALID")]
     EMigrationInvalid,
+    /// §11 (rc.14). The manifest's `origin.not_after` is present and the
+    /// client's clock (subject to the §10 clock-skew tolerance) is at or
+    /// after the declared instant; the manifest is not accepted as current.
+    /// Detected at Stage 9 after carrier origin binding succeeds.
+    #[serde(rename = "E_ORIGIN_EXPIRED")]
+    EOriginExpired,
+    /// §11 (rc.14). The manifest's `origin.not_after` is present but
+    /// violates a semantic constraint: it is not strictly later than
+    /// `canary.issued_at`, or it is more than five years after
+    /// `canary.issued_at`. Detected at Stage 5; cataloged under the §11
+    /// Binding diagnostics with the rest of the origin / migration codes.
+    #[serde(rename = "E_ORIGIN_INVALID")]
+    EOriginInvalid,
 
     // State (off-pipeline)
     #[serde(rename = "E_STATE_UNDECLARED")]
@@ -334,9 +349,13 @@ impl DiagnosticCode {
             | WCanaryGap
             | WCanaryUnavailable => 8,
 
-            // Stage 9 — Binding (incl. origin-migration codes from rc.13).
+            // Stage 9 — Binding (incl. origin-migration codes from rc.13
+            // and origin not-after codes from rc.14). E_ORIGIN_INVALID is
+            // detected at Stage 5 but cataloged under the Binding family
+            // alongside the rest of the origin / migration codes; the
+            // catalog stage controls precedence reporting and matches §11.
             EBindPath | EBindResponsePath | EBindRequestId | EBindRequestHash | EBindOrigin
-            | EMigrationMismatch | EMigrationInvalid => 9,
+            | EMigrationMismatch | EMigrationInvalid | EOriginExpired | EOriginInvalid => 9,
 
             // Off-pipeline (state, historical, image).
             EStateUndeclared

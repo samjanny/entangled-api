@@ -23,7 +23,7 @@ use super::kind::{discriminate_kind, DocumentKind};
 use super::limits::{
     CANARY_FRESHNESS_PROOF_MAX_BYTES, CANARY_STATEMENT_MAX_BYTES, MAX_BLOCKS_CONTENT,
     MAX_BLOCKS_TRANSACTION, MAX_NAVIGATION_ENTRIES, META_TITLE_MAX_BYTES,
-    MIN_REFRESH_INTERVAL_RANGE, NAVIGATION_LABEL_MAX_BYTES,
+    MIN_REFRESH_INTERVAL_RANGE, NAVIGATION_LABEL_MAX_BYTES, ORIGIN_NOT_AFTER_MAX_HORIZON_SECS,
 };
 use super::parse::parse_with_limits;
 use super::state::{validate_state_policy, validate_state_updates_standalone};
@@ -147,6 +147,7 @@ pub fn validate_manifest(manifest: &Manifest, now: &EntangledTimestamp) -> Resul
         &manifest.updated,
         now,
     )?;
+    validate_origin_not_after(&manifest.origin, &manifest.canary)?;
     if let Some(mp) = &manifest.migration_pointer {
         validate_migration_pointer(mp, &manifest.origin, &manifest.updated)?;
     }
@@ -300,10 +301,15 @@ pub(crate) fn validate_manifest_fields(
     Ok(())
 }
 
-/// Validate a manifest's `migration_pointer` block (§06 v1.0-rc.13).
+/// Validate a manifest's `migration_pointer` block (§06 v1.0-rc.13;
+/// successor-shape tightening in v1.0-rc.14).
 ///
 /// Per §06 the announcement is structurally well-formed if and only if:
 ///
+/// * `successor_origin` carries no `not_after`. The successor pointer
+///   schema has exactly three fields (`carrier`, `address`,
+///   `origin_pubkey`) per §06; `not_after` belongs to the successor's
+///   own manifest, fetched and verified at Stage 9 (rc.14 addition).
 /// * `successor_origin.address` differs from the announcing
 ///   `origin.address` (no self-pointing migration);
 /// * `successor_origin.carrier` equals the announcing `origin.carrier`
@@ -313,16 +319,33 @@ pub(crate) fn validate_manifest_fields(
 /// * `announced_at` is not later than the announcing manifest's `updated`
 ///   (the publisher cannot retroactively post-date an announcement).
 ///
-/// All three failures are reported as `E_MIGRATION_INVALID` (§11
-/// rc.13). The structural well-formedness check fires before
-/// `verify_migration_announcement`, which compares publisher pubkeys
-/// across the announcing and successor manifests after both have cleared
-/// their own pipeline.
+/// All four failures are reported as `E_MIGRATION_INVALID` (§11 rc.13,
+/// row extended in rc.14). The structural well-formedness check fires
+/// before `verify_migration_announcement`, which compares publisher
+/// pubkeys across the announcing and successor manifests after both
+/// have cleared their own pipeline. The per-flow chain-cycle check is
+/// a separate Stage 9 concern handled by
+/// [`crate::validation::check_migration_chain_cycle`].
 pub fn validate_migration_pointer(
     mp: &MigrationPointer,
     announcing_origin: &Origin,
     announcing_updated: &EntangledTimestamp,
 ) -> Result<(), Diagnostic> {
+    if mp.successor_origin.not_after.is_some() {
+        // §06 v1.0-rc.14: the successor_origin schema has exactly three
+        // fields (carrier, address, origin_pubkey). `not_after` belongs to
+        // the successor's own manifest, fetched and verified at Stage 9 —
+        // not to the pointer announcing it.
+        return Err(Diagnostic::new(
+            DiagnosticCode::EMigrationInvalid,
+            DocumentKindLabel::Manifest,
+            "migration_pointer.successor_origin must not carry not_after",
+        )
+        .with_details(serde_json::json!({
+            "field_path": "migration_pointer.successor_origin.not_after",
+            "reason": "successor_origin_not_after_present",
+        })));
+    }
     if mp.successor_origin.address == announcing_origin.address {
         return Err(Diagnostic::new(
             DiagnosticCode::EMigrationInvalid,
@@ -356,6 +379,70 @@ pub fn validate_migration_pointer(
             "reason": "announced_after_updated",
         })));
     }
+    Ok(())
+}
+
+/// Validate `origin.not_after` against `canary.issued_at` (§06 v1.0-rc.14).
+///
+/// When `origin.not_after` is absent the helper returns `Ok(())` — declaring
+/// no publisher-side expiration is the steady-state shape. When present the
+/// helper enforces the two `MUST` constraints from §06:
+///
+/// * `not_after` MUST be strictly later than `canary.issued_at`. An
+///   expiration at or before issuance is ill-formed.
+/// * `not_after` MUST NOT be more than five years
+///   ([`ORIGIN_NOT_AFTER_MAX_HORIZON_SECS`] seconds) after
+///   `canary.issued_at`. The ceiling bounds the maximum window during
+///   which a compromised `K_origin` can serve cached clients of an
+///   unrotated origin.
+///
+/// The `SHOULD` constraint ("strictly later than `canary.next_expected`") is
+/// not enforced as a Stage 5 reject per §06; an implementation MAY surface
+/// it as a warning at a higher layer, but the spec explicitly permits it.
+///
+/// Failures are reported as `E_ORIGIN_INVALID` with `details.reason` set to
+/// the §11 vocabulary (`not_after_not_after_issued_at` or
+/// `not_after_beyond_5y`), plus the offending `not_after` and the
+/// `canary.issued_at` it was compared against.
+pub fn validate_origin_not_after(
+    origin: &Origin,
+    canary: &Canary,
+) -> Result<(), Diagnostic> {
+    let Some(not_after) = origin.not_after else {
+        return Ok(());
+    };
+
+    if not_after <= canary.issued_at {
+        return Err(Diagnostic::new(
+            DiagnosticCode::EOriginInvalid,
+            DocumentKindLabel::Manifest,
+            "origin.not_after must be strictly later than canary.issued_at",
+        )
+        .with_details(serde_json::json!({
+            "field_path": "origin.not_after",
+            "reason": "not_after_not_after_issued_at",
+            "not_after": not_after.to_string(),
+            "canary_issued_at": canary.issued_at.to_string(),
+        })));
+    }
+
+    let horizon = not_after.unix_timestamp() - canary.issued_at.unix_timestamp();
+    if horizon > ORIGIN_NOT_AFTER_MAX_HORIZON_SECS {
+        return Err(Diagnostic::new(
+            DiagnosticCode::EOriginInvalid,
+            DocumentKindLabel::Manifest,
+            "origin.not_after must not be more than 5 years after canary.issued_at",
+        )
+        .with_details(serde_json::json!({
+            "field_path": "origin.not_after",
+            "reason": "not_after_beyond_5y",
+            "not_after": not_after.to_string(),
+            "canary_issued_at": canary.issued_at.to_string(),
+            "horizon_seconds": horizon,
+            "max_horizon_seconds": ORIGIN_NOT_AFTER_MAX_HORIZON_SECS,
+        })));
+    }
+
     Ok(())
 }
 

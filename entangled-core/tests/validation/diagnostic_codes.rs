@@ -68,6 +68,8 @@ fn all_codes_round_trip_via_json() {
         DiagnosticCode::EBindOrigin,
         DiagnosticCode::EMigrationMismatch,
         DiagnosticCode::EMigrationInvalid,
+        DiagnosticCode::EOriginExpired,
+        DiagnosticCode::EOriginInvalid,
         DiagnosticCode::EStateUndeclared,
         DiagnosticCode::EStateValueSize,
         DiagnosticCode::EStateTtl,
@@ -190,6 +192,26 @@ fn state_duplicate_serializes_exactly() {
 fn image_budget_serializes_exactly() {
     let s = serde_json::to_string(&DiagnosticCode::WImageBudget).unwrap();
     assert_eq!(s, "\"W_IMAGE_BUDGET\"");
+}
+
+#[test]
+fn origin_not_after_codes_are_stage_9_errors() {
+    // §11 v1.0-rc.14: E_ORIGIN_EXPIRED and E_ORIGIN_INVALID are cataloged
+    // under the Binding family (Stage 9), even though E_ORIGIN_INVALID is
+    // actually fired during Stage 5. Catalog stage drives precedence
+    // reporting and matches the §11 table.
+    assert_eq!(DiagnosticCode::EOriginExpired.stage(), 9);
+    assert_eq!(DiagnosticCode::EOriginInvalid.stage(), 9);
+    assert_eq!(DiagnosticCode::EOriginExpired.severity(), Severity::Error);
+    assert_eq!(DiagnosticCode::EOriginInvalid.severity(), Severity::Error);
+    assert_eq!(
+        serde_json::to_string(&DiagnosticCode::EOriginExpired).unwrap(),
+        "\"E_ORIGIN_EXPIRED\""
+    );
+    assert_eq!(
+        serde_json::to_string(&DiagnosticCode::EOriginInvalid).unwrap(),
+        "\"E_ORIGIN_INVALID\""
+    );
 }
 
 #[test]

@@ -25,6 +25,7 @@ pub fn unsigned_manifest_with_publisher(
             carrier: Carrier::TorV3,
             address: onion(),
             origin_pubkey: origin_key_zero(),
+            not_after: None,
         },
         canary: Canary {
             runtime_pubkey: runtime_key_zero(),

@@ -75,6 +75,10 @@ pub struct UnsignedManifest {
     /// Optional publisher-initiated origin-migration announcement (§06
     /// rc.13). Absent for the steady-state case; encoded by omission per
     /// §04 closed-schema discipline.
+    ///
+    /// The optional `origin.not_after` field added in rc.14 lives on
+    /// [`Origin`] itself and is therefore reused by `UnsignedManifest`
+    /// through the shared struct; no separate field is required here.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub migration_pointer: Option<MigrationPointer>,
 }

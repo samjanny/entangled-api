@@ -11,6 +11,7 @@ mod error_precedence;
 mod limits;
 mod manifest_clock_skew;
 mod migration;
+mod origin_not_after;
 mod policy_check;
 mod stage2_input;
 mod stage3_parse;

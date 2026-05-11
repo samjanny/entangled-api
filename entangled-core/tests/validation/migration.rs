@@ -22,6 +22,7 @@ fn alt_origin() -> Origin {
         )
         .unwrap(),
         origin_pubkey: minimal_manifest().origin.origin_pubkey,
+        not_after: None,
     }
 }
 

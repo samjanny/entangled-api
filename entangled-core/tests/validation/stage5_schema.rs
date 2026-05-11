@@ -784,6 +784,132 @@ fn migration_pointer_well_formed_accepted_at_schema_level() {
 }
 
 #[test]
+fn migration_pointer_successor_origin_with_not_after_rejected() {
+    // §06 v1.0-rc.14: the successor_origin schema is fixed at three fields;
+    // `not_after` is declared by the successor's own manifest, not by the
+    // pointer that announces it.
+    let mp = json!({
+        "successor_origin": {
+            "carrier": "tor-v3",
+            "address": "ssssssssssssssssssssssssssssssssssssssssssssssssssssssss.onion",
+            "origin_pubkey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            "not_after": "2027-05-07T00:00:00Z",
+        },
+        "announced_at": "2026-05-06T12:00:00Z",
+    });
+    let v = manifest_value_with_migration_pointer(mp);
+    let err = parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now())
+        .expect_err("successor_origin.not_after must reject");
+    assert_eq!(err.code, DiagnosticCode::EMigrationInvalid);
+    let details = err.details.as_ref().expect("details payload");
+    assert_eq!(
+        details["reason"].as_str(),
+        Some("successor_origin_not_after_present")
+    );
+}
+
+// -----------------------------------------------------------------------------
+// §06 v1.0-rc.14 origin.not_after schema validation. Stage 5 enforces the
+// two MUSTs from §06 (strictly after canary.issued_at; within a 5-year
+// horizon) and reports them as E_ORIGIN_INVALID with details.reason in the
+// §11 vocabulary. The Stage 9 expiry check (E_ORIGIN_EXPIRED) lives in
+// tests/validation/origin_not_after.rs.
+// -----------------------------------------------------------------------------
+
+fn manifest_value_with_not_after(not_after: &str) -> Value {
+    let mut v = manifest_value();
+    let origin = v.as_object_mut().unwrap().get_mut("origin").unwrap();
+    origin
+        .as_object_mut()
+        .unwrap()
+        .insert("not_after".to_owned(), json!(not_after));
+    v
+}
+
+#[test]
+fn origin_not_after_omitted_accepted() {
+    // The minimal manifest fixture does not declare not_after; rc.14 keeps
+    // that path valid byte-for-byte.
+    let v = manifest_value();
+    parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now())
+        .expect("manifest without origin.not_after accepted");
+}
+
+#[test]
+fn origin_not_after_well_formed_accepted() {
+    // canary.issued_at = 2026-05-07T00:00:00Z; not_after one year later is
+    // well within the 5-year horizon and strictly later than issued_at.
+    let v = manifest_value_with_not_after("2027-05-07T00:00:00Z");
+    parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now())
+        .expect("well-formed origin.not_after accepted");
+}
+
+#[test]
+fn origin_not_after_at_or_before_issued_at_rejected() {
+    // not_after == canary.issued_at violates the strict-later constraint.
+    let v = manifest_value_with_not_after("2026-05-07T00:00:00Z");
+    let err = parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now())
+        .expect_err("not_after at issued_at must reject");
+    assert_eq!(err.code, DiagnosticCode::EOriginInvalid);
+    let details = err.details.as_ref().expect("details payload");
+    assert_eq!(details["field_path"].as_str(), Some("origin.not_after"));
+    assert_eq!(
+        details["reason"].as_str(),
+        Some("not_after_not_after_issued_at")
+    );
+
+    // And the strictly-before case.
+    let v = manifest_value_with_not_after("2026-05-06T23:59:59Z");
+    let err = parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now())
+        .expect_err("not_after before issued_at must reject");
+    assert_eq!(err.code, DiagnosticCode::EOriginInvalid);
+    assert_eq!(
+        err.details.as_ref().unwrap()["reason"].as_str(),
+        Some("not_after_not_after_issued_at")
+    );
+}
+
+#[test]
+fn origin_not_after_beyond_5y_rejected() {
+    // canary.issued_at = 2026-05-07T00:00:00Z; 5 * 365 * 86_400s = exactly
+    // 2031-05-06T00:00:00Z. A `not_after` one day later breaches the
+    // horizon.
+    let v = manifest_value_with_not_after("2031-05-07T00:00:00Z");
+    let err = parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now())
+        .expect_err("not_after beyond 5y horizon must reject");
+    assert_eq!(err.code, DiagnosticCode::EOriginInvalid);
+    let details = err.details.as_ref().expect("details payload");
+    assert_eq!(details["reason"].as_str(), Some("not_after_beyond_5y"));
+}
+
+#[test]
+fn origin_not_after_at_5y_boundary_accepted() {
+    // The horizon is inclusive: exactly canary.issued_at + 5 * 365 * 86_400s
+    // is permitted; only strictly greater is rejected.
+    let v = manifest_value_with_not_after("2031-05-06T00:00:00Z");
+    parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now())
+        .expect("not_after at exact 5y boundary accepted");
+}
+
+#[test]
+fn origin_not_after_null_rejected_by_prepass() {
+    // §04 no-`null` discipline: absent is encoded by omission, never by
+    // null. The schema-prepass null sweep fires before serde reaches the
+    // Option<EntangledTimestamp> field.
+    let mut v = manifest_value();
+    v.as_object_mut()
+        .unwrap()
+        .get_mut("origin")
+        .unwrap()
+        .as_object_mut()
+        .unwrap()
+        .insert("not_after".to_owned(), json!(null));
+    let err = parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now())
+        .expect_err("null not_after must reject under no-null discipline");
+    assert_eq!(err.code, DiagnosticCode::ESchemaNullValue);
+}
+
+#[test]
 fn t21_inline_link_nested_inside_link_label_rejected() {
     let mut v = content_value();
     let blocks = v.as_object_mut().unwrap().get_mut("blocks").unwrap();

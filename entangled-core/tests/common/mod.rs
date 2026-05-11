@@ -123,6 +123,7 @@ pub fn minimal_manifest() -> Manifest {
             carrier: Carrier::TorV3,
             address: onion(),
             origin_pubkey: origin_key_zero(),
+            not_after: None,
         },
         canary: minimal_canary(),
         state_policy: vec![],

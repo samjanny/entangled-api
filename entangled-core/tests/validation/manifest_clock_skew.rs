@@ -149,6 +149,7 @@ fn unsigned_manifest_with_dates(
             )
             .unwrap(),
             origin_pubkey: entangled_core::types::keys::OriginPubkey::try_from(KEY_ZEROS).unwrap(),
+            not_after: None,
         },
         canary: Canary {
             runtime_pubkey: RuntimePubkey::try_from(KEY_ZEROS).unwrap(),

@@ -90,6 +90,7 @@ fn unsigned_manifest_with_consistent_origin(
             carrier: Carrier::TorV3,
             address: onion.clone(),
             origin_pubkey: OriginPubkey::from_bytes(origin_pk_bytes),
+            not_after: None,
         },
         canary: Canary {
             runtime_pubkey: runtime_key_real(),
