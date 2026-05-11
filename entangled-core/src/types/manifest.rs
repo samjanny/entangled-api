@@ -208,3 +208,36 @@ pub struct Manifest {
     /// input (§04).
     pub sig: Signature,
 }
+
+impl Manifest {
+    /// SHA-256 digest of the JCS-canonical signed payload (§04 / §05).
+    ///
+    /// This is the byte stream the publisher hashed before applying the
+    /// Ed25519 signature: the manifest envelope with `sig` removed and the
+    /// `"kind": "manifest"` discriminator attached, JCS-canonicalized.
+    /// Suitable for use as `RetainedManifestRecord::manifest_payload_hash`
+    /// in the §08 canary anti-conflict check, and for any other
+    /// caller-side equality comparison over manifest content.
+    ///
+    /// # Panics
+    ///
+    /// `Manifest` is a closed-schema typed struct constructed only through
+    /// the builder or successful Stage 2-5 parse, so its `Serialize` impl
+    /// is total over the public API. The internal `expect` calls therefore
+    /// reflect a crate invariant rather than a runtime contract.
+    #[must_use]
+    pub fn canonical_payload_hash(&self) -> [u8; 32] {
+        let mut value = serde_json::to_value(self)
+            .expect("Manifest Serialize impl is total over the closed schema");
+        if let serde_json::Value::Object(ref mut map) = value {
+            map.remove("sig");
+            map.insert(
+                "kind".to_owned(),
+                serde_json::Value::String("manifest".to_owned()),
+            );
+        }
+        let canonical = crate::canon::canonicalize(&value)
+            .expect("JCS canonicalize cannot fail on a serde_json::Value from a closed schema");
+        crate::crypto::sha256(&canonical)
+    }
+}

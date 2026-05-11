@@ -135,6 +135,19 @@ pub trait ManifestRead: sealed::HasManifest {
     fn updated(&self) -> &EntangledTimestamp {
         &self.manifest_ref().updated
     }
+    /// SHA-256 of the JCS-canonical signed payload — the input to the
+    /// publisher's Ed25519 signature, suitable for use as
+    /// `RetainedManifestRecord::manifest_payload_hash` in the §08
+    /// anti-conflict check.
+    ///
+    /// Available at every stage of the type-state chain so that
+    /// callers can record the hash for trust-state persistence
+    /// without having to call `skip_*` or `into_parts` first.
+    /// See [`Manifest::canonical_payload_hash`].
+    #[must_use]
+    fn canonical_payload_hash(&self) -> [u8; 32] {
+        self.manifest_ref().canonical_payload_hash()
+    }
 }
 
 /// Manifest after Stage 6 (signature verification) succeeded.

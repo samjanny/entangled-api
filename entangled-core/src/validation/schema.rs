@@ -48,6 +48,27 @@ pub fn parse_and_validate_manifest(
     bytes: &[u8],
     now: &EntangledTimestamp,
 ) -> Result<Manifest, Diagnostic> {
+    parse_and_validate_manifest_with_value(bytes, now).map(|(m, _)| m)
+}
+
+/// Same as [`parse_and_validate_manifest`] but also returns the raw
+/// parsed wire [`Value`] (post-parse / post-schema, with `kind` still
+/// present and `sig` still attached).
+///
+/// Used by [`crate::document::parse_and_verify_manifest`] to compute the
+/// signature input directly over the wire bytes rather than over a
+/// round-trip of the typed [`Manifest`]. Returning both pins the signed
+/// bytes to the bytes the parser actually observed, removing dependence
+/// on every [`serde::Serialize`] impl being faithful to its
+/// [`serde::Deserialize`] counterpart.
+///
+/// # Errors
+///
+/// Returns the first applicable Stage 2-5 diagnostic.
+pub fn parse_and_validate_manifest_with_value(
+    bytes: &[u8],
+    now: &EntangledTimestamp,
+) -> Result<(Manifest, Value), Diagnostic> {
     let s = check_input(bytes, InputKind::Manifest)?;
     let value = parse_with_limits(s).map_err(|d| set_kind(d, DocumentKindLabel::Manifest))?;
     let kind = discriminate_kind(&value)?;
@@ -59,14 +80,16 @@ pub fn parse_and_validate_manifest(
         ));
     }
     schema_prepass(&value, DocumentKindLabel::Manifest)?;
-    let doc: Document =
-        serde_json::from_value(value).map_err(|e| map_serde_err(e, DocumentKindLabel::Manifest))?;
+    // Clone before `from_value` (which consumes) so we can return both the
+    // typed model and the wire Value. Bounded by the Stage 2 1 MiB input cap.
+    let doc: Document = serde_json::from_value(value.clone())
+        .map_err(|e| map_serde_err(e, DocumentKindLabel::Manifest))?;
     let manifest = match doc {
         Document::Manifest(m) => m,
         _ => unreachable!("Stage 4 already discriminated as manifest"),
     };
     validate_manifest(&manifest, now)?;
-    Ok(manifest)
+    Ok((manifest, value))
 }
 
 /// Run Stages 2-5 on a content envelope and return the typed
@@ -76,6 +99,19 @@ pub fn parse_and_validate_manifest(
 ///
 /// Returns the first applicable Stage 2-5 diagnostic.
 pub fn parse_and_validate_content(bytes: &[u8]) -> Result<ContentDocument, Diagnostic> {
+    parse_and_validate_content_with_value(bytes).map(|(c, _)| c)
+}
+
+/// Same as [`parse_and_validate_content`] but also returns the raw
+/// parsed wire [`Value`]. See
+/// [`parse_and_validate_manifest_with_value`] for rationale.
+///
+/// # Errors
+///
+/// Returns the first applicable Stage 2-5 diagnostic.
+pub fn parse_and_validate_content_with_value(
+    bytes: &[u8],
+) -> Result<(ContentDocument, Value), Diagnostic> {
     let s = check_input(bytes, InputKind::ContentDocument)?;
     let value = parse_with_limits(s).map_err(|d| set_kind(d, DocumentKindLabel::Content))?;
     let kind = discriminate_kind(&value)?;
@@ -87,14 +123,14 @@ pub fn parse_and_validate_content(bytes: &[u8]) -> Result<ContentDocument, Diagn
         ));
     }
     schema_prepass(&value, DocumentKindLabel::Content)?;
-    let doc: Document =
-        serde_json::from_value(value).map_err(|e| map_serde_err(e, DocumentKindLabel::Content))?;
+    let doc: Document = serde_json::from_value(value.clone())
+        .map_err(|e| map_serde_err(e, DocumentKindLabel::Content))?;
     let content = match doc {
         Document::Content(c) => c,
         _ => unreachable!("Stage 4 already discriminated as content"),
     };
     validate_content(&content)?;
-    Ok(content)
+    Ok((content, value))
 }
 
 /// Run Stages 2-5 on a transaction envelope and return the typed
@@ -104,6 +140,19 @@ pub fn parse_and_validate_content(bytes: &[u8]) -> Result<ContentDocument, Diagn
 ///
 /// Returns the first applicable Stage 2-5 diagnostic.
 pub fn parse_and_validate_transaction(bytes: &[u8]) -> Result<TransactionDocument, Diagnostic> {
+    parse_and_validate_transaction_with_value(bytes).map(|(t, _)| t)
+}
+
+/// Same as [`parse_and_validate_transaction`] but also returns the raw
+/// parsed wire [`Value`]. See
+/// [`parse_and_validate_manifest_with_value`] for rationale.
+///
+/// # Errors
+///
+/// Returns the first applicable Stage 2-5 diagnostic.
+pub fn parse_and_validate_transaction_with_value(
+    bytes: &[u8],
+) -> Result<(TransactionDocument, Value), Diagnostic> {
     let s = check_input(bytes, InputKind::TransactionDocument)?;
     let value = parse_with_limits(s).map_err(|d| set_kind(d, DocumentKindLabel::Transaction))?;
     let kind = discriminate_kind(&value)?;
@@ -115,14 +164,14 @@ pub fn parse_and_validate_transaction(bytes: &[u8]) -> Result<TransactionDocumen
         ));
     }
     schema_prepass(&value, DocumentKindLabel::Transaction)?;
-    let doc: Document = serde_json::from_value(value)
+    let doc: Document = serde_json::from_value(value.clone())
         .map_err(|e| map_serde_err(e, DocumentKindLabel::Transaction))?;
     let tx = match doc {
         Document::Transaction(t) => t,
         _ => unreachable!("Stage 4 already discriminated as transaction"),
     };
     validate_transaction(&tx)?;
-    Ok(tx)
+    Ok((tx, value))
 }
 
 // -----------------------------------------------------------------------------

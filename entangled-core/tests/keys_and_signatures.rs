@@ -1,4 +1,4 @@
-use entangled_core::types::keys::{PublisherPubkey, Signature};
+use entangled_core::types::keys::{PublisherPubkey, RequestId, Signature};
 
 const VALID_KEY: &str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"; // 43 chars
 const VALID_SIG: &str =
@@ -130,4 +130,15 @@ fn pubkey_rejects_non_ascii_byte() {
     let mut s = "A".repeat(42);
     s.push('é'); // U+00E9 — outside the base64url alphabet
     assert!(PublisherPubkey::try_from(s.as_str()).is_err());
+}
+
+#[test]
+fn request_id_generate_draws_distinct_high_entropy_ids() {
+    // Two draws being byte-equal is a 2^-128 event; observing it means
+    // the RNG plumbing is broken, not bad luck.
+    let a = RequestId::generate();
+    let b = RequestId::generate();
+    assert_ne!(a.as_bytes(), b.as_bytes());
+    // The all-zero pattern is the obvious "uninitialised buffer" tell.
+    assert_ne!(a.as_bytes(), &[0u8; 16]);
 }

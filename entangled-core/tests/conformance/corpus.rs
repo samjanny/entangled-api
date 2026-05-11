@@ -15,7 +15,10 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize)]
 pub struct Corpus {
     pub spec_version_target: String,
-    #[allow(dead_code)] // Kept for diagnostic output and future gating.
+    /// Spec revision the corpus is built against (e.g. `v1.0-rc.18`).
+    /// The harness asserts this matches
+    /// [`entangled_core::SPEC_REVISION`] so a corpus pinned to a
+    /// different revision than the code fails CI loudly.
     pub rc_target: String,
     /// Mocked wall-clock value the harness MUST inject for the duration of
     /// the run. Required by corpus rc.9: canary diagnostics depend on

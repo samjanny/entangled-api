@@ -34,7 +34,8 @@ pub use migration::{
 };
 pub use parse::parse_with_limits;
 pub use schema::{
-    parse_and_validate_content, parse_and_validate_manifest, parse_and_validate_transaction,
-    validate_content, validate_manifest, validate_migration_pointer, validate_origin_not_after,
-    validate_transaction,
+    parse_and_validate_content, parse_and_validate_content_with_value, parse_and_validate_manifest,
+    parse_and_validate_manifest_with_value, parse_and_validate_transaction,
+    parse_and_validate_transaction_with_value, validate_content, validate_manifest,
+    validate_migration_pointer, validate_origin_not_after, validate_transaction,
 };

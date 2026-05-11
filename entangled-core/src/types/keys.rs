@@ -320,15 +320,45 @@ impl RequestId {
         &self.0
     }
 
+    /// Draw a fresh 16-byte `request_id` from operating-system entropy.
+    ///
+    /// This is the production constructor for the §09 anti-replay
+    /// contract: 128 bits from a CSPRNG makes per-submit reuse
+    /// vanishingly improbable, removing the need for callers to
+    /// manage their own RNG plumbing or replay-window state.
+    ///
+    /// Uses `getrandom` for cross-platform OS RNG access (Linux
+    /// `getrandom(2)`, `BCryptGenRandom` on Windows, `arc4random_buf`
+    /// on the BSDs, etc.).
+    ///
+    /// Retries: §09 explicitly requires a fresh `request_id` per
+    /// submit *attempt*, including retries of the same logical
+    /// form — never cache the result.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the OS RNG is unavailable. This indicates a
+    /// catastrophic platform fault (e.g. `/dev/urandom` missing on a
+    /// Unix system) and continuing would mean signing replayable
+    /// submits; aborting is the only safe option.
+    pub fn generate() -> Self {
+        let mut bytes = [0u8; REQUEST_ID_BYTES];
+        getrandom::getrandom(&mut bytes).expect("OS RNG unavailable for RequestId::generate");
+        Self(bytes)
+    }
+
     /// Build from raw 16 bytes (no validation).
     ///
     /// This constructor accepts arbitrary bytes; it does NOT enforce the
-    /// §09 / §10 no-reuse contract. The caller is responsible for ensuring
-    /// the bytes come from a fresh CSPRNG draw and are never reused across
-    /// submits — neither cross-temporally (subsequent submits, including
-    /// retries) nor concurrently (multiple in-flight submits to distinct
-    /// publishers). Reuse is a normative MUST violation; the type cannot
-    /// detect it because doing so would require session-wide state.
+    /// §09 / §10 no-reuse contract. Prefer [`RequestId::generate`] for
+    /// production callers: it draws from the OS CSPRNG and is the
+    /// hardest path to misuse. `from_bytes` is appropriate for tests
+    /// that need deterministic IDs and for embedders integrating a
+    /// non-OS entropy source (HSM, vetted application-level CSPRNG)
+    /// — never for direct construction from user-controlled or
+    /// counter-derived bytes. Reuse is a normative MUST violation;
+    /// the type cannot detect it because doing so would require
+    /// session-wide state.
     pub fn from_bytes(bytes: [u8; REQUEST_ID_BYTES]) -> Self {
         Self(bytes)
     }

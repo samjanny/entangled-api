@@ -7,6 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-05-11
+
+SEMVER PATCH. Findings from an internal crypto-security audit of the
+0.3.0 line. No wire-format or behavioral change for conformant inputs;
+all changes are additive helpers, internal hardening, or CI/policy
+fixes. Existing signatures produced under 0.3.0 continue to verify
+byte-equivalent under 0.3.1.
+
+### Fixed (security hardening)
+
+- **Verifier signature input now derived from the wire `Value`, not a
+  typed-model round trip** (audit finding H-1). Previously,
+  `parse_and_verify_{manifest,content,transaction}` computed the
+  Stage 6 signature input by re-serializing the deserialized typed
+  struct (`serde_json::to_value(&manifest)`), re-attaching the `kind`
+  discriminator, stripping `sig`, and JCS-canonicalizing the result.
+  The bytes the verifier actually checked against the Ed25519
+  signature were therefore mediated by the faithfulness of every
+  `Serialize`/`Deserialize` impl in the workspace — a structural
+  invariant that holds today but would silently break the next time
+  a struct grows a field with on-the-way-in normalization or an
+  `Option` whose `skip_serializing_if` semantics drift. The verifier
+  now takes the wire `Value` returned by Stage 3 parsing, strips
+  `sig`, and canonicalizes that directly. No conformant signature is
+  affected today (a new property test pins both paths to the same
+  JCS bytes), but the invariant is now anchored to the bytes the
+  parser observed rather than to a Serialize-impl audit obligation.
+
+### Added
+
+- `entangled_core::types::keys::RequestId::generate()` — production
+  constructor that draws 16 bytes of OS entropy via `getrandom`
+  (audit finding L-1). Documented panic on RNG unavailability,
+  matching the existing internal `SigningKey::generate` pattern.
+  `from_bytes` remains available for tests and embedders integrating
+  a non-OS entropy source; its docstring now steers production
+  callers to `generate()` so the §09 anti-replay no-reuse contract
+  is not silently bypassed by a counter-derived id.
+- `entangled_core::types::Manifest::canonical_payload_hash() -> [u8; 32]`
+  and the matching default method on `ManifestRead` (audit finding
+  L-4). Computes the SHA-256 of the JCS-canonical signed payload —
+  the same digest required for
+  `RetainedManifestRecord::manifest_payload_hash` in the §08
+  anti-conflict check. Available on every type-state wrapper so
+  callers can record the hash before `into_parts()`. A test pins
+  the helper's output byte-equal to the digest derived from the
+  wire path.
+- `entangled_core::validation::parse_and_validate_{manifest,content,
+  transaction}_with_value` — variants that return both the typed
+  model and the parsed wire `Value`. Backing the H-1 verifier
+  refactor; useful in their own right for callers that need the
+  validated `Value` (e.g. higher-level diagnostic surfaces).
+- `entangled_core::SPEC_REVISION = "1.0-rc.18"` constant. The
+  conformance harness now asserts byte-equality between this
+  constant and the corpus's `rc_target`; a corpus pinned ahead of
+  or behind the code fails CI loudly instead of degrading silently
+  (audit finding M-2).
+- Top-level `SECURITY.md` documenting the private vulnerability
+  reporting channel, response-timeline SLAs, and disclosure norms
+  (audit finding L-2).
+
+### Changed
+
+- CI conformance corpus pin moved forward to align with rc.18
+  content (audit finding M-2). Until upstream
+  [`samjanny/entangled`](https://github.com/samjanny/entangled) cuts
+  the `v1.0-rc.18` tag, the CI workflow pins to the upstream `main`
+  HEAD commit `a807cd33` carrying the rc.18 corpus during the
+  post-soak window. Switch back to a tag ref once cut.
+
 ## [0.3.0] - 2026-05-11
 
 SEMVER MINOR in 0.x. Behavioral break driven by the spec v1.0-rc.18

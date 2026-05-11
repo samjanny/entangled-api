@@ -37,6 +37,15 @@ fn corpus_vectors_match_spec() {
         "harness only knows v1.0; corpus targets {}",
         corpus.spec_version_target
     );
+    assert_eq!(
+        corpus.rc_target,
+        entangled_core::SPEC_REVISION,
+        "corpus rc_target {} drifted from crate SPEC_REVISION {}; bump \
+         either the CI corpus pin (.github/workflows/ci.yml) or the \
+         SPEC_REVISION constant (entangled-core/src/lib.rs) so they match",
+        corpus.rc_target,
+        entangled_core::SPEC_REVISION,
+    );
 
     let mut failures: Vec<String> = Vec::new();
     for vector in &corpus.vectors {

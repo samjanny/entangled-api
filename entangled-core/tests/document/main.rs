@@ -13,3 +13,4 @@ mod payload_consistency;
 mod tampering_rejected;
 mod transaction_binding;
 mod type_state;
+mod wire_signature_input;

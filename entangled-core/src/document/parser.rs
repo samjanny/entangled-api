@@ -102,7 +102,8 @@ use crate::types::document::{ContentDocument, TransactionDocument};
 use crate::types::keys::RuntimePubkey;
 use crate::types::timestamp::EntangledTimestamp;
 use crate::validation::schema::{
-    parse_and_validate_content, parse_and_validate_manifest, parse_and_validate_transaction,
+    parse_and_validate_content_with_value, parse_and_validate_manifest_with_value,
+    parse_and_validate_transaction_with_value,
 };
 use crate::validation::{Diagnostic, DiagnosticCode, DocumentKindLabel};
 
@@ -140,20 +141,14 @@ pub fn parse_and_verify_manifest(
     raw: &[u8],
     now: &EntangledTimestamp,
 ) -> Result<ManifestSigVerified, Diagnostic> {
-    let manifest = parse_and_validate_manifest(raw, now)?;
-    let mut value = serde_json::to_value(&manifest).map_err(|e| {
-        Diagnostic::new(
-            DiagnosticCode::EParseJson,
-            DocumentKindLabel::Manifest,
-            format!("failed to re-serialize manifest for signature check: {e}"),
-        )
-    })?;
-    if let serde_json::Value::Object(ref mut map) = value {
-        map.insert(
-            "kind".to_owned(),
-            serde_json::Value::String("manifest".to_owned()),
-        );
-    }
+    let (manifest, mut value) = parse_and_validate_manifest_with_value(raw, now)?;
+    // `value` is the wire-parsed Value (already schema-validated). It still
+    // carries the on-wire `kind` and `sig` fields; we strip `sig` to obtain
+    // the signed payload and canonicalize that directly. Computing the
+    // signature input from the wire Value rather than from
+    // `serde_json::to_value(&manifest)` pins the signed bytes to the bytes
+    // the parser actually observed — see the module-level note on the
+    // Serialize/Deserialize faithfulness invariant.
     let sig = extract_sig(&mut value, DocumentKindLabel::Manifest)?;
     let input = build_manifest_signature_input(&value).map_err(|e| {
         Diagnostic::new(
@@ -179,20 +174,9 @@ pub fn parse_and_verify_content(
     raw: &[u8],
     runtime_pubkey: &RuntimePubkey,
 ) -> Result<ContentDocument, Diagnostic> {
-    let content = parse_and_validate_content(raw)?;
-    let mut value = serde_json::to_value(&content).map_err(|e| {
-        Diagnostic::new(
-            DiagnosticCode::EParseJson,
-            DocumentKindLabel::Content,
-            format!("failed to re-serialize content for signature check: {e}"),
-        )
-    })?;
-    if let serde_json::Value::Object(ref mut map) = value {
-        map.insert(
-            "kind".to_owned(),
-            serde_json::Value::String("content".to_owned()),
-        );
-    }
+    let (content, mut value) = parse_and_validate_content_with_value(raw)?;
+    // See `parse_and_verify_manifest` for the rationale on canonicalizing
+    // the wire Value rather than re-serializing the typed model.
     let sig = extract_sig(&mut value, DocumentKindLabel::Content)?;
     let input = build_content_signature_input(&value).map_err(|e| {
         Diagnostic::new(
@@ -226,20 +210,9 @@ pub fn parse_and_verify_transaction(
     raw: &[u8],
     runtime_pubkey: &RuntimePubkey,
 ) -> Result<TransactionDocument, Diagnostic> {
-    let tx = parse_and_validate_transaction(raw)?;
-    let mut value = serde_json::to_value(&tx).map_err(|e| {
-        Diagnostic::new(
-            DiagnosticCode::EParseJson,
-            DocumentKindLabel::Transaction,
-            format!("failed to re-serialize transaction for signature check: {e}"),
-        )
-    })?;
-    if let serde_json::Value::Object(ref mut map) = value {
-        map.insert(
-            "kind".to_owned(),
-            serde_json::Value::String("transaction".to_owned()),
-        );
-    }
+    let (tx, mut value) = parse_and_validate_transaction_with_value(raw)?;
+    // See `parse_and_verify_manifest` for the rationale on canonicalizing
+    // the wire Value rather than re-serializing the typed model.
     let sig = extract_sig(&mut value, DocumentKindLabel::Transaction)?;
     let input = build_transaction_signature_input(&value).map_err(|e| {
         Diagnostic::new(

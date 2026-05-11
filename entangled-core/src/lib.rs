@@ -41,6 +41,17 @@
 #![deny(rust_2018_idioms)]
 #![deny(missing_docs)]
 
+/// Upstream spec revision this crate is aligned against.
+///
+/// Matches the upstream corpus's `rc_target` field (no leading `v`,
+/// which is reserved for the git tag form `v1.0-rc.18`). Bumped in
+/// lockstep with the CI conformance-corpus pin in
+/// `.github/workflows/ci.yml`. The conformance harness asserts
+/// byte-equality between this constant and the corpus's `rc_target`,
+/// so a corpus that drifts ahead of (or behind) the code fails CI
+/// instead of silently skipping new vectors.
+pub const SPEC_REVISION: &str = "1.0-rc.18";
+
 pub mod canon;
 pub mod crypto;
 pub mod document;

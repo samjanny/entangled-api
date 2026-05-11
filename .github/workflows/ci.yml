@@ -24,10 +24,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Checkout spec corpus
+        # Pinned in lockstep with entangled_core::SPEC_REVISION
+        # (entangled-core/src/lib.rs). The conformance harness asserts
+        # they match — a mismatch fails CI loudly instead of degrading
+        # silently.
+        #
+        # Temporary commit-SHA pin: the rc.18 corpus content is in
+        # upstream `main` HEAD but the `v1.0-rc.18` tag has not been
+        # cut yet (it ships post-soak). Switch back to a tag ref once
+        # upstream tags rc.18.
         uses: actions/checkout@v4
         with:
           repository: samjanny/entangled
-          ref: v1.0-rc.17
+          ref: a807cd336abef6ca1a579c8af51a1ff4dbe05576
           path: docs-spec
       - uses: dtolnay/rust-toolchain@master
         with:
