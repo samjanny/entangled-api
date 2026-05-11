@@ -42,10 +42,12 @@ fn near_expiration_24h_floor() {
 
 #[test]
 fn near_expiration_ten_percent_rule() {
-    // 90-day interval (max). 7 days remaining is ~7.78% < 10%, so we are
-    // inside the 10%-of-interval window.
-    let c = canary("2026-02-06T00:00:00Z", "2026-05-07T00:00:00Z");
-    let now = ts("2026-04-30T00:00:00Z"); // 7 days before next_expected
+    // 30-day interval (max, rc.18 N42). 10% = 3 days, 24h floor = 1 day.
+    // 2 days remaining: inside the 10% window and above the 24h floor —
+    // so the 10%-of-interval rule (not the floor) is what triggers
+    // NearExpiration.
+    let c = canary("2026-04-07T00:00:00Z", "2026-05-07T00:00:00Z");
+    let now = ts("2026-05-05T00:00:00Z"); // 2 days before next_expected
     assert_eq!(compute_canary_state(&c, &now), CanaryState::NearExpiration);
 }
 

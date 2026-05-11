@@ -109,7 +109,7 @@ pub fn minimal_canary() -> Canary {
     Canary {
         runtime_pubkey: runtime_key_real(),
         issued_at: ts("2026-05-07T00:00:00Z"),
-        next_expected: ts("2026-06-07T00:00:00Z"),
+        next_expected: ts("2026-06-06T00:00:00Z"),
         statement: "All clear.".to_owned(),
         freshness_proof: None,
     }

@@ -48,7 +48,7 @@ fn issued_at_near_future_within_skew() {
     let now = ts("2026-05-07T00:00:00Z");
     // 200s ahead -> inside the 300s tolerance.
     let issued = ts("2026-05-07T00:03:20Z"); // +200s
-    let expected = ts("2026-06-08T00:00:00Z");
+    let expected = ts("2026-05-22T00:00:00Z");
     let c = canary_with(issued, expected);
     validate_canary_structure(&c, &now).expect("within skew tolerance");
 }
@@ -81,8 +81,8 @@ fn interval_min_boundary_accepted() {
 #[test]
 fn interval_too_long_rejected() {
     let now = ts("2026-05-07T00:00:00Z");
-    // 91 days > 90 day max.
-    let c = canary_with(ts("2026-02-05T00:00:00Z"), ts("2026-05-07T00:00:00Z"));
+    // 31 days > 30 day max (rc.18 N42 tightened from 90 to 30 days).
+    let c = canary_with(ts("2026-04-06T00:00:00Z"), ts("2026-05-07T00:00:00Z"));
     let err = validate_canary_structure(&c, &now).expect_err("must reject");
     assert_eq!(err.code, DiagnosticCode::ECanaryInvalid);
 }
@@ -90,9 +90,9 @@ fn interval_too_long_rejected() {
 #[test]
 fn interval_max_boundary_accepted() {
     let now = ts("2026-05-07T00:00:00Z");
-    // Exactly 90 days = 7776000s.
-    let c = canary_with(ts("2026-02-06T00:00:00Z"), ts("2026-05-07T00:00:00Z"));
-    validate_canary_structure(&c, &now).expect("90-day boundary accepted");
+    // Exactly 30 days = 2592000s (rc.18 N42 ceiling).
+    let c = canary_with(ts("2026-04-07T00:00:00Z"), ts("2026-05-07T00:00:00Z"));
+    validate_canary_structure(&c, &now).expect("30-day boundary accepted");
 }
 
 // -----------------------------------------------------------------------------

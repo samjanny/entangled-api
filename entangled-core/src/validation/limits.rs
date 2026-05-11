@@ -217,7 +217,13 @@ pub const STATE_TTL_HARD_RANGE: RangeInclusive<u32> = 300..=7_776_000;
 pub const CANARY_INTERVAL_MIN_SECS: i64 = 7 * 86_400;
 
 /// Max canary interval `next_expected - issued_at` in seconds (§08).
-pub const CANARY_INTERVAL_MAX_SECS: i64 = 90 * 86_400;
+///
+/// Tightened from 90 to 30 days in v1.0-rc.18 (N42): the §08:81 MUST
+/// ceiling now aligns with the operational upper bound previously
+/// recommended by the operator playbook (Lotto 6). An rc.17 publisher
+/// emitting a canary interval in `(30, 90]` days is non-conformant
+/// under rc.18; the 7-day MUST floor is unchanged.
+pub const CANARY_INTERVAL_MAX_SECS: i64 = 30 * 86_400;
 
 /// Clock-skew tolerance for future timestamps in seconds (§10).
 pub const CLOCK_SKEW_TOLERANCE_SECS: i64 = 300;

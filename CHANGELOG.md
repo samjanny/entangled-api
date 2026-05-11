@@ -12,7 +12,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 The rc.18 tag is in soak on rc.17 at the time of this commit. The Lotto 7
 errata are textual clarifications and one diagnostic-precision
 constraint, all behaviorally compatible with rc.16 / rc.17 emitters.
+The Lotto 10 cryptographic-audit tranche adds one normative tightening
+in the crate's validation surface (canary interval ceiling).
 
+- **§08 Canary interval ceiling — 90 days → 30 days** (Lotto 10, N42).
+  `CANARY_INTERVAL_MAX_SECS` drops from `90 * 86_400` (7,776,000 s) to
+  `30 * 86_400` (2,592,000 s), aligning the protocol-level MUST with
+  the operational upper bound previously recommended by the operator
+  playbook. The 7-day MUST floor is unchanged. `validate_canary_structure`
+  rejects intervals in `(30, 90]` days under the same `E_CANARY_INVALID`
+  code; the diagnostic message updates from "90 days" to "30 days".
+  Tests that previously asserted a 90-day boundary now assert a 30-day
+  boundary; shared fixtures (`tests/common`, `tests/document/fixtures`,
+  `tests/tor/integration_full`, `tests/validation/manifest_clock_skew`,
+  `tests/document/type_state`) shrink their default canary intervals
+  from 31 to 30 days. An rc.17 publisher emitting an interval in
+  `(30, 90]` days is non-conformant under rc.18.
 - **§11 `E_ORIGIN_EXPIRED.details.now` rounded down to minute precision**
   (N18). `check_origin_not_after` now emits `details.now` as
   `YYYY-MM-DDTHH:MM:00Z` so the diagnostic does not leak sub-minute

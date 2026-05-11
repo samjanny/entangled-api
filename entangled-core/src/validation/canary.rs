@@ -6,7 +6,8 @@
 //!   valid canary into Fresh / NearExpiration / Expired given the current
 //!   wall clock. Never returns `Invalid` or `Unavailable`.
 //! * [`validate_canary_structure`] — Stage 8 structural checks: future-skew,
-//!   ordering, and the [7..=90] day interval bound (§08).
+//!   ordering, and the [7..=30] day interval bound (§08; ceiling
+//!   tightened from 90 to 30 days in v1.0-rc.18, N42).
 //! * [`check_anti_downgrade`] — comparison against the most recent
 //!   `issued_at` known for the same publisher pubkey in publisher history
 //!   (§08 — "MUST NOT accept a canary older than the freshest one previously
@@ -99,7 +100,8 @@ pub fn validate_canary_structure(
         ));
     }
 
-    // (c) interval in the [7..=90] day range.
+    // (c) interval in the [7..=30] day range (§08:81; ceiling tightened
+    // from 90 to 30 days in v1.0-rc.18, N42).
     let interval = expected_unix - issued_unix;
     if interval < CANARY_INTERVAL_MIN_SECS {
         return Err(Diagnostic::new(
@@ -115,7 +117,7 @@ pub fn validate_canary_structure(
             DiagnosticCode::ECanaryInvalid,
             DocumentKindLabel::Manifest,
             format!(
-                "canary interval {interval}s exceeds the {CANARY_INTERVAL_MAX_SECS}s maximum (90 days)"
+                "canary interval {interval}s exceeds the {CANARY_INTERVAL_MAX_SECS}s maximum (30 days)"
             ),
         ));
     }

@@ -117,7 +117,7 @@ fn build_default_consistent_manifest() -> (Manifest, Vec<u8>, OnionAddress) {
         0xD1,
         0xE1,
         ts("2026-05-07T00:00:00Z"),
-        ts("2026-06-07T00:00:00Z"),
+        ts("2026-06-06T00:00:00Z"),
     );
     let (manifest, bytes) = build_manifest(&unsigned, &publisher_key, &fixed_now()).expect("build");
     (manifest, bytes, onion)
@@ -136,8 +136,8 @@ fn full_chain_stage_6_8_9_completes() {
         .into_parts();
 
     assert_eq!(parsed, built, "round-tripped manifest must match");
-    // Default canary: issued 2026-05-07, expires 2026-06-07; at `fixed_now()`
-    // the full 31-day window is ahead → Fresh.
+    // Default canary: issued 2026-05-07, expires 2026-06-06; at `fixed_now()`
+    // the full 30-day window is ahead → Fresh.
     assert_eq!(canary_state, CanaryState::Fresh);
 }
 

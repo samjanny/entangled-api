@@ -63,7 +63,7 @@ fn full_pillar_b_closure() {
         canary: Canary {
             runtime_pubkey: runtime_pk,
             issued_at: ts("2026-05-07T00:00:00Z"),
-            next_expected: ts("2026-06-07T00:00:00Z"),
+            next_expected: ts("2026-06-06T00:00:00Z"),
             statement: "All clear.".to_owned(),
             freshness_proof: None,
         },

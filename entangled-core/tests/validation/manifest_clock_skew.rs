@@ -129,7 +129,7 @@ fn unsigned_manifest_for_clock_skew_canary(
         publisher_pk,
         updated,
         ts("2026-05-07T00:00:00Z"),
-        ts("2026-06-07T00:00:00Z"),
+        ts("2026-06-06T00:00:00Z"),
     )
 }
 
@@ -227,7 +227,7 @@ fn integration_future_canary_issued_at_emits_canary_invalid_via_pipeline() {
     let updated = verifier_now;
     // +400s ahead of `now` -> beyond the 300s tolerance.
     let canary_issued = ts("2026-05-07T00:06:40Z");
-    let canary_next = ts("2026-06-07T00:06:40Z");
+    let canary_next = ts("2026-06-06T00:06:40Z");
 
     // Build under a `signing_now` that lets the future-issued canary pass
     // the builder's own clock-skew gate.
@@ -263,7 +263,7 @@ fn integration_both_future_resolves_to_field_syntax_by_pipeline_precedence() {
 
     // Both timestamps are +1000s relative to verifier_now.
     let future = ts("2026-05-07T00:16:40Z");
-    let canary_next = ts("2026-06-07T00:16:40Z");
+    let canary_next = ts("2026-06-06T00:16:40Z");
 
     let unsigned = unsigned_manifest_with_dates(publisher_pk, future, future, canary_next);
     let (_signed, bytes) =

@@ -110,6 +110,6 @@ fn numeric_ranges() {
 #[test]
 fn canary_interval_and_clock_skew() {
     assert_eq!(CANARY_INTERVAL_MIN_SECS, 7 * 86_400);
-    assert_eq!(CANARY_INTERVAL_MAX_SECS, 90 * 86_400);
+    assert_eq!(CANARY_INTERVAL_MAX_SECS, 30 * 86_400);
     assert_eq!(CLOCK_SKEW_TOLERANCE_SECS, 300);
 }
