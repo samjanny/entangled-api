@@ -54,20 +54,11 @@
 //! `E_MIGRATION_INVALID` or `E_ORIGIN_INVALID` respectively.
 //!
 //! # Cross-session migration history (§10 v1.0-rc.16, N20; tightened
-//! in v1.0-rc.18, N30 & N31)
+//! in v1.0-rc.18, N30 & N31; elevated to MUST in v1.0-rc.19, N50)
 //!
 //! rc.16 introduced a SHOULD-level mitigation for cross-session migration
 //! ping-pong cycles (`A → B` in one session, `B → A` in the next, with
 //! the per-flow `visited_origins` set freshly empty each navigation).
-//! Clients that maintain migration history per `K_publisher.pub` SHOULD
-//! consult that history when processing a new migration to a successor
-//! address, looking for prior replacement of that address within a recall
-//! window. When a successor is in the recall window as a previously-
-//! replaced address, the client SHOULD raise friction: surfacing the
-//! recall information in the existing user-confirmation dialog for
-//! **Externally verified** and **TOFU pinned**; requiring explicit
-//! confirmation for **First contact** where automatic adoption of one
-//! hop is otherwise permitted.
 //!
 //! rc.18 closes two gaps in the rc.16 rule:
 //!
@@ -88,13 +79,21 @@
 //!   remains at or above the 7-day floor. Bounds migration-history
 //!   storage per publisher profile.
 //!
+//! **rc.19 (N50)** elevates all SHOULD-level migration-history
+//! requirements to MUST. Implementations MUST record Adoption and
+//! Replacement events, MUST persist them across sessions (volatile-only
+//! storage is non-conformant), and MUST consult the recall window
+//! (30-day recommended, 7-day MUST floor, 365-day MUST ceiling, zero
+//! not permitted) when processing new migration announcements. The
+//! storage backend (serialization format, database technology) remains
+//! implementation-defined; cross-session persistence is required.
+//!
 //! This is a trust-state-machine concern (publisher history persistence,
 //! user dialog content) and remains the caller's responsibility; this
 //! crate does not maintain publisher history. v1.0 leaves the storage
-//! backend unspecified and §00 documents the SHOULD-level scope as a
-//! v1.0 limitation. The per-flow [`check_migration_chain_cycle`] guard
-//! (MUST) and any per-publisher migration history (SHOULD) are
-//! independent mitigations: the former rejects intra-flow cycles
+//! backend unspecified. The per-flow [`check_migration_chain_cycle`]
+//! guard (MUST) and per-publisher migration history (MUST since rc.19)
+//! are independent mitigations: the former rejects intra-flow cycles
 //! outright; the latter raises friction without rejecting, since a
 //! publisher legitimately rotating between addresses must remain
 //! reachable.

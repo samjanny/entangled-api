@@ -2,8 +2,8 @@
 //!
 //! Stages 2 through 5 of the §10 validation pipeline are implemented here,
 //! plus the off-pipeline canary state machine (Stage 8), policy-aware state
-//! checks (§07), submit body validation (§09), and the clock-skew helper
-//! (§10).
+//! checks (§07), submit body validation (§09), content index validation
+//! (§10 rc.19), and the clock-skew helper (§10).
 //!
 //! Stage 1 (transport) and the user-facing trust-state machine (Stage 7)
 //! are out of scope for this crate.
@@ -11,6 +11,7 @@
 pub mod blocks;
 pub mod canary;
 pub mod clock;
+pub mod content_index;
 pub mod diagnostic;
 pub mod inline;
 pub mod input;
@@ -25,6 +26,9 @@ pub mod strings;
 pub mod submit;
 
 pub use clock::{check_future_timestamp, check_manifest_clock_skew};
+pub use content_index::{
+    validate_content_index, verify_content_against_index, ContentIndex, ContentIndexEntry,
+};
 pub use diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel, Severity};
 pub use input::{check_input, InputKind};
 pub use kind::{discriminate_kind, DocumentKind};

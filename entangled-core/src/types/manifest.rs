@@ -7,7 +7,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use thiserror::Error;
 
 use super::canary::Canary;
-use super::keys::{OriginPubkey, PublisherPubkey, Signature, SpecVersion};
+use super::keys::{ContentRoot, OriginPubkey, PublisherPubkey, Signature, SpecVersion};
 use super::path::EntangledPath;
 use super::state::StatePolicyEntry;
 use super::timestamp::EntangledTimestamp;
@@ -178,6 +178,8 @@ pub struct MigrationPointer {
 ///
 /// `migration_pointer` (rc.13) is optional: absent for the steady-state
 /// case, present only when the publisher is announcing an origin migration.
+/// `content_root` (rc.19) is optional: absent when the publisher does not
+/// use the content index mechanism.
 /// Per §04 / §02 closed-schema discipline, absent is encoded by omitting
 /// the field, never by `null`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -204,6 +206,14 @@ pub struct Manifest {
     /// rc.13). Absent when no migration is announced.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub migration_pointer: Option<MigrationPointer>,
+    /// Optional SHA-256 digest of the exact bytes of `/content_index.json`
+    /// (§06 v1.0-rc.19, N45). When present, commits `K_publisher` to the
+    /// content index: an attacker holding only `K_runtime_priv` cannot
+    /// forge, alter, or roll back content at indexed paths. Updated at each
+    /// publisher ceremony (canary rotation). Absent when the publisher does
+    /// not use the content index mechanism.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub content_root: Option<ContentRoot>,
     /// Ed25519 signature by `publisher_pubkey` over the manifest signature
     /// input (§04).
     pub sig: Signature,

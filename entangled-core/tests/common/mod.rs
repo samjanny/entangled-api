@@ -131,6 +131,7 @@ pub fn minimal_manifest() -> Manifest {
         min_refresh_interval: 86_400,
         updated: ts("2026-05-07T00:00:00Z"),
         migration_pointer: None,
+        content_root: None,
         sig: signature_zero(),
     }
 }
@@ -153,6 +154,7 @@ pub fn minimal_content_doc() -> ContentDocument {
             published_at: ts("2026-05-07T00:00:00Z"),
         },
         blocks: vec![minimal_paragraph()],
+        seq: None,
         sig: signature_zero(),
     }
 }

@@ -209,7 +209,7 @@ pub fn validate_manifest(manifest: &Manifest, now: &EntangledTimestamp) -> Resul
 ///
 /// Returns the first applicable Stage 5 diagnostic.
 pub fn validate_content(doc: &ContentDocument) -> Result<(), Diagnostic> {
-    validate_content_fields(&doc.meta, &doc.blocks)
+    validate_content_fields(&doc.meta, &doc.blocks, doc.seq)
 }
 
 /// Run Stage 5 schema/range/syntax checks on a typed
@@ -492,7 +492,20 @@ pub fn validate_origin_not_after(origin: &Origin, canary: &Canary) -> Result<(),
     Ok(())
 }
 
-pub(crate) fn validate_content_fields(meta: &Meta, blocks: &[Block]) -> Result<(), Diagnostic> {
+pub(crate) fn validate_content_fields(
+    meta: &Meta,
+    blocks: &[Block],
+    seq: Option<u64>,
+) -> Result<(), Diagnostic> {
+    if let Some(s) = seq {
+        if s < 1 {
+            return Err(Diagnostic::new(
+                DiagnosticCode::ESchemaFieldRange,
+                DocumentKindLabel::Content,
+                "seq must be at least 1",
+            ));
+        }
+    }
     if meta.title.len() > META_TITLE_MAX_BYTES {
         return Err(Diagnostic::new(
             DiagnosticCode::ESchemaFieldLength,

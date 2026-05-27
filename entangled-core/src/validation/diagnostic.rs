@@ -207,6 +207,38 @@ pub enum DiagnosticCode {
     #[serde(rename = "E_ORIGIN_INVALID")]
     EOriginInvalid,
 
+    // Stage 9 — Content index (§11 rc.19, N49)
+    /// Manifest declares `content_root` but `/content_index.json` fetch
+    /// failed at transport level.
+    #[serde(rename = "E_CONTENT_INDEX_FETCH_FAILED")]
+    EContentIndexFetchFailed,
+    /// SHA-256 digest of fetched `/content_index.json` bytes does not match
+    /// the manifest's `content_root` value.
+    #[serde(rename = "E_CONTENT_INDEX_HASH_MISMATCH")]
+    EContentIndexHashMismatch,
+    /// Content index fetched and hash-verified but fails structural
+    /// validation (invalid JSON, closed-structure violation, path syntax
+    /// violation, entry field violation, or exceeds 1 MiB cap).
+    #[serde(rename = "E_CONTENT_INDEX_INVALID")]
+    EContentIndexInvalid,
+    /// Content index has an entry for the document's path, but the document
+    /// omits `seq`.
+    #[serde(rename = "E_CONTENT_SEQ_MISSING")]
+    EContentSeqMissing,
+    /// Content document's `seq` is strictly less than the content index
+    /// entry's `seq` for the same path (rollback).
+    #[serde(rename = "E_CONTENT_SEQ_ROLLBACK")]
+    EContentSeqRollback,
+    /// Content document's `seq` is strictly greater than the content index
+    /// entry's `seq` for the same path (uncommitted).
+    #[serde(rename = "E_CONTENT_SEQ_UNCOMMITTED")]
+    EContentSeqUncommitted,
+    /// Content document's `seq` equals the index entry's `seq`, but the
+    /// SHA-256 digest of the response body bytes does not match the index
+    /// entry's `hash`.
+    #[serde(rename = "E_CONTENT_HASH_MISMATCH")]
+    EContentHashMismatch,
+
     // State (off-pipeline)
     #[serde(rename = "E_STATE_UNDECLARED")]
     EStateUndeclared,
@@ -349,13 +381,17 @@ impl DiagnosticCode {
             | WCanaryGap
             | WCanaryUnavailable => 8,
 
-            // Stage 9 — Binding (incl. origin-migration codes from rc.13
-            // and origin not-after codes from rc.14). E_ORIGIN_INVALID is
-            // detected at Stage 5 but cataloged under the Binding family
-            // alongside the rest of the origin / migration codes; the
-            // catalog stage controls precedence reporting and matches §11.
+            // Stage 9 — Binding (incl. origin-migration codes from rc.13,
+            // origin not-after codes from rc.14, and content-index codes
+            // from rc.19). E_ORIGIN_INVALID is detected at Stage 5 but
+            // cataloged under the Binding family alongside the rest of the
+            // origin / migration codes; the catalog stage controls
+            // precedence reporting and matches §11.
             EBindPath | EBindResponsePath | EBindRequestId | EBindRequestHash | EBindOrigin
-            | EMigrationMismatch | EMigrationInvalid | EOriginExpired | EOriginInvalid => 9,
+            | EMigrationMismatch | EMigrationInvalid | EOriginExpired | EOriginInvalid
+            | EContentIndexFetchFailed | EContentIndexHashMismatch | EContentIndexInvalid
+            | EContentSeqMissing | EContentSeqRollback | EContentSeqUncommitted
+            | EContentHashMismatch => 9,
 
             // Off-pipeline (state, historical, image).
             EStateUndeclared

@@ -22,6 +22,12 @@ pub struct ContentDocument {
     pub meta: Meta,
     /// Ordered block list (§03).
     pub blocks: Vec<Block>,
+    /// Content sequence number for this document's path (§02 v1.0-rc.19,
+    /// N46). Positive integer (≥ 1), monotonically increasing per path.
+    /// Conditionally required when the manifest declares `content_root` and
+    /// the content index has an entry for this path; absent otherwise.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub seq: Option<u64>,
     /// Ed25519 signature over the content signature input as defined in §05.
     ///
     /// Computed by signing
@@ -86,8 +92,9 @@ pub struct TransactionDocument {
 /// `"content"`, `"transaction"`) plus the kind-specific fields inlined.
 ///
 /// `Manifest` is the largest variant — `Manifest` itself is ~400 bytes
-/// because of the optional `migration_pointer` (an inlined `Origin` plus a
-/// timestamp). We deliberately do not box it: this enum is only
+/// because of the optional `migration_pointer` and `content_root` (an
+/// inlined `Origin` plus a timestamp, and a 32-byte hash). We deliberately
+/// do not box it: this enum is only
 /// constructed transiently during deserialization, immediately
 /// destructured back into the typed Manifest/Content/Transaction value,
 /// and never stored long-term, so boxing would only add an allocation

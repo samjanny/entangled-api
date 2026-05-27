@@ -72,6 +72,7 @@ fn full_pillar_b_closure() {
         min_refresh_interval: 86_400,
         updated: ts("2026-05-07T00:00:00Z"),
         migration_pointer: None,
+        content_root: None,
     };
 
     // (a) Sign it.

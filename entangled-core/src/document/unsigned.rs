@@ -40,7 +40,7 @@ use serde_json::Value;
 
 use crate::types::blocks::Block;
 use crate::types::canary::Canary;
-use crate::types::keys::{PublisherPubkey, RequestHash, RequestId, SpecVersion};
+use crate::types::keys::{ContentRoot, PublisherPubkey, RequestHash, RequestId, SpecVersion};
 use crate::types::manifest::{MigrationPointer, NavEntry, Origin};
 use crate::types::meta::Meta;
 use crate::types::path::EntangledPath;
@@ -81,6 +81,11 @@ pub struct UnsignedManifest {
     /// through the shared struct; no separate field is required here.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub migration_pointer: Option<MigrationPointer>,
+    /// Optional SHA-256 digest of the exact bytes of `/content_index.json`
+    /// (§06 v1.0-rc.19, N45). Absent when the publisher does not use the
+    /// content index mechanism.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub content_root: Option<ContentRoot>,
 }
 
 /// Unsigned counterpart of [`crate::types::ContentDocument`].
@@ -95,6 +100,10 @@ pub struct UnsignedContent {
     pub meta: Meta,
     /// Ordered block list.
     pub blocks: Vec<Block>,
+    /// Content sequence number for this path (§02 v1.0-rc.19, N46).
+    /// Positive integer (≥ 1), monotonic per path.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub seq: Option<u64>,
 }
 
 /// Unsigned counterpart of [`crate::types::TransactionDocument`].

@@ -39,7 +39,7 @@
 
 use crate::tor::verify_origin_binding;
 use crate::types::canary::Canary;
-use crate::types::keys::PublisherPubkey;
+use crate::types::keys::{ContentRoot, PublisherPubkey};
 use crate::types::manifest::{NavEntry, Origin};
 use crate::types::state::StatePolicyEntry;
 use crate::types::{EntangledTimestamp, Manifest, OnionAddress};
@@ -134,6 +134,11 @@ pub trait ManifestRead: sealed::HasManifest {
     /// Time at which the manifest was last updated (§02).
     fn updated(&self) -> &EntangledTimestamp {
         &self.manifest_ref().updated
+    }
+    /// Optional content-root hash (§06 v1.0-rc.19, N45). When present,
+    /// the manifest commits `K_publisher` to the content index.
+    fn content_root(&self) -> Option<&ContentRoot> {
+        self.manifest_ref().content_root.as_ref()
     }
     /// SHA-256 of the JCS-canonical signed payload — the input to the
     /// publisher's Ed25519 signature, suitable for use as

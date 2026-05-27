@@ -163,6 +163,7 @@ fn unsigned_manifest_with_dates(
         min_refresh_interval: 86_400,
         updated,
         migration_pointer: None,
+        content_root: None,
     }
 }
 

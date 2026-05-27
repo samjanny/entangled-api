@@ -79,6 +79,7 @@ pub fn build_manifest(
         min_refresh_interval: unsigned.min_refresh_interval,
         updated: unsigned.updated,
         migration_pointer: unsigned.migration_pointer.clone(),
+        content_root: unsigned.content_root,
         sig,
     };
 
@@ -98,7 +99,7 @@ pub fn build_content(
     unsigned: &UnsignedContent,
     runtime_key: &RuntimeSigningKey,
 ) -> Result<(ContentDocument, Vec<u8>), DocumentError> {
-    validate_content_fields(&unsigned.meta, &unsigned.blocks)?;
+    validate_content_fields(&unsigned.meta, &unsigned.blocks, unsigned.seq)?;
 
     let signed_payload = unsigned.to_signed_payload()?;
     let sig = sign_content_payload(&signed_payload, runtime_key)?;
@@ -108,6 +109,7 @@ pub fn build_content(
         path: unsigned.path.clone(),
         meta: unsigned.meta.clone(),
         blocks: unsigned.blocks.clone(),
+        seq: unsigned.seq,
         sig,
     };
 

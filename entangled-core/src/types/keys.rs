@@ -290,6 +290,17 @@ sha256_prefixed_newtype!(
     "SHA-256 digest of the JCS-canonical submit body bytes (§02 transaction \
      `request_hash`, §09)."
 );
+sha256_prefixed_newtype!(
+    ContentRoot,
+    "SHA-256 digest of the exact bytes of `/content_index.json` (§06 \
+     v1.0-rc.19, N45). Commits the publisher to a specific set of \
+     `(path, seq, hash)` triples via the manifest signature."
+);
+sha256_prefixed_newtype!(
+    ContentHash,
+    "SHA-256 digest of a content document's exact response body bytes \
+     (§02 v1.0-rc.19, N46). Used in content index entries."
+);
 
 fn decode_request_id(input: &str) -> Result<[u8; REQUEST_ID_BYTES], RequestIdDecodeError> {
     if input.len() != REQUEST_ID_BASE64URL_LEN {

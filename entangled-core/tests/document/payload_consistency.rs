@@ -34,6 +34,7 @@ fn manifest_unsigned_and_signed_produce_byte_identical_payload() {
         min_refresh_interval: unsigned.min_refresh_interval,
         updated: unsigned.updated,
         migration_pointer: unsigned.migration_pointer.clone(),
+        content_root: unsigned.content_root,
         sig: signature_zero(),
     };
 
@@ -59,6 +60,7 @@ fn content_unsigned_and_signed_produce_byte_identical_payload() {
         path: unsigned.path.clone(),
         meta: unsigned.meta.clone(),
         blocks: unsigned.blocks.clone(),
+        seq: unsigned.seq,
         sig: signature_zero(),
     };
 

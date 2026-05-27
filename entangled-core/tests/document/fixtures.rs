@@ -39,6 +39,7 @@ pub fn unsigned_manifest_with_publisher(
         min_refresh_interval: 86_400,
         updated: ts("2026-05-07T00:00:00Z"),
         migration_pointer: None,
+        content_root: None,
     }
 }
 
@@ -56,6 +57,7 @@ pub fn unsigned_content() -> UnsignedContent {
                 marks: Vec::<TextMark>::new(),
             }],
         }],
+        seq: None,
     }
 }
 

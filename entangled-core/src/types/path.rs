@@ -14,6 +14,11 @@ const PATH_MAX_LEN: usize = 256;
 /// inline-link target.
 const RESERVED_MANIFEST_PATH: &str = "/manifest.json";
 
+/// Path reserved by the protocol for the content index resource
+/// (§02 v1.0-rc.19, N46). It MUST NOT appear as a content document
+/// `path`, transaction `in_response_to`, or image `src`.
+const RESERVED_CONTENT_INDEX_PATH: &str = "/content_index.json";
+
 /// An absolute, normalized Entangled path (§02).
 ///
 /// Syntax: starts with `/`, length 1..=256 bytes, characters drawn from
@@ -49,6 +54,9 @@ pub enum PathError {
     /// Path equals the protocol-reserved `/manifest.json` (§02).
     #[error("path /manifest.json is reserved at the protocol level")]
     ReservedManifestPath,
+    /// Path equals the protocol-reserved `/content_index.json` (§02 rc.19).
+    #[error("path /content_index.json is reserved at the protocol level")]
+    ReservedContentIndexPath,
 }
 
 impl EntangledPath {
@@ -112,6 +120,9 @@ impl<'a> TryFrom<&'a str> for EntangledPath {
 
         if value == RESERVED_MANIFEST_PATH {
             return Err(PathError::ReservedManifestPath);
+        }
+        if value == RESERVED_CONTENT_INDEX_PATH {
+            return Err(PathError::ReservedContentIndexPath);
         }
 
         Ok(Self(value.to_owned()))
