@@ -192,9 +192,7 @@ pub fn verify_content_against_index(
         return Err(Diagnostic::new(
             DiagnosticCode::EContentSeqMissing,
             DocumentKindLabel::Content,
-            format!(
-                "content index has entry for {doc_path} but document omits seq"
-            ),
+            format!("content index has entry for {doc_path} but document omits seq"),
         ));
     };
 
@@ -224,9 +222,7 @@ pub fn verify_content_against_index(
         return Err(Diagnostic::new(
             DiagnosticCode::EContentHashMismatch,
             DocumentKindLabel::Content,
-            format!(
-                "content hash mismatch at seq {seq} for {doc_path}"
-            ),
+            format!("content hash mismatch at seq {seq} for {doc_path}"),
         )
         .with_details(serde_json::json!({
             "expected": idx_entry.hash.to_string(),

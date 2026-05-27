@@ -387,10 +387,21 @@ impl DiagnosticCode {
             // cataloged under the Binding family alongside the rest of the
             // origin / migration codes; the catalog stage controls
             // precedence reporting and matches §11.
-            EBindPath | EBindResponsePath | EBindRequestId | EBindRequestHash | EBindOrigin
-            | EMigrationMismatch | EMigrationInvalid | EOriginExpired | EOriginInvalid
-            | EContentIndexFetchFailed | EContentIndexHashMismatch | EContentIndexInvalid
-            | EContentSeqMissing | EContentSeqRollback | EContentSeqUncommitted
+            EBindPath
+            | EBindResponsePath
+            | EBindRequestId
+            | EBindRequestHash
+            | EBindOrigin
+            | EMigrationMismatch
+            | EMigrationInvalid
+            | EOriginExpired
+            | EOriginInvalid
+            | EContentIndexFetchFailed
+            | EContentIndexHashMismatch
+            | EContentIndexInvalid
+            | EContentSeqMissing
+            | EContentSeqRollback
+            | EContentSeqUncommitted
             | EContentHashMismatch => 9,
 
             // Off-pipeline (state, historical, image).
