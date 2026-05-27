@@ -21,7 +21,8 @@ use crate::crypto::{
     sign_content_payload, sign_manifest_payload, sign_transaction_payload, PublisherSigningKey,
     RuntimeSigningKey,
 };
-use crate::types::document::{ContentDocument, TransactionDocument};
+use crate::types::document::ContentDocument;
+use crate::types::document::TransactionDocument;
 use crate::types::manifest::Manifest;
 use crate::types::timestamp::EntangledTimestamp;
 use crate::validation::schema::{
@@ -83,7 +84,7 @@ pub fn build_manifest(
         sig,
     };
 
-    let bytes = serialize_manifest_envelope(&manifest, &sig.to_string())?;
+    let bytes = finalize_and_serialize(signed_payload, &sig.to_string())?;
     Ok((manifest, bytes))
 }
 
@@ -113,7 +114,7 @@ pub fn build_content(
         sig,
     };
 
-    let bytes = serialize_content_envelope(&content, &sig.to_string())?;
+    let bytes = finalize_and_serialize(signed_payload, &sig.to_string())?;
     Ok((content, bytes))
 }
 
@@ -144,40 +145,20 @@ pub fn build_transaction(
         sig,
     };
 
-    let bytes = serialize_transaction_envelope(&tx, &sig.to_string())?;
+    let bytes = finalize_and_serialize(signed_payload, &sig.to_string())?;
     Ok((tx, bytes))
 }
 
-fn serialize_manifest_envelope(
-    manifest: &Manifest,
+/// Attach `sig` to the already-built signed-payload `Value` and serialize
+/// to bytes. Reuses the `Value` produced by `to_signed_payload()` (which
+/// already contains `kind`), avoiding a second `serde_json::to_value`
+/// round-trip through the signed struct.
+fn finalize_and_serialize(
+    mut signed_payload: Value,
     sig_str: &str,
 ) -> Result<Vec<u8>, DocumentError> {
-    let mut value = serde_json::to_value(manifest)?;
-    finalize_envelope(&mut value, "manifest", sig_str);
-    Ok(serde_json::to_vec(&value)?)
-}
-
-fn serialize_content_envelope(
-    content: &ContentDocument,
-    sig_str: &str,
-) -> Result<Vec<u8>, DocumentError> {
-    let mut value = serde_json::to_value(content)?;
-    finalize_envelope(&mut value, "content", sig_str);
-    Ok(serde_json::to_vec(&value)?)
-}
-
-fn serialize_transaction_envelope(
-    tx: &TransactionDocument,
-    sig_str: &str,
-) -> Result<Vec<u8>, DocumentError> {
-    let mut value = serde_json::to_value(tx)?;
-    finalize_envelope(&mut value, "transaction", sig_str);
-    Ok(serde_json::to_vec(&value)?)
-}
-
-fn finalize_envelope(value: &mut Value, kind: &'static str, sig_str: &str) {
-    if let Value::Object(map) = value {
-        map.insert("kind".to_owned(), Value::String(kind.to_owned()));
-        map.insert("sig".to_owned(), Value::String(sig_str.to_owned()));
+    if let Value::Object(ref mut map) = signed_payload {
+        map.insert("sig".into(), Value::String(sig_str.into()));
     }
+    Ok(serde_json::to_vec(&signed_payload)?)
 }

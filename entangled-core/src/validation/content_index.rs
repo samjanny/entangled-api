@@ -10,7 +10,7 @@
 //! * [`verify_content_against_index`] — per-document `seq`/`hash`
 //!   verification at Stage 9.
 
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
@@ -24,7 +24,7 @@ use crate::validation::limits::CONTENT_INDEX_MAX_BYTES;
 /// verification against the manifest's `content_root`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ContentIndex {
-    entries: BTreeMap<String, ContentIndexEntry>,
+    entries: HashMap<String, ContentIndexEntry>,
 }
 
 /// One entry in the content index: a `(seq, hash)` pair for a path.
@@ -41,7 +41,7 @@ pub struct ContentIndexEntry {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ContentIndexWire {
-    entries: BTreeMap<String, ContentIndexEntry>,
+    entries: HashMap<String, ContentIndexEntry>,
 }
 
 impl ContentIndex {

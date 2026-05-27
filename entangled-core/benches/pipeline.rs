@@ -302,8 +302,7 @@ fn bench_build_transaction(c: &mut Criterion) {
 fn bench_validate_content_index_small(c: &mut Criterion) {
     let index_bytes = make_content_index_bytes(10);
     let hash = sha256(&index_bytes);
-    let content_root =
-        entangled_core::types::keys::ContentRoot::from_bytes(hash);
+    let content_root = entangled_core::types::keys::ContentRoot::from_bytes(hash);
 
     c.bench_function("validate_content_index_10_entries", |b| {
         b.iter(|| validate_content_index(black_box(&index_bytes), &content_root).unwrap())
@@ -313,8 +312,7 @@ fn bench_validate_content_index_small(c: &mut Criterion) {
 fn bench_validate_content_index_large(c: &mut Criterion) {
     let index_bytes = make_content_index_bytes(500);
     let hash = sha256(&index_bytes);
-    let content_root =
-        entangled_core::types::keys::ContentRoot::from_bytes(hash);
+    let content_root = entangled_core::types::keys::ContentRoot::from_bytes(hash);
 
     c.bench_function("validate_content_index_500_entries", |b| {
         b.iter(|| validate_content_index(black_box(&index_bytes), &content_root).unwrap())
@@ -324,8 +322,7 @@ fn bench_validate_content_index_large(c: &mut Criterion) {
 fn bench_verify_content_against_index(c: &mut Criterion) {
     let index_bytes = make_content_index_bytes(100);
     let hash = sha256(&index_bytes);
-    let content_root =
-        entangled_core::types::keys::ContentRoot::from_bytes(hash);
+    let content_root = entangled_core::types::keys::ContentRoot::from_bytes(hash);
     let index = validate_content_index(&index_bytes, &content_root).unwrap();
 
     let doc_hash_bytes = sha256(b"content-50");
@@ -358,16 +355,12 @@ fn bench_verify_content_against_index(c: &mut Criterion) {
 
 fn bench_sha256_1k(c: &mut Criterion) {
     let data = vec![0xABu8; 1024];
-    c.bench_function("sha256_1k", |b| {
-        b.iter(|| sha256(black_box(&data)))
-    });
+    c.bench_function("sha256_1k", |b| b.iter(|| sha256(black_box(&data))));
 }
 
 fn bench_sha256_64k(c: &mut Criterion) {
     let data = vec![0xABu8; 65536];
-    c.bench_function("sha256_64k", |b| {
-        b.iter(|| sha256(black_box(&data)))
-    });
+    c.bench_function("sha256_64k", |b| b.iter(|| sha256(black_box(&data))));
 }
 
 criterion_group!(
@@ -387,10 +380,7 @@ criterion_group!(
     bench_parse_validate_content,
 );
 
-criterion_group!(
-    manifest_ops,
-    bench_canonical_payload_hash,
-);
+criterion_group!(manifest_ops, bench_canonical_payload_hash,);
 
 criterion_group!(
     content_index,
@@ -399,10 +389,6 @@ criterion_group!(
     bench_verify_content_against_index,
 );
 
-criterion_group!(
-    crypto,
-    bench_sha256_1k,
-    bench_sha256_64k,
-);
+criterion_group!(crypto, bench_sha256_1k, bench_sha256_64k,);
 
 criterion_main!(build, parse, manifest_ops, content_index, crypto);
