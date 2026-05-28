@@ -6,6 +6,7 @@
 mod common;
 
 mod array_boundaries;
+mod content_index;
 mod diagnostic_codes;
 mod error_precedence;
 mod limits;

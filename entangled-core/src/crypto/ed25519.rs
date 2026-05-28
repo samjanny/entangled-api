@@ -43,20 +43,75 @@ pub enum CryptoError {
     VerificationFailed,
 }
 
+/// Edwards25519 field prime `p = 2^255 - 19`, encoded as the 32 little-
+/// endian bytes of `y` in a canonical Ed25519 public key. A canonical
+/// encoding has `y < p` after masking off the high bit (which holds the
+/// sign of `x`, per RFC 8032 §5.1.2). Values `y >= p` are non-canonical
+/// even though `curve25519_dalek::FieldElement::from_bytes` silently
+/// reduces them under ZIP-215 acceptance.
+const ED25519_FIELD_PRIME_LE: [u8; 32] = [
+    0xED, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F,
+];
+
+/// Compare two little-endian 32-byte unsigned integers: returns `true`
+/// when `a < b`. Constant-ish (early-exit on first differing byte from
+/// MSB); we only call this on attacker-controllable public material and
+/// the comparison result is itself the security boundary, so timing
+/// leakage is not in scope here.
+#[inline]
+fn lt_le_32(a: &[u8; 32], b: &[u8; 32]) -> bool {
+    for i in (0..32).rev() {
+        match a[i].cmp(&b[i]) {
+            std::cmp::Ordering::Less => return true,
+            std::cmp::Ordering::Greater => return false,
+            std::cmp::Ordering::Equal => {}
+        }
+    }
+    false
+}
+
+/// Reject Ed25519 public keys whose `y`-coordinate encoding is non-canonical
+/// (i.e. `y >= p` where `p = 2^255 - 19`).
+///
+/// `ed25519_dalek::VerifyingKey::from_bytes` follows ZIP-215 (see
+/// `curve25519-dalek#626`), under which `curve25519_dalek::FieldElement`
+/// silently reduces `y mod p`. Two byte-distinct encodings of the same
+/// underlying point would therefore both decode successfully — a
+/// closed-grammar violation under §05's "non-canonical encodings are
+/// rejected" rule. This function closes that gap by rejecting any
+/// 32-byte encoding whose low 255 bits exceed the field prime.
+fn validate_pubkey_canonical_encoding(bytes: &[u8; 32]) -> Result<(), CryptoError> {
+    // Mask off the high bit at byte 31 (sign of x), leaving the 255-bit
+    // `y` value little-endian.
+    let mut y = *bytes;
+    y[31] &= 0x7F;
+    if !lt_le_32(&y, &ED25519_FIELD_PRIME_LE) {
+        return Err(CryptoError::InvalidPublicKey);
+    }
+    Ok(())
+}
+
 /// Strict §05 public-key validation: canonical encoding **and** non-small-order.
 ///
-/// `ed25519_dalek::VerifyingKey::from_bytes` checks that the 32 bytes
-/// decompress to a valid curve point under the canonical compressed
-/// encoding. The §05 strict profile additionally requires the point to be
-/// non-small-order (order does not divide the cofactor 8); this rejection
-/// is enforced here via `VerifyingKey::is_weak`.
+/// Three checks, in order:
+///
+/// 1. Canonical encoding: the 32-byte `y`-coordinate (masked of its sign
+///    bit) MUST be strictly less than the field prime `p = 2^255 - 19`.
+///    Closes the ZIP-215 gap left by
+///    `ed25519_dalek::VerifyingKey::from_bytes`, which accepts
+///    non-canonical encodings (`y >= p` silently reduced).
+/// 2. Decompression to a valid curve point.
+/// 3. Non-small-order: the point's order must not divide the cofactor 8,
+///    enforced via `VerifyingKey::is_weak`.
 ///
 /// Use this helper when the strict profile must hold at a pipeline stage
 /// other than ordinary signature verification — for example, validating
 /// `canary.runtime_pubkey` at Stage 8 or `origin.origin_pubkey` at
 /// Stage 9. For ordinary signature verification, [`VerifyingKey::verify`]
-/// already invokes the equivalent check via `verify_strict`.
+/// also invokes this helper indirectly via [`Self::from_pubkey_bytes`].
 pub fn validate_pubkey_strict(bytes: &[u8; 32]) -> Result<(), CryptoError> {
+    validate_pubkey_canonical_encoding(bytes)?;
     let vk = ed25519_dalek::VerifyingKey::from_bytes(bytes)
         .map_err(|_| CryptoError::InvalidPublicKey)?;
     if vk.is_weak() {
@@ -250,6 +305,10 @@ impl VerifyingKey {
     }
 
     fn from_pubkey_bytes(bytes: &[u8; 32]) -> Result<Self, CryptoError> {
+        // Canonical-encoding check before delegating to dalek's
+        // ZIP-215-accepting decoder. See `validate_pubkey_strict` for
+        // the full rationale.
+        validate_pubkey_canonical_encoding(bytes)?;
         let vk = ed25519_dalek::VerifyingKey::from_bytes(bytes)
             .map_err(|_| CryptoError::InvalidPublicKey)?;
         if vk.is_weak() {
@@ -264,9 +323,11 @@ impl VerifyingKey {
     /// keys MUST be in canonical encoding and MUST NOT be small-order;
     /// signatures MUST use canonical `R` and canonical `S` (`0 ≤ S < L`);
     /// verification uses the cofactorless equation `[S]B = R + [k]A`.
-    /// `ed25519-dalek`'s `verify_strict` enforces exactly this set
-    /// (RFC 8032 §5.1.7 strict mode), so cofactored verification and
-    /// non-canonical encodings are not accepted.
+    /// The canonical-encoding check on the public key is performed by
+    /// `from_pubkey_bytes` before this method runs (closing the ZIP-215
+    /// gap in `ed25519_dalek::VerifyingKey::from_bytes`); `verify_strict`
+    /// then enforces canonical `R` / canonical `S` / cofactorless
+    /// verification per RFC 8032 §5.1.7.
     pub fn verify(&self, input: &[u8], sig: &Signature) -> Result<(), CryptoError> {
         let parsed = ed25519_dalek::Signature::from_bytes(sig.as_bytes());
         self.0

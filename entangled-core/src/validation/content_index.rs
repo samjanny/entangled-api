@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use crate::types::keys::{ContentHash, ContentRoot};
 use crate::validation::diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel};
 use crate::validation::limits::CONTENT_INDEX_MAX_BYTES;
+use crate::validation::parse::parse_with_limits;
 
 /// A validated content index.
 ///
@@ -71,14 +72,27 @@ impl ContentIndex {
 /// Runs in order:
 /// 1. Size check (≤ 1 MiB).
 /// 2. Hash verification against `content_root`.
-/// 3. Structural validation (JSON parse, closed schema, path/entry checks).
+/// 3. Input discipline (strict UTF-8, no BOM).
+/// 4. Strict JSON parse (no duplicate keys; integer grammar per §04;
+///    Stage 3 JSON nesting / array / object-key / string-length caps).
+/// 5. Closed-schema deserialization.
+/// 6. Per-entry path syntax + seq lower bound.
+///
+/// Per §02:208 the content index is hash-bound to a `K_publisher`-signed
+/// commitment and therefore MUST be parsed under the same input
+/// restrictions that apply to Entangled documents — including strict
+/// duplicate-key rejection (not last-wins) and lexical integer grammar.
+/// Steps 3-4 are routed through [`parse_with_limits`] for that reason;
+/// any deviation between two conforming parsers on the same bytes would
+/// defeat the content_root binding model.
 ///
 /// Returns the validated [`ContentIndex`] on success.
 ///
 /// # Errors
 ///
 /// * `E_CONTENT_INDEX_HASH_MISMATCH` — hash does not match `content_root`.
-/// * `E_CONTENT_INDEX_INVALID` — structural validation failure or size cap exceeded.
+/// * `E_CONTENT_INDEX_INVALID` — any other failure (size cap, UTF-8, BOM,
+///   parse error, schema violation, path syntax, seq lower bound).
 pub fn validate_content_index(
     bytes: &[u8],
     content_root: &ContentRoot,
@@ -126,7 +140,19 @@ pub fn validate_content_index(
         ));
     }
 
-    let wire: ContentIndexWire = serde_json::from_str(s).map_err(|e| {
+    // §02:208: parse under the same input restrictions as Entangled
+    // documents (no duplicate JSON keys, integer grammar, parser limits).
+    // Map any parse diagnostic onto the single content-index code per
+    // §11 — the content index does not surface stage-3 codes directly.
+    let value = parse_with_limits(s).map_err(|d| {
+        Diagnostic::new(
+            DiagnosticCode::EContentIndexInvalid,
+            DocumentKindLabel::Manifest,
+            format!("content index parse failure: {}", d.message),
+        )
+    })?;
+
+    let wire: ContentIndexWire = serde_json::from_value(value).map_err(|e| {
         Diagnostic::new(
             DiagnosticCode::EContentIndexInvalid,
             DocumentKindLabel::Manifest,

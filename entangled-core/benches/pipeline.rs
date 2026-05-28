@@ -310,11 +310,15 @@ fn bench_validate_content_index_small(c: &mut Criterion) {
 }
 
 fn bench_validate_content_index_large(c: &mut Criterion) {
-    let index_bytes = make_content_index_bytes(500);
+    // 256 is the §02:208/Stage 3 cap on distinct keys in a JSON object;
+    // the content index's `entries` map is bound by it because the
+    // parser disciplines apply to the index per the hash-binding rule.
+    // Use the cap itself to exercise the worst-case-within-spec path.
+    let index_bytes = make_content_index_bytes(256);
     let hash = sha256(&index_bytes);
     let content_root = entangled_core::types::keys::ContentRoot::from_bytes(hash);
 
-    c.bench_function("validate_content_index_500_entries", |b| {
+    c.bench_function("validate_content_index_256_entries", |b| {
         b.iter(|| validate_content_index(black_box(&index_bytes), &content_root).unwrap())
     });
 }
