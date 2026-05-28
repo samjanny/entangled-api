@@ -7,14 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-SEMVER MINOR in 0.x. Two upstream spec tags land in this release: rc.20
-was errata-only (corpus vector 139 field correction, no implementation
-impact), and rc.21 introduces a normative tightening on `state_policy`
-satisfiability (N62, `E_SUBMIT_BUDGET`). The same release closes the
-rc.19 catch-up that the prior 0.3.x line had only partially landed
-(Lotti 11-13 / N45-N51); Lotti 14, 15, 16, 18, and 19 are now landed
-here. Conformance harness now matches the upstream rc.21 corpus
-byte-equal at the `rc_target` boundary.
+SEMVER MINOR in 0.x. Three upstream spec tags land in this release:
+rc.20 was errata-only (corpus vector 139 field correction, no
+implementation impact), rc.21 introduces a normative tightening on
+`state_policy` satisfiability (N62, `E_SUBMIT_BUDGET`), and rc.22
+aligns §05:174 to what `ed25519-dalek::verify_strict` has always
+actually done about small-order signature `R` rejection (N63, closing
+upstream issue #1, opened from this audit). The same release closes
+the rc.19 catch-up that the prior 0.3.x line had only partially
+landed (Lotti 11-13 / N45-N51); Lotti 14, 15, 16, 18, and 19 are now
+landed here. The release also lands an internal audit pass that
+plugged seven correctness/normative gaps unrelated to a single spec
+revision. Conformance harness now matches the upstream rc.22 corpus
+byte-equal at the `rc_target` boundary (60/60 vectors).
+
+### Changed (spec v1.0-rc.22 alignment — Lotto 22)
+
+- **§05:174 small-order `R` rejection alignment** (Lotto 22, N63).
+  Pre-N63 §05:174 wrongly claimed `verify_strict` accepts small-order
+  `R`; rc.22 inverts the rule (the strict profile MUST reject small-
+  order `R`), matching what `ed25519_dalek 2.x verify_strict` always
+  did. No code change was needed in this crate — `crypto::ed25519`
+  uses `verify_strict`, so we were already conformant under rc.22
+  semantics. The `VerifyingKey::verify` docstring is updated to drop
+  the "known divergence" note (no longer divergent) and cite N63 as
+  the source of the symmetric small-order rejection rule. Corpus
+  vector `157-sig-small-order-r` lands as an additional sub-case of
+  `E_SIG_VERIFICATION` and passes end-to-end against the existing
+  pipeline.
 
 ### Changed (spec v1.0-rc.21 alignment — Lotto 21)
 
