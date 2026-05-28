@@ -182,6 +182,44 @@ pub const SUBMIT_FIELD_VALUE_MAX_BYTES: usize = 8 * 1024;
 pub const SUBMIT_REQUEST_STATE_MAX_ENTRIES: usize = 32;
 
 // -----------------------------------------------------------------------------
+// Submit body budget partition (§09 v1.0-rc.21, N62)
+// -----------------------------------------------------------------------------
+//
+// The 64 KiB submit body cap is normatively partitioned into three reserves so
+// that the declared maximum request-state load and a minimally-submittable form
+// always coexist within the cap. The values below are the v1.0 normative split;
+// future protocol versions MAY re-tune them.
+
+/// Envelope reserve: `request_id`, `in_response_to`, JSON structural
+/// bytes, and margin for future additive envelope fields (§09 v1.0-rc.21,
+/// N62). 4096 bytes.
+pub const SUBMIT_OVERHEAD_RESERVE_BYTES: usize = 4096;
+
+/// Form-fields reserve: a reserve (not a cap) for the user-entered
+/// `fields` portion of the submit body, sized so a publisher's
+/// minimally-submittable form always fits alongside a maxed-out
+/// request_state (§09 v1.0-rc.21, N62). 8192 bytes.
+pub const SUBMIT_FIELD_MIN_RESERVE_BYTES: usize = 8192;
+
+/// `state_policy` aggregate worst-case wire budget — the limit against
+/// which a manifest's `state_policy` aggregate request-mode encoded
+/// contribution is evaluated at Stage 5 (§09 v1.0-rc.21, N62; §07
+/// "Submit budget satisfiability"). Equal to
+/// `SUBMIT_BODY_MAX_BYTES - SUBMIT_OVERHEAD_RESERVE_BYTES -
+/// SUBMIT_FIELD_MIN_RESERVE_BYTES = 53248`.
+pub const SUBMIT_STATE_BUDGET_BYTES: usize =
+    SUBMIT_BODY_MAX_BYTES - SUBMIT_OVERHEAD_RESERVE_BYTES - SUBMIT_FIELD_MIN_RESERVE_BYTES;
+
+// Compile-time guard: the §09 partition `overhead + field_min + state_budget`
+// MUST equal the 64 KiB submit body cap. A re-tune that violates the identity
+// would break the satisfiability invariant; surface it here at build time.
+const _: () = assert!(
+    SUBMIT_OVERHEAD_RESERVE_BYTES + SUBMIT_FIELD_MIN_RESERVE_BYTES + SUBMIT_STATE_BUDGET_BYTES
+        == SUBMIT_BODY_MAX_BYTES,
+    "submit body partition reserves must sum to SUBMIT_BODY_MAX_BYTES",
+);
+
+// -----------------------------------------------------------------------------
 // Numeric ranges (use as inclusive ranges)
 // -----------------------------------------------------------------------------
 

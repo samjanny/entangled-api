@@ -131,6 +131,18 @@ pub enum DiagnosticCode {
     ESchemaNonInteger,
     #[serde(rename = "E_SCHEMA_MALFORMED_UNICODE")]
     ESchemaMalformedUnicode,
+    /// §11 (rc.21 N62). The manifest's `state_policy` declares an
+    /// aggregate worst-case request-state encoded contribution that
+    /// exceeds the §09 `state_budget` (53248 bytes for v1.0). The
+    /// satisfiability invariant is computed from the manifest payload
+    /// alone and does not depend on the client's retained state.
+    /// Structured `details` carry `component` (`"state"` is the only
+    /// v1.0 value), `declared_bytes` (the computed aggregate), and
+    /// `budget_bytes` (the applicable limit). Distinct from the
+    /// runtime-side `E_STATE_TRANSMIT_BUDGET` (manifest validation vs
+    /// individual `set` operation; both codes coexist in v1.0).
+    #[serde(rename = "E_SUBMIT_BUDGET")]
+    ESubmitBudget,
 
     // Stage 6 — Signature
     #[serde(rename = "E_SIG_VERIFICATION")]
@@ -159,6 +171,15 @@ pub enum DiagnosticCode {
     ECanaryDowngrade,
     #[serde(rename = "E_CANARY_CONFLICT")]
     ECanaryConflict,
+    /// §11 (rc.19 N55/N60). A new manifest's `canary.runtime_pubkey`
+    /// reuses a value previously authorized for the same
+    /// `K_publisher.pub`. MUST-level against the immediately preceding
+    /// verified manifest (N55); SHOULD-level against any prior entry in
+    /// publisher history (N60). The diagnostic `details.window_position`
+    /// distinguishes the two cases: `1` for the immediate-preceding
+    /// match, `>= 2` for a deeper-history match.
+    #[serde(rename = "E_CANARY_RUNTIME_REUSE")]
+    ECanaryRuntimeReuse,
     #[serde(rename = "W_CANARY_NEAR_EXPIRATION")]
     WCanaryNearExpiration,
     #[serde(rename = "W_CANARY_EXPIRED")]
@@ -262,6 +283,14 @@ pub enum DiagnosticCode {
     EHistoricalNoAuthorization,
     #[serde(rename = "E_HISTORICAL_TRUST_BLOCKED")]
     EHistoricalTrustBlocked,
+    /// §11 (rc.19 N52). Historical content document verification reached
+    /// a state where neither a previously-verified content index entry
+    /// nor a prior rendering record names the document's `(path, seq,
+    /// hash)` tuple under the authorizing manifest. Off-pipeline; the
+    /// crate exposes the code for callers that implement the historical
+    /// content path. See §10 "Historical content".
+    #[serde(rename = "E_HISTORICAL_NO_PUBLICATION_PROOF")]
+    EHistoricalNoPublicationProof,
     #[serde(rename = "W_HISTORICAL_RENDERED")]
     WHistoricalRendered,
     #[serde(rename = "W_HISTORICAL_RUNTIME_AMBIGUOUS")]
@@ -357,7 +386,8 @@ impl DiagnosticCode {
             | ESchemaFieldLength
             | ESchemaNullValue
             | ESchemaNonInteger
-            | ESchemaMalformedUnicode => 5,
+            | ESchemaMalformedUnicode
+            | ESubmitBudget => 5,
 
             // Stage 6 — Signature, plus the manifest identity pre-check
             // detected during Stage 6 per §11 (rc.10): `E_TRUST_MISMATCH`
@@ -376,6 +406,7 @@ impl DiagnosticCode {
             ECanaryInvalid
             | ECanaryDowngrade
             | ECanaryConflict
+            | ECanaryRuntimeReuse
             | WCanaryNearExpiration
             | WCanaryExpired
             | WCanaryGap
@@ -415,6 +446,7 @@ impl DiagnosticCode {
             | IStateConsentRemembered
             | EHistoricalNoAuthorization
             | EHistoricalTrustBlocked
+            | EHistoricalNoPublicationProof
             | WHistoricalRendered
             | WHistoricalRuntimeAmbiguous
             | WImageHashMismatch

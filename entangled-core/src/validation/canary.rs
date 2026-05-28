@@ -267,3 +267,93 @@ pub fn check_canary_conflict(
         "presented_runtime_pubkey": new_runtime_pubkey.to_string(),
     })))
 }
+
+/// Stage 8 runtime-pubkey rotation-proof check (§08, rc.19 N55 + N60).
+///
+/// A new manifest's `canary.runtime_pubkey` MUST differ from the
+/// immediately preceding verified manifest's `runtime_pubkey` for the
+/// same `K_publisher.pub` (N55, MUST). Stateful clients that retain
+/// publisher history SHOULD additionally reject reuse against any prior
+/// entry in that history (N60, SHOULD), reporting the depth via
+/// `details.window_position`.
+///
+/// Without this rule, a publisher (or attacker holding `K_runtime_priv`)
+/// can maintain the same key indefinitely behind a stream of
+/// fresh-looking canaries; with the SHOULD extension, an attacker also
+/// cannot resurrect a key previously retired by ceremony discipline.
+///
+/// Arguments:
+///
+/// * `new_runtime_pubkey`, `new_issued_at` — fields of the freshly
+///   verified manifest;
+/// * `immediately_preceding` — the most recently retained manifest
+///   record for the same `K_publisher.pub`, or `None` if none (first
+///   contact). When `Some(r)` and `r.runtime_pubkey == new_runtime_pubkey`,
+///   a MUST-level rejection fires with `window_position = 1`;
+/// * `extended_history` — optional ordered history of prior manifests
+///   for the same `K_publisher.pub`, *most-recent-first* and *excluding*
+///   the immediately-preceding entry already supplied above. Empty for
+///   stateless clients. When non-empty and any entry matches the new
+///   pubkey, a SHOULD-level rejection fires with `window_position =
+///   index_in_history + 2` (matching the §11 N60 schema where `1` is
+///   the immediate-preceding match and `>= 2` walks backwards).
+///
+/// The MUST check fires before the SHOULD check. A client that does not
+/// maintain extended history passes an empty slice; the MUST is still
+/// enforced. The diagnostic carries `details = { runtime_pubkey,
+/// previous_issued_at, current_issued_at, window_position }`.
+pub fn check_runtime_pubkey_rotation(
+    new_runtime_pubkey: &RuntimePubkey,
+    new_issued_at: &EntangledTimestamp,
+    immediately_preceding: Option<&RetainedManifestRecord>,
+    extended_history: &[RetainedManifestRecord],
+) -> Result<(), Diagnostic> {
+    if let Some(prev) = immediately_preceding {
+        if &prev.runtime_pubkey == new_runtime_pubkey {
+            return Err(runtime_reuse_diagnostic(
+                new_runtime_pubkey,
+                &prev.issued_at,
+                new_issued_at,
+                1,
+            ));
+        }
+    }
+    for (idx, entry) in extended_history.iter().enumerate() {
+        if &entry.runtime_pubkey == new_runtime_pubkey {
+            // `idx == 0` is the entry one step behind the immediately
+            // preceding one, i.e. window_position == 2.
+            let window_position = idx + 2;
+            return Err(runtime_reuse_diagnostic(
+                new_runtime_pubkey,
+                &entry.issued_at,
+                new_issued_at,
+                window_position,
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn runtime_reuse_diagnostic(
+    runtime_pubkey: &RuntimePubkey,
+    previous_issued_at: &EntangledTimestamp,
+    current_issued_at: &EntangledTimestamp,
+    window_position: usize,
+) -> Diagnostic {
+    let message = if window_position == 1 {
+        "canary.runtime_pubkey reuses the immediately preceding manifest's runtime key"
+    } else {
+        "canary.runtime_pubkey reuses a previously retired runtime key in publisher history"
+    };
+    Diagnostic::new(
+        DiagnosticCode::ECanaryRuntimeReuse,
+        DocumentKindLabel::Manifest,
+        message,
+    )
+    .with_details(serde_json::json!({
+        "runtime_pubkey": runtime_pubkey.to_string(),
+        "previous_issued_at": previous_issued_at.to_string(),
+        "current_issued_at": current_issued_at.to_string(),
+        "window_position": window_position,
+    }))
+}

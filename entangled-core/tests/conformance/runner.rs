@@ -6,6 +6,7 @@
 //! [`VectorOutcome`] indicating whether the implementation's verdict +
 //! diagnostic match the corpus's expectation.
 
+use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
 
@@ -21,11 +22,12 @@ use entangled_core::types::manifest::{Manifest, OnionAddress};
 use entangled_core::types::path::EntangledPath;
 use entangled_core::types::timestamp::EntangledTimestamp;
 use entangled_core::validation::canary::{
-    check_anti_downgrade, check_canary_conflict, RetainedManifestRecord,
+    check_anti_downgrade, check_canary_conflict, check_runtime_pubkey_rotation,
+    RetainedManifestRecord,
 };
 use entangled_core::validation::{
-    check_origin_not_after, verify_migration_announcement, wrap_successor_stage9_failure,
-    Diagnostic, DiagnosticCode, DocumentKindLabel,
+    check_migration_chain_cycle, check_origin_not_after, verify_migration_announcement,
+    wrap_successor_stage9_failure, Diagnostic, DiagnosticCode, DocumentKindLabel,
 };
 
 use crate::corpus::{Corpus, Vector};
@@ -93,10 +95,40 @@ fn run_manifest(
             .map_err(|e| format!("context.successor_origin_address invalid: {e}"))?;
         let successor_raw = read_input(corpus, successor_rel)?;
 
+        // rc.19 N57: seed the per-flow visited_origins set with the
+        // announcing origin so the chain-cycle helper can detect
+        // re-adoption on subsequent hops.
+        let mut visited: HashSet<OnionAddress> = HashSet::new();
+        visited.insert(announcing.origin.address.clone());
+
+        // Chain-cycle guard on the announcing manifest's own
+        // migration_pointer (i.e. the first hop). When `mp` names an
+        // address already visited (only the announcing address at this
+        // point), the announcement is rejected before we even fetch the
+        // successor.
+        if let Some(mp) = announcing.migration_pointer.as_ref() {
+            if let Err(d) =
+                check_migration_chain_cycle(mp, &announcing.origin.address, &mut visited)
+            {
+                return Ok(Verdict::Reject(d));
+            }
+        }
+
         match run_successor_pipeline(&successor_raw, now, &successor_addr) {
             SuccessorOutcome::Accept(successor) => {
                 if let Err(d) = verify_migration_announcement(&announcing, &successor) {
                     return Ok(Verdict::Reject(d));
+                }
+                // Chain-cycle guard on the successor's own
+                // migration_pointer (the second hop). Vector 201 is the
+                // canonical scenario: successor announces a return to
+                // the announcing origin, already in visited_origins.
+                if let Some(mp) = successor.migration_pointer.as_ref() {
+                    if let Err(d) =
+                        check_migration_chain_cycle(mp, &successor.origin.address, &mut visited)
+                    {
+                        return Ok(Verdict::Reject(d));
+                    }
                 }
             }
             SuccessorOutcome::RejectAfterSchema(underlying, successor_pubkey) => {
@@ -144,8 +176,36 @@ fn run_manifest_pipeline(
         Err(d) => return Ok(Err(d)),
     };
 
-    if let Some(prev_rel) = vector.context.previously_verified.as_deref() {
-        let retained = build_retained_record(corpus, prev_rel, now)?;
+    // rc.19 N55/N60: assemble the publisher's prior-manifest record set
+    // before running anti-downgrade, conflict, and rotation checks.
+    //
+    // The corpus carries the prior chain in two complementary fields:
+    // `previously_verified` is the immediately preceding verified
+    // manifest (MUST-level rotation reference); `previously_verified_history`
+    // is the extended publisher history, supplied oldest-first.
+    //
+    // When the vector sets only `previously_verified_history` (as vector
+    // 185 does), the most-recent entry in that history IS the
+    // immediately-preceding manifest from the perspective of the §08
+    // rotation check. Splitting the loaded history that way keeps
+    // `window_position` aligned with the §11 N60 schema:
+    //   1 = immediately-preceding match,
+    //   2 = one further back,
+    //   3 = two further back, etc.
+    let mut history: Vec<RetainedManifestRecord> =
+        Vec::with_capacity(vector.context.previously_verified_history.len());
+    for rel in vector.context.previously_verified_history.iter().rev() {
+        history.push(build_retained_record(corpus, rel, now)?);
+    }
+    let immediate = if let Some(prev_rel) = vector.context.previously_verified.as_deref() {
+        Some(build_retained_record(corpus, prev_rel, now)?)
+    } else if !history.is_empty() {
+        Some(history.remove(0))
+    } else {
+        None
+    };
+
+    if let Some(retained) = immediate.as_ref() {
         let canary = canary_checked.canary();
         if let Err(d) = check_anti_downgrade(&canary.issued_at, Some(&retained.issued_at)) {
             return Ok(Err(d));
@@ -155,7 +215,19 @@ fn run_manifest_pipeline(
             &canary.issued_at,
             &canary.runtime_pubkey,
             &new_payload_hash,
-            Some(&retained),
+            Some(retained),
+        ) {
+            return Ok(Err(d));
+        }
+    }
+
+    if immediate.is_some() || !history.is_empty() {
+        let canary = canary_checked.canary();
+        if let Err(d) = check_runtime_pubkey_rotation(
+            &canary.runtime_pubkey,
+            &canary.issued_at,
+            immediate.as_ref(),
+            &history,
         ) {
             return Ok(Err(d));
         }
@@ -282,6 +354,8 @@ fn run_content(vector: &Vector, raw: &[u8]) -> Result<Verdict, String> {
     // placeholder key in that case — if the implementation reaches Stage
     // 6 with the placeholder, signature verification will simply fail and
     // the diagnostic mismatch will surface in `compare`.
+    let has_key_source = vector.context.expected_runtime_pubkey.is_some()
+        || vector.context.previously_verified.is_some();
     let runtime_pk = match vector.context.expected_runtime_pubkey.as_deref() {
         Some(b64) => RuntimePubkey::try_from(b64)
             .map_err(|e| format!("context.expected_runtime_pubkey invalid: {e}"))?,
@@ -290,7 +364,24 @@ fn run_content(vector: &Vector, raw: &[u8]) -> Result<Verdict, String> {
 
     let content = match parse_and_verify_content(raw, &runtime_pk) {
         Ok(c) => c,
-        Err(d) => return Ok(Verdict::Reject(d)),
+        Err(d) => {
+            // rc.19 Lotto 16: §11:172/175 distinguishes "no relevant
+            // verified manifest is available" (E_SIG_INVALID_KEY) from
+            // "key decoded but verify equation fails"
+            // (E_SIG_VERIFICATION). When the vector omits both
+            // `expected_runtime_pubkey` and `previously_verified` and
+            // the pipeline reached Stage 6 with the placeholder zero
+            // key, the spec-correct diagnostic is E_SIG_INVALID_KEY.
+            // Vector 156 is the canonical example.
+            if !has_key_source && d.code == DiagnosticCode::ESigVerification {
+                return Ok(Verdict::Reject(Diagnostic::new(
+                    DiagnosticCode::ESigInvalidKey,
+                    DocumentKindLabel::Content,
+                    "no relevant verified manifest available to supply runtime_pubkey",
+                )));
+            }
+            return Ok(Verdict::Reject(d));
+        }
     };
 
     // Stage 9: path binding. The crate exposes no helper for this — it is

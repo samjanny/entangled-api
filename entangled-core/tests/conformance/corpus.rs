@@ -69,6 +69,11 @@ pub struct Context {
     pub submit_body_path: Option<String>,
     #[serde(default)]
     pub previously_verified: Option<String>,
+    /// rc.19 N60: ordered publisher history (oldest first), used to
+    /// seed the extended runtime-pubkey-reuse check. Empty / unset for
+    /// stateless vectors.
+    #[serde(default)]
+    pub previously_verified_history: Vec<String>,
     /// rc.16 migration vectors: address of the announced successor
     /// origin, used as the carrier-binding target when running the
     /// successor manifest through Stages 1-9.

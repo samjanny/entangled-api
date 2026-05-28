@@ -347,8 +347,11 @@ fn minute_precision_utc(ts: &EntangledTimestamp) -> String {
 ///
 /// `E_MIGRATION_INVALID` with `details.reason = "chain_cycle"` when
 /// `mp.successor_origin.address` is already present in `visited_origins`.
+/// Structured `details` carry `announcing_origin_address` and
+/// `successor_origin_address` per §11 v1.0-rc.19 (N57).
 pub fn check_migration_chain_cycle(
     mp: &MigrationPointer,
+    announcing_origin_address: &OnionAddress,
     visited_origins: &mut HashSet<OnionAddress>,
 ) -> Result<(), Diagnostic> {
     let successor = &mp.successor_origin.address;
@@ -361,7 +364,8 @@ pub fn check_migration_chain_cycle(
         .with_details(serde_json::json!({
             "field_path": "migration_pointer.successor_origin.address",
             "reason": "chain_cycle",
-            "successor_address": successor.as_str(),
+            "announcing_origin_address": announcing_origin_address.as_str(),
+            "successor_origin_address": successor.as_str(),
         })));
     }
     visited_origins.insert(successor.clone());

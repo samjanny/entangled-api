@@ -12,14 +12,32 @@
 use std::collections::HashSet;
 
 use crate::types::slug::Slug;
-use crate::types::state::{StatePolicyEntry, StateUpdateOp};
+use crate::types::state::{StateMode, StatePolicyEntry, StateUpdateOp};
 
 use super::diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel};
 use super::limits::{
     MAX_STATE_POLICY_ENTRIES, MAX_STATE_UPDATES, STATE_MAX_LIFETIME_RANGE, STATE_MAX_SIZE_RANGE,
     STATE_PURPOSE_MAX_BYTES, STATE_TTL_HARD_RANGE, STATE_VALUE_MAX_BYTES,
+    SUBMIT_STATE_BUDGET_BYTES,
 };
 use super::strings::{check_nfc, no_control_chars};
+
+/// Fixed JSON envelope of a single `request_state` entry, excluding the
+/// `namespace` value, the `key` value, and the `value` value but including
+/// all surrounding quoting and structural punctuation.
+///
+/// Counted from the literal entry shape used in the §09 partition and the
+/// corpus accounting:
+///
+/// ```text
+/// {"namespace":"...","key":"...","value":"..."}
+/// ```
+///
+/// `{"namespace":"` = 14, `","key":"` = 9, `","value":"` = 11, `"}` = 2.
+/// Total = 36 bytes (assuming `namespace`/`key`/`value` contain no
+/// JSON-escape-bearing characters; slug syntax guarantees this for
+/// `namespace` and `key`).
+const REQUEST_STATE_ENTRY_ENVELOPE_BYTES: usize = 36;
 
 /// Validate a manifest's `state_policy` array (Stage 5).
 ///
@@ -104,7 +122,58 @@ pub fn validate_state_policy(policy: &[StatePolicyEntry]) -> Result<(), Diagnost
             DocumentKindLabel::Manifest,
         )?;
     }
+
+    // §07 / §09 submit budget satisfiability (rc.21 N62). Aggregate the
+    // worst-case encoded wire contribution of every `mode = request` entry
+    // as if each held a value at its declared `max_size`. Reject when the
+    // aggregate exceeds `SUBMIT_STATE_BUDGET_BYTES`. Client-only entries
+    // do not contribute (they are never transmitted).
+    let declared_bytes = aggregate_request_state_bytes(policy);
+    if declared_bytes > SUBMIT_STATE_BUDGET_BYTES {
+        return Err(Diagnostic::new(
+            DiagnosticCode::ESubmitBudget,
+            DocumentKindLabel::Manifest,
+            format!(
+                "state_policy aggregate worst-case wire contribution {declared_bytes} \
+                 bytes exceeds the {SUBMIT_STATE_BUDGET_BYTES}-byte state_budget",
+            ),
+        )
+        .with_details(serde_json::json!({
+            "component": "state",
+            "declared_bytes": declared_bytes,
+            "budget_bytes": SUBMIT_STATE_BUDGET_BYTES,
+        })));
+    }
+
     Ok(())
+}
+
+/// Compute the worst-case encoded wire contribution of a `state_policy`
+/// to the `request_state` array of a submit body (§07 v1.0-rc.21, N62).
+///
+/// Per the §09 partition, contribution is measured in encoded JSON bytes:
+/// for each `mode = request` entry, the fixed entry-shape envelope plus
+/// the `namespace`, `key`, and worst-case `value` byte lengths, plus a
+/// single array-delimiter comma between successive entries. Client-only
+/// entries do not contribute.
+fn aggregate_request_state_bytes(policy: &[StatePolicyEntry]) -> usize {
+    let mut total: usize = 0;
+    let mut request_entries: usize = 0;
+    for e in policy {
+        if e.mode != StateMode::Request {
+            continue;
+        }
+        let entry_bytes = REQUEST_STATE_ENTRY_ENVELOPE_BYTES
+            + e.namespace.as_str().len()
+            + e.key.as_str().len()
+            + e.max_size as usize;
+        total = total.saturating_add(entry_bytes);
+        request_entries += 1;
+    }
+    if request_entries > 1 {
+        total = total.saturating_add(request_entries - 1);
+    }
+    total
 }
 
 /// Standalone validation of a transaction's `state_updates` array (no

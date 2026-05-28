@@ -738,7 +738,10 @@ fn migration_pointer_self_pointing_address_rejected() {
         .expect_err("self-pointing migration must reject");
     assert_eq!(err.code, DiagnosticCode::EMigrationInvalid);
     let details = err.details.as_ref().expect("details payload");
-    assert_eq!(details["reason"].as_str(), Some("self_pointing_migration"));
+    // rc.19 N57: renamed from `self_pointing_migration` to `self_pointer`.
+    assert_eq!(details["reason"].as_str(), Some("self_pointer"));
+    assert!(details["announcing_origin_address"].is_string());
+    assert!(details["successor_origin_address"].is_string());
 }
 
 #[test]
@@ -757,7 +760,14 @@ fn migration_pointer_announced_after_updated_rejected() {
         .expect_err("announced_at after updated must reject");
     assert_eq!(err.code, DiagnosticCode::EMigrationInvalid);
     let details = err.details.as_ref().expect("details payload");
-    assert_eq!(details["reason"].as_str(), Some("announced_after_updated"));
+    // rc.19 N57: renamed from `announced_after_updated` to match §11
+    // vocabulary.
+    assert_eq!(
+        details["reason"].as_str(),
+        Some("announced_at_after_updated")
+    );
+    assert!(details["announcing_origin_address"].is_string());
+    assert!(details["successor_origin_address"].is_string());
 }
 
 #[test]
@@ -874,7 +884,7 @@ fn origin_not_after_at_or_before_issued_at_rejected() {
     assert_eq!(details["field_path"].as_str(), Some("origin.not_after"));
     assert_eq!(
         details["reason"].as_str(),
-        Some("not_after_not_after_issued_at")
+        Some("not_after_not_later_than_issued_at")
     );
 
     // And the strictly-before case.
@@ -884,7 +894,7 @@ fn origin_not_after_at_or_before_issued_at_rejected() {
     assert_eq!(err.code, DiagnosticCode::EOriginInvalid);
     assert_eq!(
         err.details.as_ref().unwrap()["reason"].as_str(),
-        Some("not_after_not_after_issued_at")
+        Some("not_after_not_later_than_issued_at")
     );
 }
 

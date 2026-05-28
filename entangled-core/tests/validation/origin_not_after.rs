@@ -105,40 +105,51 @@ fn pointer_to(addr: &str) -> MigrationPointer {
     }
 }
 
+const ANNOUNCING_ADDR: &str = "abcdefghijklmnopqrstuvwxyz234567abcdefghijklmnopqrstuvwx.onion";
+
 #[test]
 fn chain_cycle_helper_threads_visited_set() {
     // Initial set seeded with the announcing origin (per §10): no successor
     // address is in the set yet, so the first hop succeeds and the helper
     // inserts the successor for the next hop.
-    let mut visited = HashSet::from([OnionAddress::try_from(
-        "abcdefghijklmnopqrstuvwxyz234567abcdefghijklmnopqrstuvwx.onion",
-    )
-    .unwrap()]);
+    let announcing = OnionAddress::try_from(ANNOUNCING_ADDR).unwrap();
+    let mut visited = HashSet::from([announcing.clone()]);
     let mp_first = pointer_to(SUCCESSOR_ADDR);
-    check_migration_chain_cycle(&mp_first, &mut visited)
+    check_migration_chain_cycle(&mp_first, &announcing, &mut visited)
         .expect("first hop to fresh successor must accept");
     assert!(visited.contains(&OnionAddress::try_from(SUCCESSOR_ADDR).unwrap()));
 
     // A subsequent hop to a different address still succeeds and extends
-    // the set.
+    // the set. The announcing origin for the second hop is the previously
+    // adopted successor.
+    let announcing_second = OnionAddress::try_from(SUCCESSOR_ADDR).unwrap();
     let mp_second = pointer_to(ALT_ADDR);
-    check_migration_chain_cycle(&mp_second, &mut visited)
+    check_migration_chain_cycle(&mp_second, &announcing_second, &mut visited)
         .expect("hop to a previously-unvisited successor must accept");
     assert!(visited.contains(&OnionAddress::try_from(ALT_ADDR).unwrap()));
 }
 
 #[test]
 fn chain_cycle_rejects_revisited_address() {
+    let announcing = OnionAddress::try_from(ANNOUNCING_ADDR).unwrap();
     let mut visited = HashSet::new();
     visited.insert(OnionAddress::try_from(SUCCESSOR_ADDR).unwrap());
 
     let mp = pointer_to(SUCCESSOR_ADDR);
-    let err = check_migration_chain_cycle(&mp, &mut visited)
+    let err = check_migration_chain_cycle(&mp, &announcing, &mut visited)
         .expect_err("successor already in visited_origins must reject");
     assert_eq!(err.code, DiagnosticCode::EMigrationInvalid);
     let details = err.details.as_ref().expect("details payload");
     assert_eq!(details["reason"].as_str(), Some("chain_cycle"));
-    assert_eq!(details["successor_address"].as_str(), Some(SUCCESSOR_ADDR));
+    // rc.19 N57: structured details carry both endpoint addresses.
+    assert_eq!(
+        details["announcing_origin_address"].as_str(),
+        Some(ANNOUNCING_ADDR)
+    );
+    assert_eq!(
+        details["successor_origin_address"].as_str(),
+        Some(SUCCESSOR_ADDR)
+    );
     assert_eq!(
         details["field_path"].as_str(),
         Some("migration_pointer.successor_origin.address")
@@ -149,11 +160,12 @@ fn chain_cycle_rejects_revisited_address() {
 fn chain_cycle_does_not_insert_on_rejection() {
     // The helper inserts only on acceptance: a rejection leaves the set
     // unchanged so the caller's higher-level flow can rely on it.
+    let announcing = OnionAddress::try_from(ANNOUNCING_ADDR).unwrap();
     let mut visited = HashSet::new();
     visited.insert(OnionAddress::try_from(SUCCESSOR_ADDR).unwrap());
     let before = visited.clone();
 
     let mp = pointer_to(SUCCESSOR_ADDR);
-    let _ = check_migration_chain_cycle(&mp, &mut visited);
+    let _ = check_migration_chain_cycle(&mp, &announcing, &mut visited);
     assert_eq!(visited, before);
 }

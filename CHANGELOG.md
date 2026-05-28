@@ -7,6 +7,115 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+SEMVER MINOR in 0.x. Two upstream spec tags land in this release: rc.20
+was errata-only (corpus vector 139 field correction, no implementation
+impact), and rc.21 introduces a normative tightening on `state_policy`
+satisfiability (N62, `E_SUBMIT_BUDGET`). The same release closes the
+rc.19 catch-up that the prior 0.3.x line had only partially landed
+(Lotti 11-13 / N45-N51); Lotti 14, 15, 16, 18, and 19 are now landed
+here. Conformance harness now matches the upstream rc.21 corpus
+byte-equal at the `rc_target` boundary.
+
+### Changed (spec v1.0-rc.21 alignment — Lotto 21)
+
+- **§07 / §09 submit budget satisfiability invariant** (Lotto 21, N62).
+  `validate_state_policy` now rejects a manifest whose `state_policy`
+  aggregate worst-case `request_state` encoded contribution exceeds
+  the new `SUBMIT_STATE_BUDGET_BYTES = 53_248` budget. The check is
+  Stage 5, deterministic from the manifest payload alone, and does
+  not depend on the client's current retained state. New diagnostic
+  `E_SUBMIT_BUDGET` (severity Error, stage 5, document_kind Manifest)
+  with structured `details = { component: "state", declared_bytes,
+  budget_bytes }`. Closes the deadlock vector in which a compromised
+  `K_runtime` repeatedly issues `set` operations filling state to the
+  policy's declared maxima.
+- **`SUBMIT_STATE_BUDGET_BYTES`, `SUBMIT_OVERHEAD_RESERVE_BYTES`,
+  `SUBMIT_FIELD_MIN_RESERVE_BYTES`** added to
+  `entangled_core::validation::limits`. A compile-time `const _: () =
+  assert!(...)` pins the §09 partition identity `overhead +
+  field_min + state_budget == SUBMIT_BODY_MAX_BYTES` so a future
+  re-tune cannot silently break the cap.
+
+### Changed (spec v1.0-rc.19 catch-up — Lotti 14-19, N52-N60)
+
+These changes had landed in upstream rc.19 alongside Lotti 11-13
+but were not in the prior 0.3.x line. They are landed here as part
+of the rc.21 bump.
+
+- **`E_CANARY_RUNTIME_REUSE`** (Lotto 14 N55 + Lotto 19 N60). New
+  Stage 8 diagnostic. New helper
+  `entangled_core::validation::canary::check_runtime_pubkey_rotation`
+  enforces the MUST-level immediate-preceding rotation check and the
+  SHOULD-level extended publisher-history check. Structured `details
+  = { runtime_pubkey, previous_issued_at, current_issued_at,
+  window_position }` where `window_position = 1` is the immediate-
+  preceding match and `>= 2` walks publisher history backwards.
+- **`E_HISTORICAL_NO_PUBLICATION_PROOF`** (Lotto 14 N52). New
+  off-pipeline diagnostic (severity Error, document_kind Content).
+  Catalog entry only — the check itself is the caller's
+  responsibility, since publication-existence proof relies on either
+  a previously verified content index or a rendering record, both
+  outside the crate's scope.
+- **`canary.freshness_proof` NFC enforcement made explicit** (Lotto
+  18 N59). Stage 5 now applies the §04 NFC requirement to
+  `freshness_proof` symmetrically with `statement`. An rc.18
+  implementation correctly applying §04:154 already produced the
+  correct rejection; the explicit check pins the behavior against
+  future refactors and corpus vector `191-unicode-nfd-freshness-proof`.
+- **`E_MIGRATION_INVALID` structured details extended** (Lotto 15
+  N57). All emission sites now carry `announcing_origin_address` and
+  `successor_origin_address` in `details`. Two `reason` identifiers
+  are renamed to the §11 vocabulary:
+  `self_pointing_migration → self_pointer` and `announced_after_updated
+  → announced_at_after_updated`. The `chain_cycle` reason already
+  matched. The helper `check_migration_chain_cycle` gains an
+  `announcing_origin_address` parameter so the diagnostic can name
+  both ends of the rejected hop (callers must pass the announcing
+  origin's address — typically the announcing manifest's
+  `origin.address`).
+- **`E_ORIGIN_INVALID.details.reason` typo fixed** (Lotto 15 N56).
+  The strict-later-than constraint now reports `details.reason =
+  "not_after_not_later_than_issued_at"`, matching the §11 vocabulary.
+  The pre-N56 identifier (`not_after_not_after_issued_at`) carried
+  an obvious stutter.
+
+### Changed (conformance harness — rc.19/rc.21 alignment)
+
+- **`previously_verified_history` context field** wired into the
+  harness. Carries the publisher's ordered prior-manifest history
+  (oldest first) for N60-style vectors (`185-canary-runtime-reuse-
+  resurrection`). The harness reverses the array into the
+  most-recent-first order expected by `check_runtime_pubkey_rotation`
+  and, when the corpus omits the immediate-preceding
+  `previously_verified` field, treats the head of the history as the
+  immediate-preceding manifest so `window_position` accounting
+  matches the §11 N60 schema.
+- **Migration chain-cycle guard wired into multi-manifest vectors.**
+  The harness now seeds `visited_origins` with the announcing
+  origin, applies `check_migration_chain_cycle` on the announcing
+  manifest's own `migration_pointer`, and reapplies it on the
+  successor manifest's `migration_pointer` after a successful
+  successor pipeline. Exercises vector
+  `201-migration-chain-cycle` end-to-end.
+- **No-key-available content vectors emit `E_SIG_INVALID_KEY`.**
+  When a content vector omits both `expected_runtime_pubkey` and
+  `previously_verified` and the pipeline surfaces
+  `E_SIG_VERIFICATION` under the placeholder zero key, the harness
+  re-maps the diagnostic to `E_SIG_INVALID_KEY` per §11:172/175.
+  Models the "no relevant verified manifest available" case from
+  vector `156-sig-invalid-key-no-manifest` without conflating it
+  with verify-equation failures.
+
+### Changed (spec revision pin)
+
+- **`entangled_core::SPEC_REVISION = "1.0-rc.21"`** (bumped from
+  rc.19, skipping rc.20 which was errata-only and conformance-
+  identical to rc.19 at the catalog level).
+- **CI conformance corpus pin** moved from the rc.18 commit-SHA pin
+  to `ref: v1.0-rc.21` in `.github/workflows/ci.yml`. The
+  "temporary commit-SHA pin" note is dropped now that an upstream
+  tag exists.
+
 ## [0.3.1] - 2026-05-11
 
 SEMVER PATCH. Findings from an internal crypto-security audit of the

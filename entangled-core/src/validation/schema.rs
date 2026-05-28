@@ -345,6 +345,9 @@ pub(crate) fn validate_manifest_fields(
                 "canary.freshness_proof contains control characters",
             ));
         }
+        // §08 explicit NFC rule (rc.19 N59): the user-visible
+        // `freshness_proof` is subject to the §04 NFC requirement.
+        check_nfc(fp, "canary.freshness_proof", DocumentKindLabel::Manifest)?;
     }
 
     Ok(())
@@ -393,9 +396,13 @@ pub fn validate_migration_pointer(
         .with_details(serde_json::json!({
             "field_path": "migration_pointer.successor_origin.not_after",
             "reason": "successor_origin_not_after_present",
+            "announcing_origin_address": announcing_origin.address.as_str(),
+            "successor_origin_address": mp.successor_origin.address.as_str(),
         })));
     }
     if mp.successor_origin.address == announcing_origin.address {
+        // rc.19 N57: identifier renamed `self_pointing_migration` ->
+        // `self_pointer` to match the §11 closed-enum vocabulary.
         return Err(Diagnostic::new(
             DiagnosticCode::EMigrationInvalid,
             DocumentKindLabel::Manifest,
@@ -403,7 +410,9 @@ pub fn validate_migration_pointer(
         )
         .with_details(serde_json::json!({
             "field_path": "migration_pointer.successor_origin.address",
-            "reason": "self_pointing_migration",
+            "reason": "self_pointer",
+            "announcing_origin_address": announcing_origin.address.as_str(),
+            "successor_origin_address": mp.successor_origin.address.as_str(),
         })));
     }
     if mp.successor_origin.carrier != announcing_origin.carrier {
@@ -415,9 +424,13 @@ pub fn validate_migration_pointer(
         .with_details(serde_json::json!({
             "field_path": "migration_pointer.successor_origin.carrier",
             "reason": "carrier_mismatch",
+            "announcing_origin_address": announcing_origin.address.as_str(),
+            "successor_origin_address": mp.successor_origin.address.as_str(),
         })));
     }
     if mp.announced_at > *announcing_updated {
+        // rc.19 N57: identifier renamed `announced_after_updated` ->
+        // `announced_at_after_updated` to match the §11 vocabulary.
         return Err(Diagnostic::new(
             DiagnosticCode::EMigrationInvalid,
             DocumentKindLabel::Manifest,
@@ -425,7 +438,9 @@ pub fn validate_migration_pointer(
         )
         .with_details(serde_json::json!({
             "field_path": "migration_pointer.announced_at",
-            "reason": "announced_after_updated",
+            "reason": "announced_at_after_updated",
+            "announcing_origin_address": announcing_origin.address.as_str(),
+            "successor_origin_address": mp.successor_origin.address.as_str(),
         })));
     }
     Ok(())
@@ -450,9 +465,10 @@ pub fn validate_migration_pointer(
 /// it as a warning at a higher layer, but the spec explicitly permits it.
 ///
 /// Failures are reported as `E_ORIGIN_INVALID` with `details.reason` set to
-/// the §11 vocabulary (`not_after_not_after_issued_at` or
+/// the §11 vocabulary (`not_after_not_later_than_issued_at` or
 /// `not_after_beyond_5y`), plus the offending `not_after` and the
-/// `canary.issued_at` it was compared against.
+/// `canary.issued_at` it was compared against. The identifier was renamed
+/// from `not_after_not_after_issued_at` (typo) in v1.0-rc.19 (N56).
 pub fn validate_origin_not_after(origin: &Origin, canary: &Canary) -> Result<(), Diagnostic> {
     let Some(not_after) = origin.not_after else {
         return Ok(());
@@ -466,7 +482,7 @@ pub fn validate_origin_not_after(origin: &Origin, canary: &Canary) -> Result<(),
         )
         .with_details(serde_json::json!({
             "field_path": "origin.not_after",
-            "reason": "not_after_not_after_issued_at",
+            "reason": "not_after_not_later_than_issued_at",
             "not_after": not_after.to_string(),
             "canary_issued_at": canary.issued_at.to_string(),
         })));
