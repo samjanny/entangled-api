@@ -9,6 +9,36 @@
 //! * [`validate_content_index`] — structural validation of the raw bytes.
 //! * [`verify_content_against_index`] — per-document `seq`/`hash`
 //!   verification at Stage 9.
+//!
+//! # Caller obligations for the transport fetch
+//!
+//! The helpers in this module operate on the raw response body bytes of
+//! `/content_index.json` and do NOT inspect HTTP response headers.
+//! Three transport-layer rules from Section 09 are the fetching
+//! caller's responsibility, and the spec maps each violation onto
+//! `E_CONTENT_INDEX_FETCH_FAILED` rather than onto the generic Stage 1
+//! transport codes that apply to Entangled signed documents:
+//!
+//! 1. `Content-Type` MUST be `application/json`. The content index is
+//!    not an Entangled signed document, so `application/entangled+json`
+//!    is not an acceptable value here.
+//! 2. `Content-Length` MUST be present and exact. A response without
+//!    `Content-Length` is `E_CONTENT_INDEX_FETCH_FAILED` (not
+//!    `E_TRANSPORT_CONTENT_LENGTH`).
+//! 3. `Content-Encoding` and `Transfer-Encoding` MUST be absent. The
+//!    `content_root` hash binding is over the exact response body
+//!    bytes, so any transfer-layer transformation invalidates the hash.
+//!    A response carrying either header is
+//!    `E_CONTENT_INDEX_FETCH_FAILED` (not
+//!    `E_TRANSPORT_CONTENT_ENCODING` or
+//!    `E_TRANSPORT_TRANSFER_ENCODING`).
+//!
+//! A non-`200` response is also `E_CONTENT_INDEX_FETCH_FAILED`. When
+//! the manifest declares `content_root` and the content index cannot
+//! be obtained for any of the above reasons, the client MUST NOT
+//! render content documents from the site under that manifest: the
+//! spec treats failure to honor a signed `content_root` commitment as
+//! indistinguishable from server compromise (Section 09:114).
 
 use std::collections::HashMap;
 
@@ -93,6 +123,13 @@ impl ContentIndex {
 /// * `E_CONTENT_INDEX_HASH_MISMATCH` — hash does not match `content_root`.
 /// * `E_CONTENT_INDEX_INVALID` — any other failure (size cap, UTF-8, BOM,
 ///   parse error, schema violation, path syntax, seq lower bound).
+///
+/// Transport-layer failures (missing `Content-Length`, wrong
+/// `Content-Type`, presence of `Content-Encoding` /
+/// `Transfer-Encoding`, non-`200` status) are the fetching caller's
+/// responsibility and map to `E_CONTENT_INDEX_FETCH_FAILED` rather than
+/// to the generic Stage 1 transport codes. See the module-level docs
+/// for the full caller checklist.
 pub fn validate_content_index(
     bytes: &[u8],
     content_root: &ContentRoot,

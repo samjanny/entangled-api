@@ -15,6 +15,51 @@
 //!
 //! String length caps for `statement` and `freshness_proof` are part of Stage
 //! 5 schema validation and are not duplicated here.
+//!
+//! # Client UX obligations after `compute_canary_state`
+//!
+//! [`compute_canary_state`] classifies the canary; it does not
+//! enforce the Section 10 client UX obligations attached to each
+//! state. Those are the caller's responsibility:
+//!
+//! * [`CanaryState::Fresh`]: render content normally; chrome shows
+//!   `canary.next_expected`.
+//! * [`CanaryState::NearExpiration`]: render content normally;
+//!   chrome surfaces the approaching deadline with visual emphasis.
+//! * [`CanaryState::Expired`]: Section 08:183 MUST -- the client
+//!   refuses to render current content. The content area MUST be
+//!   blank or a client-generated placeholder; publisher-controlled
+//!   content MUST NOT appear. Section 08:185 MUST -- the client
+//!   provides a per-session user-override affordance with these
+//!   properties:
+//!     * an affirmative-action chrome control (button, key
+//!       combination, or equivalent) whose semantics are
+//!       unambiguously "accept the risk and proceed"; passive
+//!       events MUST NOT count as acceptance;
+//!     * scope is the remainder of the current session for the
+//!       affected site only: the override does not persist across
+//!       sessions, does not modify the canary state, and does not
+//!       suppress the chrome warning;
+//!     * while the override is active, a persistent,
+//!       not-easily-dismissible warning MUST stay visible in
+//!       chrome.
+//! * [`CanaryState::Invalid`]: Section 08:197 MUST -- refuse to
+//!   render any content from the site; chrome shows a prominent
+//!   error.
+//! * [`CanaryState::Unavailable`]: handle as the corresponding
+//!   transport-failure UX (Section 09 / Section 10); the value
+//!   carries no normative `W_*` code on its own.
+//!
+//! The Section 11 diagnostic `W_CANARY_EXPIRED` is catalogued at
+//! warning severity, and Section 11:81 frames warnings as
+//! non-blocking by default; the Section 08:183 MUST overrides that
+//! default for this specific state. The library remains stateless:
+//! it classifies the canary, surfaces the state, and the embedding
+//! caller is responsible for the rendering block, the per-session
+//! override affordance, and the chrome warning that persists while
+//! the override is active. See also the crate `README` section
+//! "Canary state and the Expired user-override contract" for the
+//! corresponding public-docs framing.
 
 use crate::crypto::validate_runtime_pubkey_strict;
 use crate::types::keys::RuntimePubkey;
@@ -41,7 +86,10 @@ pub enum CanaryState {
     Fresh,
     /// Canary is within `max(10% of interval, 24h)` of its `next_expected`.
     NearExpiration,
-    /// `now >= next_expected`.
+    /// `now >= next_expected`. The Section 08:183/185 client
+    /// rendering block and per-session user-override affordance
+    /// are the caller's responsibility; see the module-level docs
+    /// for the full contract.
     Expired,
     /// Canary failed structural validation (Stage 8).
     Invalid,

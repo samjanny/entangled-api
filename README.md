@@ -153,22 +153,41 @@ use entangled_core::types::{EntangledTimestamp, OnionAddress};
 #     manifest_bytes: &[u8],
 #     now: &EntangledTimestamp,
 #     fetched_onion: &OnionAddress,
+#     content_index_bytes: Option<&[u8]>,
 # ) -> Result<(), entangled_core::validation::Diagnostic> {
 let verified = parse_and_verify_manifest(manifest_bytes, now)?;
 
-let (manifest, canary_state) = verified
+let (manifest, canary_state, content_index) = verified
     .verify_canary(now)?
     .verify_origin(fetched_onion, now)?
+    .verify_content_index(content_index_bytes)?
     .into_parts();
 
 let runtime_pubkey = manifest.canary.runtime_pubkey;
 # let _ = canary_state;
+# let _ = content_index;
 # let _ = runtime_pubkey;
 # Ok(())
 # }
 ```
 
-If a caller is building offline tooling, conformance tests, or another context where canary/origin checks are intentionally not applicable, the API provides explicit opt-out methods such as `skip_canary_check` and `skip_origin_check`.
+`verify_content_index` enforces the Section 09:114 hard-fail model when the manifest declares `content_root`: callers MUST supply the `/content_index.json` response body bytes, which are hash-verified against `content_root` and structurally validated. A manifest that omits `content_root` accepts `None` here and yields `content_index = None`.
+
+If a caller is building offline tooling, conformance tests, or another context where canary/origin/content-index checks are intentionally not applicable, the API provides explicit opt-out methods such as `skip_canary_check`, `skip_origin_check`, and `skip_content_index_check`.
+
+## Canary state and the Expired user-override contract
+
+`verify_canary` returns the manifest as `ManifestCanaryChecked` and exposes the classified `CanaryState` via `canary_state()`. The library does not act on the state: rendering policy lives in the embedding client.
+
+Section 08:183 of the specification is a normative MUST: when `CanaryState::Expired` is observed, the client MUST refuse to render current content. The content area MUST be blank or a client-generated placeholder; publisher-controlled content MUST NOT appear.
+
+Section 08:185 attaches a second MUST to the rendering block: the client MUST provide a per-session user-override affordance with these properties:
+
+- an affirmative-action chrome control (a button, key combination, or equivalent affordance) whose semantics are unambiguously "accept the risk and proceed"; passive events MUST NOT count as acceptance;
+- the override applies only for the remainder of the current session for the affected site, does not persist across sessions, does not modify the canary state, and does not suppress the chrome warning;
+- while the override is active, a persistent, not-easily-dismissible warning MUST stay visible in the chrome.
+
+The Section 11 diagnostic code `W_CANARY_EXPIRED` is catalogued at warning severity, and Section 11:81 frames warnings as non-blocking by default; the Section 08:183 MUST overrides that default for this specific state. `entangled-core` classifies the canary, surfaces `CanaryState::Expired`, and emits the diagnostic at Section 11 severity. The override state, the chrome affordance, and the session-scoped persistence all live in the embedding client.
 
 ## Content verification
 

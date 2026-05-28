@@ -17,9 +17,127 @@ upstream issue #1, opened from this audit). The same release closes
 the rc.19 catch-up that the prior 0.3.x line had only partially
 landed (Lotti 11-13 / N45-N51); Lotti 14, 15, 16, 18, and 19 are now
 landed here. The release also lands an internal audit pass that
-plugged seven correctness/normative gaps unrelated to a single spec
-revision. Conformance harness now matches the upstream rc.22 corpus
+plugged fifteen correctness/normative gaps unrelated to a single spec
+revision (PR1-PR5). Conformance harness now matches the upstream rc.22 corpus
 byte-equal at the `rc_target` boundary (60/60 vectors).
+
+### Changed (internal review follow-ups, PR4 + PR5)
+
+The PR4 commit (`6d3e0c5`) and the PR5 follow-ups together plug
+eight further spec-vs-code gaps surfaced by an internal review
+pass against rc.22. None of the items below changes the wire
+protocol.
+
+PR4:
+
+- **Section 10 Stage 9 `origin.not_after` reached via the canonical
+  pipeline** (audit finding C-1). `ManifestCanaryChecked::verify_origin`
+  previously ran only the carrier (Tor v3 address) binding, leaving
+  the `not_after` expiry check (`check_origin_not_after`,
+  `validation::migration`) reachable only by callers who knew to
+  invoke it manually after Stage 9. The canonical chain
+  `parse_and_verify_manifest -> verify_canary -> verify_origin`
+  therefore silently accepted manifests whose `origin.not_after`
+  was past, violating the Section 10 MUST. `verify_origin` now takes
+  a `now: &EntangledTimestamp` argument and runs
+  `check_origin_not_after` after the address binding. The conformance
+  runner no longer needs the manual post-call. New regression tests
+  in `tests/document/type_state.rs` assert that the canonical
+  pipeline emits `E_ORIGIN_EXPIRED` on a past `not_after` and accepts
+  a future one.
+- **Section 06 Stage 5 builder enforces `origin.not_after` semantic
+  constraints** (audit finding M-3).
+  `document::builder::build_manifest` ran `validate_manifest_fields`
+  but never `validate_origin_not_after`, so a publisher could sign a
+  manifest whose `not_after` was at or before `canary.issued_at`, or
+  more than five years after it, and the bytes would only fail at
+  parse time on the receiving side. The builder now calls
+  `validate_origin_not_after`, matching the verifier path. Two
+  regression tests in `tests/document/build_parse_roundtrip.rs`
+  cover both rejection branches
+  (`not_after_not_later_than_issued_at`, `not_after_beyond_5y`).
+- **Section 11 `E_ORIGIN_INVALID` details use canonical vocabulary**
+  (audit finding M-1). The diagnostic `details` emitted the
+  non-canonical key `canary_issued_at` instead of the Section 11:273
+  vocabulary `issued_at`. Renamed at both emission sites in
+  `validation::schema`. New regression test in
+  `tests/validation/stage5_schema.rs` pins the canonical key for
+  both reason variants and asserts the old key is gone.
+- **`DocumentKindLabel::ContentIndex` variant** (audit finding L-1).
+  Content-index diagnostics were tagged `Manifest` because no
+  `ContentIndex` variant existed. Added the variant (wire form
+  `content_index`), updated all eight call sites in
+  `validation::content_index`. Per-document diagnostics in
+  `verify_content_against_index` keep `DocumentKindLabel::Content`,
+  which is correct (they pertain to a content document, not the
+  index). New regression test in `tests/validation/content_index.rs`
+  covers six diagnostic paths.
+- **`ORIGIN_NOT_AFTER_MAX_HORIZON_SECS` placement fix** (audit
+  finding L-2). The constant lived under the Content index section
+  header in `limits.rs` by mistake; the Origin not-after section
+  header was empty. The constant was moved under its correct
+  header.
+- **Drive-by**: `crypto::ed25519::validate_pubkey_strict` docstring
+  intra-doc link to `Self::from_pubkey_bytes` was broken because
+  `Self` in a free-function context does not resolve, so
+  `cargo doc -D warnings` (the CI doc job) was failing. Reworded to
+  a plain prose reference to the private
+  `VerifyingKey::from_pubkey_bytes` constructor.
+
+PR5:
+
+- **Caller-side transport obligations documented on
+  `validation::content_index`** (audit finding M-4). The Section 09
+  transport rules for the `/content_index.json` fetch are the
+  fetching caller's responsibility: `Content-Type` MUST be
+  `application/json` (not `application/entangled+json`),
+  `Content-Length` MUST be present and exact, and `Content-Encoding`
+  / `Transfer-Encoding` MUST be absent. Each violation maps to
+  `E_CONTENT_INDEX_FETCH_FAILED` rather than to the generic Stage 1
+  transport codes. The module docstring and the
+  `validate_content_index` `# Errors` block now spell this out so a
+  caller routing around the Stage 1 codes knows which code to emit.
+  No library code change.
+- **`W_CANARY_EXPIRED` per-session user-override caller contract
+  documented** (audit finding M-5). Section 08:183 attaches a
+  normative MUST-block on rendering when `CanaryState::Expired` is
+  observed, and Section 08:185 attaches a normative MUST-provide
+  per-session user-override affordance, even though Section 11:206
+  catalogues `W_CANARY_EXPIRED` at warning severity and Section
+  11:81 frames warnings as non-blocking by default. The library
+  remains stateless: it classifies the canary and emits the
+  diagnostic at the catalogued severity; the override state, the
+  chrome affordance, and the persistent chrome warning while the
+  override is active all live in the embedding caller. Documented
+  on the `validation::canary` module, on `CanaryState::Expired`,
+  and as a new top-level section "Canary state and the Expired
+  user-override contract" in the workspace README. No library code
+  change. A separate upstream issue raises the Section 08 vs
+  Section 11 framing tension against the spec.
+- **`ManifestContentIndexVerified` Stage 9b type-state** (audit
+  finding C-2). The Section 09:114 hard-fail MUST ("when the
+  manifest declares `content_root` and the content index cannot be
+  obtained, the client MUST NOT render content documents from the
+  site") is now enforced structurally by extending the type-state
+  chain: `ManifestOriginBound::verify_content_index(content_index_bytes:
+  Option<&[u8]>)` returns a new `ManifestContentIndexVerified`
+  terminal wrapper, and
+  `ManifestOriginBound::skip_content_index_check()` is the explicit
+  opt-out (mirroring `skip_canary_check` /
+  `skip_origin_check`). `ManifestOriginBound::into_parts` has been
+  removed in favour of
+  `ManifestContentIndexVerified::into_parts() -> (Manifest, CanaryState, Option<ContentIndex>)`.
+  This is a public API break (SEMVER MINOR in 0.x): existing
+  callers of `into_parts` on `ManifestOriginBound` must either
+  insert `.verify_content_index(maybe_bytes)?` or call
+  `.skip_content_index_check()`. The conformance runner and the
+  Tor integration test use `skip_content_index_check` because
+  content-index validation is exercised separately against the
+  standalone `validate_content_index` helper. Three new regression
+  tests in `tests/document/type_state.rs` cover the hard-fail on
+  `None` bytes plus declared `content_root`, the happy path with
+  matching bytes, and the explicit `skip_content_index_check`
+  opt-out.
 
 ### Changed (spec v1.0-rc.22 alignment — Lotto 22)
 
