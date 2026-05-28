@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-28
+
+SEMVER MINOR in 0.x. Public API break driven by the v1.0-rc.23 spec
+catalog alignment (Lotto 23, N64-N66): two diagnostic codes are
+renamed and promoted from `warning` to `error`, and one stage tag is
+corrected, closing upstream `samjanny/entangled#10` (AMB-09) and
+`samjanny/entangled#6` (AMB-05) plus one sweep finding (N66). The
+break affects downstream code that pattern-matches the renamed enum
+variants or relies on `DiagnosticCode::stage()` returning `9` for
+`EOriginInvalid`, and the serde wire form of the `code` field
+changes for the two renamed codes. No wire-format change to any
+signed document; `spec_version` remains `"1.0"`.
+
 ### Changed (spec v1.0-rc.23 alignment - Lotto 23: N64-N66)
 
 Two diagnostic codes are renamed and promoted from `warning` to
