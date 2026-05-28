@@ -87,7 +87,12 @@ pub fn validate_block(block: &Block, doc_kind: DocumentKind) -> Result<(), Diagn
         } => {
             validate_inline(content, QUOTE_CONTENT_MAX_BYTES, true)?;
             if let Some(attr) = attribution {
-                validate_inline(attr, QUOTE_ATTRIBUTION_MAX_BYTES, false)?;
+                // §03:265: `attribution` is an inline content array with no
+                // restriction on inline `link` elements. Only `link.label`
+                // (§03:654) and `submit_form.label` (§03:702) forbid nested
+                // links; attribution permits them per the inline-content
+                // grammar.
+                validate_inline(attr, QUOTE_ATTRIBUTION_MAX_BYTES, true)?;
             }
             Ok(())
         }

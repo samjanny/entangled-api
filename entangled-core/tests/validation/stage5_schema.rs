@@ -814,9 +814,14 @@ fn migration_pointer_well_formed_accepted_at_schema_level() {
 
 #[test]
 fn migration_pointer_successor_origin_with_not_after_rejected() {
-    // §06 v1.0-rc.14: the successor_origin schema is fixed at three fields;
-    // `not_after` is declared by the successor's own manifest, not by the
-    // pointer that announces it.
+    // §06:373 (v1.0-rc.14): the successor_origin schema is fixed at three
+    // fields; `not_after` belongs to the successor's own manifest, not to
+    // the pointer announcing it. Reported as `E_SCHEMA_UNKNOWN_FIELD`
+    // because the §11 N57 closed-enum `details.reason` vocabulary for
+    // `E_MIGRATION_INVALID` does not cover this case (the four members
+    // are self_pointer / announced_at_after_updated / carrier_mismatch /
+    // chain_cycle); a stray field on the successor pointer is a
+    // closed-schema violation, not a migration-semantic failure.
     let mp = json!({
         "successor_origin": {
             "carrier": "tor-v3",
@@ -829,11 +834,11 @@ fn migration_pointer_successor_origin_with_not_after_rejected() {
     let v = manifest_value_with_migration_pointer(mp);
     let err = parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now())
         .expect_err("successor_origin.not_after must reject");
-    assert_eq!(err.code, DiagnosticCode::EMigrationInvalid);
+    assert_eq!(err.code, DiagnosticCode::ESchemaUnknownField);
     let details = err.details.as_ref().expect("details payload");
     assert_eq!(
-        details["reason"].as_str(),
-        Some("successor_origin_not_after_present")
+        details["field_path"].as_str(),
+        Some("migration_pointer.successor_origin.not_after")
     );
 }
 

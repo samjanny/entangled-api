@@ -285,6 +285,13 @@ impl StateStore {
 
     /// Commit a delete. Returns `Ok(false)` if no entry was present (no-op,
     /// per §07 "Delete operation").
+    ///
+    /// This entry point does NOT check the `(namespace, key)` declaration
+    /// against the current policy. §07:319 requires that the combination
+    /// MUST be declared in the current manifest's `state_policy`; callers
+    /// that have the current policy available SHOULD use
+    /// [`Self::delete_with_policy`] instead, which folds the
+    /// `E_STATE_UNDECLARED` check into the commit atomically.
     pub fn delete(
         &mut self,
         publisher: &PublisherPubkey,
@@ -302,6 +309,38 @@ impl StateStore {
         };
         let k = StoreKey::new(publisher, ns, key);
         Ok(self.inner.remove(&k).is_some())
+    }
+
+    /// Atomic "validate against policy and commit delete".
+    ///
+    /// §07:319 requires that the `(namespace, key)` combination MUST be
+    /// declared in the current manifest's `state_policy` for the delete to
+    /// be valid. This entry point performs the declaration check (via
+    /// [`crate::validation::policy_check::validate_state_update_against_policy`])
+    /// before invoking [`Self::delete`]. Reach for the lower-level
+    /// [`Self::delete`] only when policy resolution is intentionally
+    /// already done elsewhere.
+    ///
+    /// Returns `Ok(false)` if no entry was present (no-op), `Ok(true)` if
+    /// an entry was removed, or `Err(E_STATE_UNDECLARED)` when the
+    /// `(namespace, key)` is not in the current policy.
+    pub fn delete_with_policy(
+        &mut self,
+        publisher: &PublisherPubkey,
+        op: &StateUpdateOp,
+        policy: &[StatePolicyEntry],
+    ) -> Result<bool, Diagnostic> {
+        if matches!(op, StateUpdateOp::Set { .. }) {
+            return Err(Diagnostic::new(
+                DiagnosticCode::EStateOp,
+                DocumentKindLabel::Transaction,
+                "expected a delete operation but got set",
+            ));
+        }
+        // Drop the &policy_entry borrow before calling self.delete (which
+        // takes &mut self). The declaration check is all we need from it.
+        let _ = validate_state_update_against_policy(op, policy)?;
+        self.delete(publisher, op)
     }
 
     /// All non-expired request-mode entries for `publisher` whose

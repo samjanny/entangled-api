@@ -384,20 +384,23 @@ pub fn validate_migration_pointer(
     announcing_updated: &EntangledTimestamp,
 ) -> Result<(), Diagnostic> {
     if mp.successor_origin.not_after.is_some() {
-        // §06 v1.0-rc.14: the successor_origin schema has exactly three
-        // fields (carrier, address, origin_pubkey). `not_after` belongs to
-        // the successor's own manifest, fetched and verified at Stage 9 —
-        // not to the pointer announcing it.
+        // §06:373 (v1.0-rc.14): `successor_origin` has exactly three
+        // fields (carrier, address, origin_pubkey). `not_after` is a
+        // closed-schema violation for the successor pointer (it belongs
+        // to the successor's own manifest, fetched and verified at
+        // Stage 9). The shared `Origin` type carries `not_after` as
+        // optional because the top-level `origin` may declare it; the
+        // closed-shape constraint on the successor pointer is enforced
+        // here. Reported as `E_SCHEMA_UNKNOWN_FIELD` rather than
+        // `E_MIGRATION_INVALID` to stay within the §11 N57 closed-enum
+        // `details.reason` vocabulary for the latter code.
         return Err(Diagnostic::new(
-            DiagnosticCode::EMigrationInvalid,
+            DiagnosticCode::ESchemaUnknownField,
             DocumentKindLabel::Manifest,
             "migration_pointer.successor_origin must not carry not_after",
         )
         .with_details(serde_json::json!({
             "field_path": "migration_pointer.successor_origin.not_after",
-            "reason": "successor_origin_not_after_present",
-            "announcing_origin_address": announcing_origin.address.as_str(),
-            "successor_origin_address": mp.successor_origin.address.as_str(),
         })));
     }
     if mp.successor_origin.address == announcing_origin.address {

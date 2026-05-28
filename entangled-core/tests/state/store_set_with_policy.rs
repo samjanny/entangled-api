@@ -168,3 +168,75 @@ fn set_with_policy_rejects_delete_op() {
         .unwrap_err();
     assert_eq!(err.code, DiagnosticCode::EStateOp);
 }
+
+// -----------------------------------------------------------------------------
+// `StateStore::delete_with_policy` — the symmetric atomic-validation entry
+// point that enforces §07:319 ("(namespace, key) MUST be declared in the
+// current state_policy") before committing the delete. The bare
+// `StateStore::delete` deliberately skips this so callers with no policy
+// in hand can still remove entries; `delete_with_policy` is the safer
+// default whenever the manifest's current state_policy is available.
+// -----------------------------------------------------------------------------
+
+#[test]
+fn delete_with_policy_removes_existing_entry() {
+    let pub_a = pub_from_seed(108);
+    let now = ts("2026-05-07T00:00:00Z");
+    let mut store = StateStore::new();
+    let policy = vec![policy_entry("ns", "k", StateMode::ClientOnly, 64, 86_400)];
+
+    store
+        .set_with_policy(
+            &pub_a,
+            &set_op("ns", "k", "value", 600),
+            &policy,
+            ACCEPTED,
+            &now,
+        )
+        .unwrap();
+
+    let removed = store
+        .delete_with_policy(&pub_a, &delete_op("ns", "k"), &policy)
+        .unwrap();
+    assert!(removed);
+    assert!(store.get(&pub_a, &slug("ns"), &slug("k"), &now).is_none());
+}
+
+#[test]
+fn delete_with_policy_rejects_undeclared_pair() {
+    let pub_a = pub_from_seed(109);
+    let mut store = StateStore::new();
+    let policy = vec![policy_entry("ns", "k", StateMode::ClientOnly, 64, 86_400)];
+
+    let err = store
+        .delete_with_policy(&pub_a, &delete_op("ns", "missing"), &policy)
+        .unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::EStateUndeclared);
+}
+
+#[test]
+fn delete_with_policy_no_op_on_absent_declared_entry() {
+    // (ns, k) is declared in the policy but no entry exists in the store.
+    // §07: a delete referencing a declared (ns, key) with no extant value
+    // is a no-op (returns false), not an error.
+    let pub_a = pub_from_seed(110);
+    let mut store = StateStore::new();
+    let policy = vec![policy_entry("ns", "k", StateMode::ClientOnly, 64, 86_400)];
+
+    let removed = store
+        .delete_with_policy(&pub_a, &delete_op("ns", "k"), &policy)
+        .unwrap();
+    assert!(!removed);
+}
+
+#[test]
+fn delete_with_policy_rejects_set_op() {
+    let pub_a = pub_from_seed(111);
+    let mut store = StateStore::new();
+    let policy = vec![policy_entry("ns", "k", StateMode::ClientOnly, 64, 86_400)];
+
+    let err = store
+        .delete_with_policy(&pub_a, &set_op("ns", "k", "v", 600), &policy)
+        .unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::EStateOp);
+}
