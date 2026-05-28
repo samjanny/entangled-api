@@ -3,7 +3,7 @@
 use entangled_core::state::{ConsentDecision, SetOutcome, StateStore};
 use entangled_core::types::state::StateMode;
 
-use crate::helpers::{delete_op, pub_from_seed, set_op, slug, ts};
+use crate::helpers::{default_runtime, delete_op, pub_from_seed, set_op, slug, ts};
 
 const ACCEPTED: ConsentDecision = ConsentDecision {
     accepted: true,
@@ -18,7 +18,14 @@ fn set_then_get_returns_entry() {
 
     let op = set_op("session", "auth", "token-abc", 3600);
     let outcome = store
-        .set(&pub_a, &op, StateMode::Request, ACCEPTED, &now)
+        .set(
+            &pub_a,
+            &op,
+            StateMode::Request,
+            ACCEPTED,
+            &default_runtime(),
+            &now,
+        )
         .unwrap();
     assert_eq!(outcome, SetOutcome::Committed { remembered: false });
 
@@ -40,7 +47,14 @@ fn get_returns_none_when_expired() {
 
     let op = set_op("session", "auth", "v", 300);
     store
-        .set(&pub_a, &op, StateMode::ClientOnly, ACCEPTED, &now)
+        .set(
+            &pub_a,
+            &op,
+            StateMode::ClientOnly,
+            ACCEPTED,
+            &default_runtime(),
+            &now,
+        )
         .unwrap();
     // After ttl elapsed (now + 300 == later? Actually 600 > 300).
     let after_expiry = ts("2026-05-07T00:06:00Z");
@@ -62,6 +76,7 @@ fn delete_existing_returns_true_then_get_is_none() {
             &set_op("session", "auth", "v", 600),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -96,6 +111,7 @@ fn per_publisher_isolation() {
             &set_op("ns", "k", "v", 600),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -120,6 +136,7 @@ fn round_trip_preserves_fields() {
             &set_op("session", "auth", "abcdef", 3600),
             StateMode::Request,
             consent,
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -146,6 +163,7 @@ fn variant_mismatch_set_with_delete_op_errors() {
             &delete_op("ns", "k"),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap_err();

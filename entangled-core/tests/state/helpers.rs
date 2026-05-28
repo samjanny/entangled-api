@@ -1,8 +1,8 @@
 //! Shared helpers for the state test bundle.
 
-use entangled_core::crypto::PublisherSigningKey;
+use entangled_core::crypto::{PublisherSigningKey, RuntimeSigningKey};
 use entangled_core::types::{
-    keys::PublisherPubkey,
+    keys::{PublisherPubkey, RuntimePubkey},
     slug::Slug,
     state::{StateMode, StatePolicyEntry, StateUpdateOp},
     timestamp::EntangledTimestamp,
@@ -11,6 +11,17 @@ use entangled_core::types::{
 pub fn pub_from_seed(byte: u8) -> PublisherPubkey {
     let seed = [byte; 32];
     PublisherSigningKey::from_seed(&seed).verifying_key()
+}
+
+pub fn rt_from_seed(byte: u8) -> RuntimePubkey {
+    let seed = [byte; 32];
+    RuntimeSigningKey::from_seed(&seed).verifying_key()
+}
+
+/// Single fixed RuntimePubkey to thread through tests that don't care about
+/// rotation. Tests targeting §07 N53 specifically use distinct seeds.
+pub fn default_runtime() -> RuntimePubkey {
+    rt_from_seed(0xAA)
 }
 
 pub fn slug(s: &str) -> Slug {

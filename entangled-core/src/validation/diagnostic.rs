@@ -271,6 +271,17 @@ pub enum DiagnosticCode {
     EStateOp,
     #[serde(rename = "E_STATE_STORAGE_CAP")]
     EStateStorageCap,
+    /// §11:286 (rc.19+). Committing a request-mode `set` operation
+    /// would make the retained request-state aggregate overflow the
+    /// minimal-submit 64 KiB transmit budget, so the operation is
+    /// rejected locally before commit. Distinct from `E_SUBMIT_BUDGET`
+    /// (Stage 5 publisher-policy satisfiability invariant): the former
+    /// rejects a satisfiable policy's individual run-time set, the
+    /// latter rejects an unsatisfiable policy outright. Structured
+    /// `details` SHOULD include `namespace`, `key`, `projected_bytes`,
+    /// `cap_bytes` (65536).
+    #[serde(rename = "E_STATE_TRANSMIT_BUDGET")]
+    EStateTransmitBudget,
     #[serde(rename = "E_STATE_DUPLICATE")]
     EStateDuplicate,
     #[serde(rename = "I_STATE_CONSENT_REJECTED")]
@@ -441,6 +452,7 @@ impl DiagnosticCode {
             | EStateTtl
             | EStateOp
             | EStateStorageCap
+            | EStateTransmitBudget
             | EStateDuplicate
             | IStateConsentRejected
             | IStateConsentRemembered

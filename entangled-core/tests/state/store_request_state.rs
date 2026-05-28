@@ -4,7 +4,7 @@
 use entangled_core::state::{ConsentDecision, StateStore};
 use entangled_core::types::state::StateMode;
 
-use crate::helpers::{policy_entry, pub_from_seed, set_op, ts};
+use crate::helpers::{default_runtime, policy_entry, pub_from_seed, set_op, ts};
 
 const ACCEPTED: ConsentDecision = ConsentDecision {
     accepted: true,
@@ -26,6 +26,7 @@ fn returns_only_request_mode_non_expired() {
             &set_op("session", "auth", "alpha", 3600),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -36,6 +37,7 @@ fn returns_only_request_mode_non_expired() {
             &set_op("prefs", "lang", "en", 3600),
             StateMode::ClientOnly,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -46,6 +48,7 @@ fn returns_only_request_mode_non_expired() {
             &set_op("session", "stale", "old", 300),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -81,6 +84,7 @@ fn excludes_request_entries_dropped_from_current_policy() {
             &set_op("session", "auth", "alpha", 3600),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();

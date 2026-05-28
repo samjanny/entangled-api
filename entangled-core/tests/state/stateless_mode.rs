@@ -4,7 +4,7 @@
 use entangled_core::state::{ConsentDecision, StateStore};
 use entangled_core::types::state::StateMode;
 
-use crate::helpers::{pub_from_seed, set_op, slug, ts};
+use crate::helpers::{default_runtime, pub_from_seed, set_op, slug, ts};
 
 const ACCEPTED: ConsentDecision = ConsentDecision {
     accepted: true,
@@ -24,6 +24,7 @@ fn stateless_supports_set_and_get() {
             &set_op("session", "auth", "v", 600),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -44,6 +45,7 @@ fn clear_session_wipes_everything_in_stateless() {
             &set_op("session", "auth", "v", 600),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();

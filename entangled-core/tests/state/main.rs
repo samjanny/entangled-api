@@ -7,6 +7,7 @@ mod common;
 mod helpers;
 
 mod integration_full;
+mod runtime_superseded;
 mod stateless_mode;
 mod store_basic;
 mod store_cleanup;
@@ -16,3 +17,4 @@ mod store_request_state;
 mod store_set_with_policy;
 mod store_storage_cap;
 mod submit_body_build;
+mod transmit_budget;

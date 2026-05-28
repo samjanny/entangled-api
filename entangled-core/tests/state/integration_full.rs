@@ -10,7 +10,7 @@ use entangled_core::validation::policy_check::validate_state_updates_against_pol
 use entangled_core::validation::state::validate_state_policy;
 use entangled_core::validation::submit::validate_submit_body;
 
-use crate::helpers::{policy_entry, pub_from_seed, set_op, ts};
+use crate::helpers::{default_runtime, policy_entry, pub_from_seed, set_op, ts};
 
 #[test]
 fn full_submit_flow_end_to_end() {
@@ -42,7 +42,14 @@ fn full_submit_flow_end_to_end() {
         remembered: true,
     };
     store
-        .set(&pub_a, &op, StateMode::Request, consent, &now)
+        .set(
+            &pub_a,
+            &op,
+            StateMode::Request,
+            consent,
+            &default_runtime(),
+            &now,
+        )
         .unwrap();
 
     // 7. Build the submit body.

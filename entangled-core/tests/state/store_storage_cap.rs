@@ -4,7 +4,7 @@ use entangled_core::state::{ConsentDecision, StateStore, StorageCap};
 use entangled_core::types::state::StateMode;
 use entangled_core::validation::DiagnosticCode;
 
-use crate::helpers::{pub_from_seed, set_op, ts};
+use crate::helpers::{default_runtime, pub_from_seed, set_op, ts};
 
 const ACCEPTED: ConsentDecision = ConsentDecision {
     accepted: true,
@@ -28,6 +28,7 @@ fn within_cap_committed() {
             &set_op("ns", "k1", &value, 600),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -51,6 +52,7 @@ fn second_set_exceeds_cap() {
             &set_op("ns", "k1", &v1, 600),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -62,6 +64,7 @@ fn second_set_exceeds_cap() {
             &set_op("ns", "k2", &v2, 600),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap_err();
@@ -84,6 +87,7 @@ fn second_set_meets_cap_exactly() {
             &set_op("ns", "k1", &v1, 600),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -97,6 +101,7 @@ fn second_set_meets_cap_exactly() {
             &set_op("ns", "k2", &v2, 600),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -119,6 +124,7 @@ fn replacing_with_smaller_value_is_allowed_at_cap() {
             &set_op("ns", "k", &v1, 600),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -132,6 +138,7 @@ fn replacing_with_smaller_value_is_allowed_at_cap() {
             &set_op("ns", "k", &v2, 600),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -154,6 +161,7 @@ fn caps_are_per_publisher() {
             &set_op("ns", "k", &v, 600),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -164,6 +172,7 @@ fn caps_are_per_publisher() {
             &set_op("ns", "k", &v, 600),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();

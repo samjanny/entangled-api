@@ -3,7 +3,7 @@
 use entangled_core::state::{ConsentDecision, SetOutcome, StateStore};
 use entangled_core::types::state::StateMode;
 
-use crate::helpers::{pub_from_seed, set_op, slug, ts};
+use crate::helpers::{default_runtime, pub_from_seed, set_op, slug, ts};
 
 #[test]
 fn consent_rejected_does_not_commit() {
@@ -20,6 +20,7 @@ fn consent_rejected_does_not_commit() {
                 accepted: false,
                 remembered: false,
             },
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -44,6 +45,7 @@ fn consent_accepted_not_remembered() {
                 accepted: true,
                 remembered: false,
             },
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -70,6 +72,7 @@ fn consent_accepted_remembered() {
                 accepted: true,
                 remembered: true,
             },
+            &default_runtime(),
             &now,
         )
         .unwrap();

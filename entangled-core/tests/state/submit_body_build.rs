@@ -7,7 +7,7 @@ use entangled_core::state::{build_submit_body, ConsentDecision, StateStore};
 use entangled_core::types::keys::RequestId;
 use entangled_core::types::state::StateMode;
 
-use crate::helpers::{policy_entry, pub_from_seed, set_op, ts};
+use crate::helpers::{default_runtime, policy_entry, pub_from_seed, set_op, ts};
 
 /// 16 zero bytes — these tests exercise field/state plumbing, not §09's
 /// freshness rule for `request_id`.
@@ -32,6 +32,7 @@ fn build_with_two_request_entries() {
             &set_op("session", "auth", "alpha", 600),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -41,6 +42,7 @@ fn build_with_two_request_entries() {
             &set_op("session", "csrf", "beta", 600),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -99,6 +101,7 @@ fn build_excludes_expired_request_state() {
             &set_op("session", "stale", "old", 300),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();

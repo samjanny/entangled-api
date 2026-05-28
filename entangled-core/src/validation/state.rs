@@ -37,7 +37,29 @@ use super::strings::{check_nfc, no_control_chars};
 /// Total = 36 bytes (assuming `namespace`/`key`/`value` contain no
 /// JSON-escape-bearing characters; slug syntax guarantees this for
 /// `namespace` and `key`).
-const REQUEST_STATE_ENTRY_ENVELOPE_BYTES: usize = 36;
+pub const REQUEST_STATE_ENTRY_ENVELOPE_BYTES: usize = 36;
+
+/// Encoded wire contribution of a single `request_state` entry given the
+/// concrete byte lengths of `namespace`, `key`, and `value` — i.e. the
+/// JSON shape `{"namespace":"...","key":"...","value":"..."}` measured
+/// on the wire. Used by:
+///
+/// * the Stage 5 N62 satisfiability invariant
+///   ([`validate_state_policy`]), where `value_bytes` is the entry's
+///   declared `max_size`;
+/// * the runtime [`crate::state::StateStore`] transmit-budget check
+///   ([`E_STATE_TRANSMIT_BUDGET`](crate::validation::DiagnosticCode::EStateTransmitBudget)),
+///   where `value_bytes` is the actual `value.len()` retained.
+///
+/// [`E_STATE_TRANSMIT_BUDGET`]: crate::validation::DiagnosticCode::EStateTransmitBudget
+#[must_use]
+pub fn encoded_request_state_entry_bytes(
+    namespace_bytes: usize,
+    key_bytes: usize,
+    value_bytes: usize,
+) -> usize {
+    REQUEST_STATE_ENTRY_ENVELOPE_BYTES + namespace_bytes + key_bytes + value_bytes
+}
 
 /// Validate a manifest's `state_policy` array (Stage 5).
 ///
@@ -163,10 +185,11 @@ fn aggregate_request_state_bytes(policy: &[StatePolicyEntry]) -> usize {
         if e.mode != StateMode::Request {
             continue;
         }
-        let entry_bytes = REQUEST_STATE_ENTRY_ENVELOPE_BYTES
-            + e.namespace.as_str().len()
-            + e.key.as_str().len()
-            + e.max_size as usize;
+        let entry_bytes = encoded_request_state_entry_bytes(
+            e.namespace.as_str().len(),
+            e.key.as_str().len(),
+            e.max_size as usize,
+        );
         total = total.saturating_add(entry_bytes);
         request_entries += 1;
     }

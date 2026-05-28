@@ -5,7 +5,7 @@
 use entangled_core::state::{ConsentDecision, StateStore};
 use entangled_core::types::state::StateMode;
 
-use crate::helpers::{pub_from_seed, set_op, slug, ts};
+use crate::helpers::{default_runtime, pub_from_seed, set_op, slug, ts};
 
 const ACCEPTED: ConsentDecision = ConsentDecision {
     accepted: true,
@@ -24,6 +24,7 @@ fn entry_mode_is_what_was_passed_at_set_time() {
             &set_op("session", "auth", "v1", 3600),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -50,6 +51,7 @@ fn rewriting_with_different_mode_replaces_entry_with_new_mode() {
             &set_op("session", "auth", "v1", 3600),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -59,6 +61,7 @@ fn rewriting_with_different_mode_replaces_entry_with_new_mode() {
             &set_op("session", "auth", "v2", 3600),
             StateMode::ClientOnly,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -87,6 +90,7 @@ fn entry_mode_field_is_immutable_from_outside() {
             &set_op("ns", "k", "v", 3600),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();

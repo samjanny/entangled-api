@@ -4,7 +4,7 @@
 use entangled_core::state::{ConsentDecision, StateStore};
 use entangled_core::types::state::StateMode;
 
-use crate::helpers::{pub_from_seed, set_op, ts};
+use crate::helpers::{default_runtime, pub_from_seed, set_op, ts};
 
 const ACCEPTED: ConsentDecision = ConsentDecision {
     accepted: true,
@@ -24,6 +24,7 @@ fn cleanup_expired_removes_expired_entries() {
                 &set_op("ns", &format!("k{i}"), "v", *ttl),
                 StateMode::Request,
                 ACCEPTED,
+                &default_runtime(),
                 &now,
             )
             .unwrap();
@@ -49,6 +50,7 @@ fn clear_publisher_only_removes_targeted_publisher() {
             &set_op("ns", "k", "v", 600),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -58,6 +60,7 @@ fn clear_publisher_only_removes_targeted_publisher() {
             &set_op("ns", "k", "v", 600),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -81,6 +84,7 @@ fn clear_session_removes_everything() {
             &set_op("ns", "k", "v", 600),
             StateMode::Request,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -90,6 +94,7 @@ fn clear_session_removes_everything() {
             &set_op("ns", "k", "v", 600),
             StateMode::ClientOnly,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();

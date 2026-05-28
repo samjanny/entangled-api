@@ -4,7 +4,7 @@ use entangled_core::state::{ConsentDecision, SetOutcome, StateStore};
 use entangled_core::types::state::StateMode;
 use entangled_core::validation::DiagnosticCode;
 
-use crate::helpers::{delete_op, policy_entry, pub_from_seed, set_op, slug, ts};
+use crate::helpers::{default_runtime, delete_op, policy_entry, pub_from_seed, set_op, slug, ts};
 
 const ACCEPTED: ConsentDecision = ConsentDecision {
     accepted: true,
@@ -30,6 +30,7 @@ fn set_with_policy_resolves_mode_from_policy() {
             &set_op("session", "auth", "tok", 3600),
             &policy,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -61,6 +62,7 @@ fn set_with_policy_rejects_undeclared_pair() {
             &set_op("session", "missing", "v", 600),
             &policy,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap_err();
@@ -80,6 +82,7 @@ fn set_with_policy_rejects_value_over_max_size() {
             &set_op("ns", "k", "12345", 600), // 5 > max_size 4
             &policy,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap_err();
@@ -99,6 +102,7 @@ fn set_with_policy_rejects_ttl_over_max_lifetime() {
             &set_op("ns", "k", "v", 3600), // ttl 3600 > policy max_lifetime 600
             &policy,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap_err();
@@ -118,6 +122,7 @@ fn set_with_policy_rejects_ttl_below_hard_minimum() {
             &set_op("ns", "k", "v", 60), // 60 < absolute hard min 300
             &policy,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap_err();
@@ -147,6 +152,7 @@ fn set_with_policy_refused_consent_does_not_commit() {
             &set_op("session", "auth", "tok", 3600),
             &policy,
             refused,
+            &default_runtime(),
             &now,
         )
         .unwrap();
@@ -164,7 +170,14 @@ fn set_with_policy_rejects_delete_op() {
     let policy = vec![policy_entry("ns", "k", StateMode::ClientOnly, 64, 86_400)];
 
     let err = store
-        .set_with_policy(&pub_a, &delete_op("ns", "k"), &policy, ACCEPTED, &now)
+        .set_with_policy(
+            &pub_a,
+            &delete_op("ns", "k"),
+            &policy,
+            ACCEPTED,
+            &default_runtime(),
+            &now,
+        )
         .unwrap_err();
     assert_eq!(err.code, DiagnosticCode::EStateOp);
 }
@@ -191,6 +204,7 @@ fn delete_with_policy_removes_existing_entry() {
             &set_op("ns", "k", "value", 600),
             &policy,
             ACCEPTED,
+            &default_runtime(),
             &now,
         )
         .unwrap();

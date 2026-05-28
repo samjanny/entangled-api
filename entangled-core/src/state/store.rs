@@ -9,11 +9,12 @@ use std::collections::HashMap;
 
 use time::Duration;
 
-use crate::types::keys::PublisherPubkey;
+use crate::types::keys::{PublisherPubkey, RuntimePubkey};
 use crate::types::slug::Slug;
 use crate::types::state::{StateMode, StatePolicyEntry, StateUpdateOp};
 use crate::types::timestamp::EntangledTimestamp;
 use crate::validation::diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel};
+use crate::validation::limits::{SUBMIT_BODY_MAX_BYTES, SUBMIT_OVERHEAD_RESERVE_BYTES};
 use crate::validation::policy_check::validate_state_update_against_policy;
 
 /// One state entry, as stored client-side. The `mode` is preserved from the
@@ -32,6 +33,19 @@ pub struct StateEntry {
     /// Whether the user opted to remember this consent for future writes
     /// to the same `(publisher, namespace, key)` triple.
     pub remembered_consent: bool,
+    /// `canary.runtime_pubkey` of the manifest that authorized this
+    /// commit (§07 rc.19 N53). When the publisher subsequently rotates
+    /// to a different `K_runtime`, [`StateStore::mark_runtime_superseded`]
+    /// flips [`Self::runtime_superseded`] on every entry whose
+    /// `authorizing_runtime_pubkey` does not match the new one.
+    pub authorizing_runtime_pubkey: RuntimePubkey,
+    /// `true` once the authorizing `K_runtime` has been superseded by a
+    /// subsequent canary rotation (§07 rc.19 N53). A superseded
+    /// request-mode entry MUST NOT be included in submit requests but
+    /// MUST be retained until its natural `expires_at` for user
+    /// inspection and deletion. The flag does not affect client-only
+    /// entries, which are never transmitted.
+    pub runtime_superseded: bool,
 }
 
 /// User decision delivered to the store. The store does not run the consent
@@ -182,12 +196,20 @@ impl StateStore {
     /// resolved mode here; the store then preserves it on the entry for the
     /// lifetime of that entry, even if the policy later changes (§07
     /// "Mode change").
+    ///
+    /// `runtime_pubkey` is `canary.runtime_pubkey` of the manifest under
+    /// which the authorizing transaction was verified (§07 rc.19 N53).
+    /// The store records it on the new entry so that a later canary
+    /// rotation can flag the entry as `runtime_superseded` via
+    /// [`Self::mark_runtime_superseded`]; superseded entries are
+    /// excluded from [`Self::get_request_state`] per the N53 MUST.
     pub fn set(
         &mut self,
         publisher: &PublisherPubkey,
         op: &StateUpdateOp,
         mode: StateMode,
         consent: ConsentDecision,
+        runtime_pubkey: &RuntimePubkey,
         now: &EntangledTimestamp,
     ) -> Result<SetOutcome, Diagnostic> {
         let (ns, key, value, ttl) = match op {
@@ -235,6 +257,39 @@ impl StateStore {
             ));
         }
 
+        // §07:466-482 (rc.21) transmit-budget rule. The minimal submit
+        // body is `envelope + request_state`; committing this set
+        // operation MUST NOT make that minimal body overflow the 64 KiB
+        // submit cap (§09). Compute the projected post-commit minimal
+        // body and reject as E_STATE_TRANSMIT_BUDGET if it would
+        // overflow. Distinct from `E_STATE_STORAGE_CAP` above
+        // (per-publisher cap) and `E_SUBMIT_BUDGET` at Stage 5 (Stage 5
+        // satisfiability invariant).
+        //
+        // Only request-mode entries contribute to the transmit budget
+        // (client-only state is never transmitted). A client-only set
+        // therefore cannot trigger this diagnostic.
+        if mode == StateMode::Request {
+            let projected =
+                self.projected_minimal_submit_bytes(publisher, ns, key, value.len(), now);
+            if projected > SUBMIT_BODY_MAX_BYTES {
+                return Err(Diagnostic::new(
+                    DiagnosticCode::EStateTransmitBudget,
+                    DocumentKindLabel::Transaction,
+                    format!(
+                        "set would put the minimal submit body at {projected} bytes, \
+                         submit cap is {SUBMIT_BODY_MAX_BYTES}",
+                    ),
+                )
+                .with_details(serde_json::json!({
+                    "namespace": ns.as_str(),
+                    "key": key.as_str(),
+                    "projected_bytes": projected,
+                    "cap_bytes": SUBMIT_BODY_MAX_BYTES,
+                })));
+            }
+        }
+
         let expires_at = *now + Duration::seconds(i64::from(ttl));
         let entry = StateEntry {
             value: value.clone(),
@@ -242,6 +297,10 @@ impl StateStore {
             expires_at,
             consent_at: *now,
             remembered_consent: consent.remembered,
+            authorizing_runtime_pubkey: *runtime_pubkey,
+            // A fresh commit under the current K_runtime is by definition
+            // not superseded; only a subsequent rotation can flip the flag.
+            runtime_superseded: false,
         };
         self.inner.insert(store_key, entry);
         Ok(SetOutcome::Committed {
@@ -270,6 +329,7 @@ impl StateStore {
         op: &StateUpdateOp,
         policy: &[StatePolicyEntry],
         consent: ConsentDecision,
+        runtime_pubkey: &RuntimePubkey,
         now: &EntangledTimestamp,
     ) -> Result<SetOutcome, Diagnostic> {
         if matches!(op, StateUpdateOp::Delete { .. }) {
@@ -280,7 +340,7 @@ impl StateStore {
             ));
         }
         let entry = validate_state_update_against_policy(op, policy)?;
-        self.set(publisher, op, entry.mode, consent, now)
+        self.set(publisher, op, entry.mode, consent, runtime_pubkey, now)
     }
 
     /// Commit a delete. Returns `Ok(false)` if no entry was present (no-op,
@@ -344,13 +404,21 @@ impl StateStore {
     }
 
     /// All non-expired request-mode entries for `publisher` whose
-    /// `(namespace, key)` is still declared in the current `state_policy`,
+    /// `(namespace, key)` is still declared in the current `state_policy`
+    /// and whose authorizing `K_runtime` has not been superseded,
     /// formatted as `RequestStateItem`. Used by `build_submit_body`.
     ///
     /// §07: state for `(namespace, key)` combinations no longer declared in
     /// the current policy MUST NOT be included in submit requests, even if
     /// the entry has not yet expired and was committed in `Request` mode.
     /// The entry is retained for inspection/deletion but excluded here.
+    ///
+    /// §07 rc.19 N53: request-mode entries whose `runtime_superseded`
+    /// flag is set (because the authorizing `K_runtime` has been rotated
+    /// out) MUST NOT be transmitted either. Use
+    /// [`Self::mark_runtime_superseded`] when a new manifest authorises a
+    /// distinct `K_runtime` so the rotation actually bounds the exposure
+    /// of request-state credentials.
     pub fn get_request_state(
         &mut self,
         publisher: &PublisherPubkey,
@@ -368,6 +436,9 @@ impl StateStore {
             if e.mode != StateMode::Request {
                 continue;
             }
+            if e.runtime_superseded {
+                continue;
+            }
             if !policy_declares(current_policy, &k.namespace, &k.key) {
                 continue;
             }
@@ -378,6 +449,53 @@ impl StateStore {
             });
         }
         out
+    }
+
+    /// Mark every retained request-mode entry for `publisher` whose
+    /// `authorizing_runtime_pubkey` does not match `current_runtime_pubkey`
+    /// as `runtime_superseded` (§07 rc.19 N53).
+    ///
+    /// Callers invoke this when they observe a new manifest whose
+    /// `canary.runtime_pubkey` differs from the previously authorising
+    /// one. Per the §07:550-560 MUST set:
+    ///
+    /// * Superseded entries MUST NOT be transmitted in subsequent submit
+    ///   requests ([`Self::get_request_state`] honours this).
+    /// * Superseded entries MUST be retained for user inspection and
+    ///   deletion until their natural `expires_at`. This function does
+    ///   not remove them; it only flips the flag.
+    /// * The client MUST display a chrome notice. Surfacing the notice
+    ///   is the caller's responsibility; the return value reports how
+    ///   many entries were just marked, so the caller can decide whether
+    ///   to prompt.
+    ///
+    /// Client-only entries are not affected: they are never transmitted
+    /// and the rotation rationale does not apply (§07:564).
+    ///
+    /// Returns the number of entries newly marked superseded by this
+    /// call (entries already superseded are not counted).
+    pub fn mark_runtime_superseded(
+        &mut self,
+        publisher: &PublisherPubkey,
+        current_runtime_pubkey: &RuntimePubkey,
+    ) -> usize {
+        let mut marked = 0;
+        for (k, e) in self.inner.iter_mut() {
+            if k.publisher != *publisher {
+                continue;
+            }
+            if e.mode != StateMode::Request {
+                continue;
+            }
+            if e.runtime_superseded {
+                continue;
+            }
+            if e.authorizing_runtime_pubkey != *current_runtime_pubkey {
+                e.runtime_superseded = true;
+                marked += 1;
+            }
+        }
+        marked
     }
 
     /// Drop every expired entry across every publisher. Returns the count.
@@ -415,6 +533,76 @@ impl StateStore {
             .filter(|(_, e)| !is_expired(e, now))
             .map(|(k, e)| entry_storage_bytes(&k.namespace, &k.key, &e.value))
             .sum()
+    }
+
+    /// Projected total bytes of the minimal submit body that would
+    /// result if a request-mode `set` of `(set_ns, set_key) = set_value`
+    /// were committed under `publisher` right now.
+    ///
+    /// The minimal submit body is `envelope_reserve + request_state` —
+    /// no `fields` portion, no oversized envelope. `request_state`
+    /// includes every currently-retained, non-expired, non-superseded
+    /// request-mode entry for `publisher`, plus the proposed new entry
+    /// (with `value.len() == set_value_len`) substituting any existing
+    /// retained value at the same `(ns, key)`.
+    ///
+    /// Used by the transmit-budget check that fires
+    /// `E_STATE_TRANSMIT_BUDGET` (§07:466-482) before commit.
+    fn projected_minimal_submit_bytes(
+        &self,
+        publisher: &PublisherPubkey,
+        set_ns: &Slug,
+        set_key: &Slug,
+        set_value_len: usize,
+        now: &EntangledTimestamp,
+    ) -> usize {
+        let mut total = SUBMIT_OVERHEAD_RESERVE_BYTES;
+        let mut included = 0usize;
+        let mut found_overwrite = false;
+        for (k, e) in &self.inner {
+            if k.publisher != *publisher {
+                continue;
+            }
+            if is_expired(e, now) {
+                continue;
+            }
+            if e.mode != StateMode::Request {
+                continue;
+            }
+            if e.runtime_superseded {
+                continue;
+            }
+            let same_slot = &k.namespace == set_ns && &k.key == set_key;
+            let value_len = if same_slot {
+                found_overwrite = true;
+                set_value_len
+            } else {
+                e.value.len()
+            };
+            total =
+                total.saturating_add(crate::validation::state::encoded_request_state_entry_bytes(
+                    k.namespace.as_str().len(),
+                    k.key.as_str().len(),
+                    value_len,
+                ));
+            included += 1;
+        }
+        if !found_overwrite {
+            // The proposed entry is a fresh slot, not an overwrite.
+            total =
+                total.saturating_add(crate::validation::state::encoded_request_state_entry_bytes(
+                    set_ns.as_str().len(),
+                    set_key.as_str().len(),
+                    set_value_len,
+                ));
+            included += 1;
+        }
+        // Inter-entry array commas (N - 1) when the request_state array
+        // has at least one entry.
+        if included > 1 {
+            total = total.saturating_add(included - 1);
+        }
+        total
     }
 }
 
