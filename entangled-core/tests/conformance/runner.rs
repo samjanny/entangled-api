@@ -234,27 +234,25 @@ fn run_manifest_pipeline(
     }
 
     // Stage 9 carrier origin binding (when the vector supplies a
-    // fetched address). `verify_origin` consumes the wrapper; the bare
-    // `Manifest` is then needed for the rc.14 `origin.not_after` check
-    // and for any follow-on migration verification, so the two arms
-    // produce the same `Manifest` shape.
+    // fetched address). `verify_origin` runs both Stage 9 sub-bullets
+    // (carrier binding and origin.not_after expiry) and consumes the
+    // wrapper; for vectors that omit the fetched address we fall back
+    // to `skip_origin_check` and run the not_after check standalone so
+    // that runtime-only origin-expired vectors still exercise it.
     let manifest = if let Some(addr) = vector.context.fetched_origin_address.as_deref() {
         let onion = OnionAddress::try_from(addr)
             .map_err(|e| format!("context.fetched_origin_address invalid: {e}"))?;
-        match canary_checked.verify_origin(&onion) {
+        match canary_checked.verify_origin(&onion, now) {
             Ok(b) => b.into_parts().0,
             Err(d) => return Ok(Err(d)),
         }
     } else {
-        canary_checked.skip_origin_check()
+        let m = canary_checked.skip_origin_check();
+        if let Err(d) = check_origin_not_after(&m, now) {
+            return Ok(Err(d));
+        }
+        m
     };
-
-    // Stage 9 (§06 / §10 rc.14): origin.not_after expiry. Runs after
-    // carrier origin binding succeeds and rejects manifests whose
-    // declared `not_after` is past `now + tolerance`.
-    if let Err(d) = check_origin_not_after(&manifest, now) {
-        return Ok(Err(d));
-    }
 
     Ok(Ok(manifest))
 }
@@ -311,7 +309,7 @@ fn run_successor_pipeline(
             };
         }
     };
-    let origin_bound = match canary_checked.verify_origin(successor_addr) {
+    let origin_bound = match canary_checked.verify_origin(successor_addr, now) {
         Ok(b) => b,
         Err(d) => {
             let pk = canary_checked_publisher_pubkey(raw);
@@ -322,10 +320,6 @@ fn run_successor_pipeline(
         }
     };
     let manifest = origin_bound.into_parts().0;
-
-    if let Err(d) = check_origin_not_after(&manifest, now) {
-        return SuccessorOutcome::RejectAfterSchema(d, manifest.publisher_pubkey);
-    }
 
     SuccessorOutcome::Accept(manifest)
 }

@@ -926,6 +926,40 @@ fn origin_not_after_at_5y_boundary_accepted() {
 }
 
 #[test]
+fn origin_not_after_details_use_issued_at_key_per_spec() {
+    // M-1 regression: Section 11 vocabulary for E_ORIGIN_INVALID details
+    // uses `issued_at` (the declared `canary.issued_at` value), not
+    // `canary_issued_at`. The implementation previously emitted the
+    // latter; this test pins the canonical key for both reason variants.
+
+    // not_after_not_later_than_issued_at branch.
+    let v = manifest_value_with_not_after("2026-05-07T00:00:00Z");
+    let err = parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now())
+        .expect_err("not_after at issued_at must reject");
+    let details = err.details.as_ref().expect("details payload");
+    assert_eq!(
+        details["issued_at"].as_str(),
+        Some("2026-05-07T00:00:00Z"),
+        "Section 11 vocabulary requires key `issued_at`"
+    );
+    assert!(
+        details.get("canary_issued_at").is_none(),
+        "non-canonical `canary_issued_at` key must not be emitted"
+    );
+
+    // not_after_beyond_5y branch.
+    let v = manifest_value_with_not_after("2031-05-07T00:00:00Z");
+    let err = parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now())
+        .expect_err("not_after beyond 5y must reject");
+    let details = err.details.as_ref().expect("details payload");
+    assert_eq!(details["issued_at"].as_str(), Some("2026-05-07T00:00:00Z"));
+    assert!(
+        details.get("canary_issued_at").is_none(),
+        "non-canonical `canary_issued_at` key must not be emitted"
+    );
+}
+
+#[test]
 fn origin_not_after_null_rejected_by_prepass() {
     // §04 no-`null` discipline: absent is encoded by omission, never by
     // null. The schema-prepass null sweep fires before serde reaches the

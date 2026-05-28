@@ -89,7 +89,7 @@ fn full_pillar_b_closure() {
         .expect("parse_and_verify_manifest")
         .verify_canary(&now)
         .expect("canary structure")
-        .verify_origin(&onion)
+        .verify_origin(&onion, &now)
         .expect("origin binding must succeed")
         .into_parts();
     assert_eq!(parsed, manifest);

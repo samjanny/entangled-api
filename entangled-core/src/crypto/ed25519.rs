@@ -109,7 +109,8 @@ fn validate_pubkey_canonical_encoding(bytes: &[u8; 32]) -> Result<(), CryptoErro
 /// other than ordinary signature verification — for example, validating
 /// `canary.runtime_pubkey` at Stage 8 or `origin.origin_pubkey` at
 /// Stage 9. For ordinary signature verification, [`VerifyingKey::verify`]
-/// also invokes this helper indirectly via [`Self::from_pubkey_bytes`].
+/// also invokes this helper indirectly via the private
+/// `VerifyingKey::from_pubkey_bytes` constructor.
 pub fn validate_pubkey_strict(bytes: &[u8; 32]) -> Result<(), CryptoError> {
     validate_pubkey_canonical_encoding(bytes)?;
     let vk = ed25519_dalek::VerifyingKey::from_bytes(bytes)

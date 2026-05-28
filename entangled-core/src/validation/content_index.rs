@@ -100,7 +100,7 @@ pub fn validate_content_index(
     if bytes.len() > CONTENT_INDEX_MAX_BYTES {
         return Err(Diagnostic::new(
             DiagnosticCode::EContentIndexInvalid,
-            DocumentKindLabel::Manifest,
+            DocumentKindLabel::ContentIndex,
             format!(
                 "content index response body of {} bytes exceeds cap of {CONTENT_INDEX_MAX_BYTES}",
                 bytes.len()
@@ -112,7 +112,7 @@ pub fn validate_content_index(
     if computed != *content_root.as_bytes() {
         return Err(Diagnostic::new(
             DiagnosticCode::EContentIndexHashMismatch,
-            DocumentKindLabel::Manifest,
+            DocumentKindLabel::ContentIndex,
             "SHA-256 of content index bytes does not match manifest content_root",
         )
         .with_details(serde_json::json!({
@@ -127,7 +127,7 @@ pub fn validate_content_index(
     let s = std::str::from_utf8(bytes).map_err(|_| {
         Diagnostic::new(
             DiagnosticCode::EContentIndexInvalid,
-            DocumentKindLabel::Manifest,
+            DocumentKindLabel::ContentIndex,
             "content index is not valid UTF-8",
         )
     })?;
@@ -135,7 +135,7 @@ pub fn validate_content_index(
     if s.starts_with('\u{FEFF}') {
         return Err(Diagnostic::new(
             DiagnosticCode::EContentIndexInvalid,
-            DocumentKindLabel::Manifest,
+            DocumentKindLabel::ContentIndex,
             "content index must not begin with a BOM",
         ));
     }
@@ -147,7 +147,7 @@ pub fn validate_content_index(
     let value = parse_with_limits(s).map_err(|d| {
         Diagnostic::new(
             DiagnosticCode::EContentIndexInvalid,
-            DocumentKindLabel::Manifest,
+            DocumentKindLabel::ContentIndex,
             format!("content index parse failure: {}", d.message),
         )
     })?;
@@ -155,7 +155,7 @@ pub fn validate_content_index(
     let wire: ContentIndexWire = serde_json::from_value(value).map_err(|e| {
         Diagnostic::new(
             DiagnosticCode::EContentIndexInvalid,
-            DocumentKindLabel::Manifest,
+            DocumentKindLabel::ContentIndex,
             format!("content index structural validation failed: {e}"),
         )
     })?;
@@ -165,7 +165,7 @@ pub fn validate_content_index(
         if entry.seq < 1 {
             return Err(Diagnostic::new(
                 DiagnosticCode::EContentIndexInvalid,
-                DocumentKindLabel::Manifest,
+                DocumentKindLabel::ContentIndex,
                 format!("content index entry for {path}: seq must be at least 1"),
             ));
         }
@@ -185,7 +185,7 @@ fn validate_index_path(path: &str) -> Result<(), Diagnostic> {
     EntangledPath::try_from(path).map_err(|e| {
         Diagnostic::new(
             DiagnosticCode::EContentIndexInvalid,
-            DocumentKindLabel::Manifest,
+            DocumentKindLabel::ContentIndex,
             format!("content index path {path:?}: {e}"),
         )
     })?;

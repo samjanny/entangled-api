@@ -13,7 +13,7 @@
 
 use entangled_core::crypto::sha256;
 use entangled_core::types::keys::ContentRoot;
-use entangled_core::validation::{validate_content_index, DiagnosticCode};
+use entangled_core::validation::{validate_content_index, DiagnosticCode, DocumentKindLabel};
 
 /// Build a content_root that matches `bytes`, so the validator gets past
 /// the hash check and exercises the parse disciplines that follow.
@@ -150,4 +150,49 @@ fn reserved_path_rejected() {
     let root = matching_root(&bytes);
     let err = validate_content_index(&bytes, &root).expect_err("reserved path MUST be rejected");
     assert_eq!(err.code, DiagnosticCode::EContentIndexInvalid);
+}
+
+#[test]
+fn content_index_diagnostics_carry_content_index_kind_label() {
+    // L-1 regression: diagnostics raised by `validate_content_index`
+    // pertain to the content index resource (Section 09), not to a
+    // manifest. They MUST be labelled `DocumentKindLabel::ContentIndex`
+    // so callers inspecting `document_kind` can route them correctly.
+
+    // Size cap path.
+    let bytes = vec![b' '; 1024 * 1024 + 1];
+    let any = ContentRoot::from_bytes([0u8; 32]);
+    let err = validate_content_index(&bytes, &any).expect_err("oversize body");
+    assert_eq!(err.document_kind, DocumentKindLabel::ContentIndex);
+
+    // Hash-mismatch path.
+    let bytes = br#"{"entries":{}}"#.to_vec();
+    let wrong = ContentRoot::from_bytes([0u8; 32]);
+    let err = validate_content_index(&bytes, &wrong).expect_err("hash mismatch");
+    assert_eq!(err.document_kind, DocumentKindLabel::ContentIndex);
+
+    // UTF-8 path.
+    let bytes = vec![b'{', 0xFF, 0xFE, b'}'];
+    let root = matching_root(&bytes);
+    let err = validate_content_index(&bytes, &root).expect_err("invalid UTF-8");
+    assert_eq!(err.document_kind, DocumentKindLabel::ContentIndex);
+
+    // BOM path.
+    let mut bytes = vec![0xEF, 0xBB, 0xBF];
+    bytes.extend_from_slice(br#"{"entries":{}}"#);
+    let root = matching_root(&bytes);
+    let err = validate_content_index(&bytes, &root).expect_err("BOM");
+    assert_eq!(err.document_kind, DocumentKindLabel::ContentIndex);
+
+    // Schema violation path.
+    let bytes = br#"{"entries":{},"extra":1}"#.to_vec();
+    let root = matching_root(&bytes);
+    let err = validate_content_index(&bytes, &root).expect_err("unknown field");
+    assert_eq!(err.document_kind, DocumentKindLabel::ContentIndex);
+
+    // Reserved path inside entries.
+    let bytes = br#"{"entries":{"/manifest.json":{"seq":1,"hash":"sha-256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}}}"#.to_vec();
+    let root = matching_root(&bytes);
+    let err = validate_content_index(&bytes, &root).expect_err("reserved path");
+    assert_eq!(err.document_kind, DocumentKindLabel::ContentIndex);
 }

@@ -270,6 +270,13 @@ pub const CLOCK_SKEW_TOLERANCE_SECS: i64 = 300;
 // Origin not-after (§06 v1.0-rc.14)
 // -----------------------------------------------------------------------------
 
+/// Maximum permitted gap between `canary.issued_at` and `origin.not_after`
+/// (§06 v1.0-rc.14). Five years, in seconds — exactly 157_680_000.
+///
+/// The constant is computed as `5 * 365 * 86_400` (no leap-year accounting)
+/// to match the spec's literal value byte-for-byte.
+pub const ORIGIN_NOT_AFTER_MAX_HORIZON_SECS: i64 = 5 * 365 * 86_400;
+
 // -----------------------------------------------------------------------------
 // Content index (§02/§09 v1.0-rc.19)
 // -----------------------------------------------------------------------------
@@ -277,10 +284,3 @@ pub const CLOCK_SKEW_TOLERANCE_SECS: i64 = 300;
 /// Maximum response body size for `/content_index.json` (§09 v1.0-rc.19,
 /// N47). 1 MiB.
 pub const CONTENT_INDEX_MAX_BYTES: usize = 1024 * 1024;
-
-/// Maximum permitted gap between `canary.issued_at` and `origin.not_after`
-/// (§06 v1.0-rc.14). Five years, in seconds — exactly 157_680_000.
-///
-/// The constant is computed as `5 * 365 * 86_400` (no leap-year accounting)
-/// to match the spec's literal value byte-for-byte.
-pub const ORIGIN_NOT_AFTER_MAX_HORIZON_SECS: i64 = 5 * 365 * 86_400;

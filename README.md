@@ -158,7 +158,7 @@ let verified = parse_and_verify_manifest(manifest_bytes, now)?;
 
 let (manifest, canary_state) = verified
     .verify_canary(now)?
-    .verify_origin(fetched_onion)?
+    .verify_origin(fetched_onion, now)?
     .into_parts();
 
 let runtime_pubkey = manifest.canary.runtime_pubkey;

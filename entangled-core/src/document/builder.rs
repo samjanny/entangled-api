@@ -26,7 +26,8 @@ use crate::types::document::TransactionDocument;
 use crate::types::manifest::Manifest;
 use crate::types::timestamp::EntangledTimestamp;
 use crate::validation::schema::{
-    validate_content_fields, validate_manifest_fields, validate_transaction_fields,
+    validate_content_fields, validate_manifest_fields, validate_origin_not_after,
+    validate_transaction_fields,
 };
 
 use super::error::DocumentError;
@@ -63,6 +64,7 @@ pub fn build_manifest(
         &unsigned.updated,
         now,
     )?;
+    validate_origin_not_after(&unsigned.origin, &unsigned.canary)?;
     if let Some(mp) = &unsigned.migration_pointer {
         crate::validation::validate_migration_pointer(mp, &unsigned.origin, &unsigned.updated)?;
     }

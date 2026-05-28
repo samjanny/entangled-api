@@ -34,6 +34,10 @@ pub enum DocumentKindLabel {
     Content,
     /// Transaction document.
     Transaction,
+    /// Content index resource (Section 09). Not an Entangled signed
+    /// document but a `K_publisher`-committed JSON resource that the
+    /// client fetches alongside the manifest.
+    ContentIndex,
     /// Kind not yet known (Stage 2-3 diagnostics).
     None,
 }

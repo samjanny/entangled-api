@@ -487,7 +487,7 @@ pub fn validate_origin_not_after(origin: &Origin, canary: &Canary) -> Result<(),
             "field_path": "origin.not_after",
             "reason": "not_after_not_later_than_issued_at",
             "not_after": not_after.to_string(),
-            "canary_issued_at": canary.issued_at.to_string(),
+            "issued_at": canary.issued_at.to_string(),
         })));
     }
 
@@ -502,7 +502,7 @@ pub fn validate_origin_not_after(origin: &Origin, canary: &Canary) -> Result<(),
             "field_path": "origin.not_after",
             "reason": "not_after_beyond_5y",
             "not_after": not_after.to_string(),
-            "canary_issued_at": canary.issued_at.to_string(),
+            "issued_at": canary.issued_at.to_string(),
             "horizon_seconds": horizon,
             "max_horizon_seconds": ORIGIN_NOT_AFTER_MAX_HORIZON_SECS,
         })));

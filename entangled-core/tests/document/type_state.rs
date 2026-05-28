@@ -132,7 +132,7 @@ fn full_chain_stage_6_8_9_completes() {
         .expect("Stage 6")
         .verify_canary(&fixed_now())
         .expect("Stage 8")
-        .verify_origin(&onion)
+        .verify_origin(&onion, &fixed_now())
         .expect("Stage 9")
         .into_parts();
 
@@ -193,7 +193,9 @@ fn manifest_and_canary_state_readable_pre_into_parts() {
     assert_eq!(canary_checked.canary_state(), CanaryState::Fresh);
 
     // Same for `ManifestOriginBound`.
-    let origin_bound = canary_checked.verify_origin(&onion).expect("Stage 9");
+    let origin_bound = canary_checked
+        .verify_origin(&onion, &fixed_now())
+        .expect("Stage 9");
     assert_eq!(origin_bound.publisher_pubkey(), &built.publisher_pubkey);
     assert_eq!(origin_bound.origin(), &built.origin);
     assert_eq!(origin_bound.canary(), &built.canary);
@@ -283,8 +285,60 @@ fn origin_mismatch_fails_with_e_bind_origin() {
         .expect("Stage 6")
         .verify_canary(&fixed_now())
         .expect("Stage 8")
-        .verify_origin(&wrong_onion)
+        .verify_origin(&wrong_onion, &fixed_now())
         .expect_err("address mismatch must fail Stage 9");
 
     assert_eq!(err.code, DiagnosticCode::EBindOrigin);
+}
+
+#[test]
+fn expired_origin_not_after_fails_pipeline_with_e_origin_expired() {
+    // C-1 regression: the canonical pipeline must reject a manifest whose
+    // `origin.not_after` has passed (modulo the 300s skew tolerance), per
+    // Section 10 Stage 9. Before the fix, `verify_origin` only enforced
+    // carrier origin binding and silently accepted expired manifests.
+    let (publisher_key, onion, mut unsigned) = unsigned_manifest_with_consistent_origin(
+        0xD4,
+        0xE4,
+        ts("2024-01-01T00:00:00Z"),
+        ts("2024-01-31T00:00:00Z"),
+    );
+    // `not_after` is past `fixed_now()` (2026-05-07) by well over the
+    // 300s clock-skew tolerance, but the manifest's other fields are
+    // valid at sign time.
+    unsigned.origin.not_after = Some(ts("2024-06-01T00:00:00Z"));
+    unsigned.updated = ts("2024-01-15T00:00:00Z");
+    let sign_now = ts("2024-01-15T00:00:00Z");
+    let (_manifest, bytes) = build_manifest(&unsigned, &publisher_key, &sign_now).expect("build");
+
+    let err = parse_and_verify_manifest(&bytes, &fixed_now())
+        .expect("Stage 6")
+        .verify_canary(&fixed_now())
+        .expect("Stage 8 accepts Expired as a state")
+        .verify_origin(&onion, &fixed_now())
+        .expect_err("expired origin.not_after must fail Stage 9");
+
+    assert_eq!(err.code, DiagnosticCode::EOriginExpired);
+}
+
+#[test]
+fn non_expired_origin_not_after_passes_pipeline() {
+    // Companion to the expired test: an `origin.not_after` strictly in the
+    // future must traverse the full canonical pipeline without error.
+    let (publisher_key, onion, mut unsigned) = unsigned_manifest_with_consistent_origin(
+        0xD5,
+        0xE5,
+        ts("2026-05-07T00:00:00Z"),
+        ts("2026-06-06T00:00:00Z"),
+    );
+    unsigned.origin.not_after = Some(ts("2027-05-07T00:00:00Z"));
+    let (_manifest, bytes) =
+        build_manifest(&unsigned, &publisher_key, &fixed_now()).expect("build");
+
+    parse_and_verify_manifest(&bytes, &fixed_now())
+        .expect("Stage 6")
+        .verify_canary(&fixed_now())
+        .expect("Stage 8")
+        .verify_origin(&onion, &fixed_now())
+        .expect("future not_after must pass Stage 9");
 }

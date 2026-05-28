@@ -45,6 +45,7 @@ use crate::types::state::StatePolicyEntry;
 use crate::types::{EntangledTimestamp, Manifest, OnionAddress};
 use crate::validation::canary::{compute_canary_state, validate_canary_structure, CanaryState};
 use crate::validation::diagnostic::Diagnostic;
+use crate::validation::migration::check_origin_not_after;
 
 mod sealed {
     use crate::types::Manifest;
@@ -104,7 +105,7 @@ mod sealed {
 ///     .unwrap()
 ///     .verify_canary(now)
 ///     .unwrap()
-///     .verify_origin(addr)
+///     .verify_origin(addr, now)
 ///     .unwrap();
 /// let _: &Manifest = v.manifest(); // ERROR: no method named `manifest`
 /// # }
@@ -263,16 +264,29 @@ impl ManifestCanaryChecked {
     }
 
     /// Stage 9: bind to the .onion address from which the manifest was
-    /// fetched.
+    /// fetched, then enforce `origin.not_after` expiry.
     ///
     /// `fetched_address` MUST be the carrier address of the actual
     /// transport-layer fetch, byte-exact lowercase canonical form.
     /// Caller obtains it from the transport layer.
+    ///
+    /// `now` is the local wall-clock time used for the Section 10
+    /// `origin.not_after` past-bound expiry check (clock-skew tolerance
+    /// of 300s in the publisher's favour, per Section 10). Stage 9 sub-
+    /// bullets per Section 10:107:
+    ///
+    /// 1. carrier origin binding (Tor v3 address derivation);
+    /// 2. when `origin.not_after` is present, reject if `now > not_after
+    ///    + 300s` as `E_ORIGIN_EXPIRED` (Section 11).
+    ///
+    /// A manifest without `origin.not_after` skips sub-bullet 2.
     pub fn verify_origin(
         self,
         fetched_address: &OnionAddress,
+        now: &EntangledTimestamp,
     ) -> Result<ManifestOriginBound, Diagnostic> {
         verify_origin_binding(fetched_address, &self.inner.origin)?;
+        check_origin_not_after(&self.inner, now)?;
         Ok(ManifestOriginBound {
             inner: self.inner,
             canary_state: self.canary_state,
