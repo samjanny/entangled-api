@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-28
+
 SEMVER MINOR in 0.x. Three upstream spec tags land in this release:
 rc.20 was errata-only (corpus vector 139 field correction, no
 implementation impact), rc.21 introduces a normative tightening on
