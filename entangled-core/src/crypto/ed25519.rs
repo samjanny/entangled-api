@@ -328,6 +328,16 @@ impl VerifyingKey {
     /// gap in `ed25519_dalek::VerifyingKey::from_bytes`); `verify_strict`
     /// then enforces canonical `R` / canonical `S` / cofactorless
     /// verification per RFC 8032 §5.1.7.
+    ///
+    /// Known divergence from §05:174 prose. The spec claims that
+    /// `verify_strict` does NOT reject small-order `R` and uses that
+    /// claim to justify §05:174's "small-order `R` accepted" rule.
+    /// `ed25519-dalek 2.x verify_strict` actually rejects small-order
+    /// `R` (see `verifying.rs:370`: `signature_R.is_small_order()`).
+    /// This implementation therefore rejects more signatures than
+    /// §05:174 declares conformant; the divergence is strictly in the
+    /// safer direction. Tracked upstream at
+    /// <https://github.com/samjanny/entangled/issues/1>.
     pub fn verify(&self, input: &[u8], sig: &Signature) -> Result<(), CryptoError> {
         let parsed = ed25519_dalek::Signature::from_bytes(sig.as_bytes());
         self.0
