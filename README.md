@@ -187,7 +187,7 @@ Section 08:185 attaches a second MUST to the rendering block: the client MUST pr
 - the override applies only for the remainder of the current session for the affected site, does not persist across sessions, does not modify the canary state, and does not suppress the chrome warning;
 - while the override is active, a persistent, not-easily-dismissible warning MUST stay visible in the chrome.
 
-The Section 11 diagnostic code `W_CANARY_EXPIRED` is catalogued at warning severity, and Section 11:81 frames warnings as non-blocking by default; the Section 08:183 MUST overrides that default for this specific state. `entangled-core` classifies the canary, surfaces `CanaryState::Expired`, and emits the diagnostic at Section 11 severity. The override state, the chrome affordance, and the session-scoped persistence all live in the embedding client.
+The Section 11 diagnostic code `E_CANARY_EXPIRED` is catalogued at `error` severity (rc.23 N64; the code was `W_CANARY_EXPIRED` at `warning` severity in rc.10 through rc.22, and rc.23 closed the catalog-vs-behavior mismatch by renaming and promoting). The catalog now aligns with the Section 08:183 normative MUST that rendering of current content is blocked. The Section 08:185 per-session user-override affordance and the Section 08 permissive-canary mode are the spec-defined laxer-policy carve-outs to the default block, distinct from a Section 11:87 client-side reclassification of severity. `entangled-core` classifies the canary, surfaces `CanaryState::Expired`, and emits the diagnostic at `error` severity. The override state, the chrome affordance, and the session-scoped persistence all live in the embedding client.
 
 ## Content verification
 

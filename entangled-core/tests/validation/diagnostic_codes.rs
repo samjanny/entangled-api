@@ -58,7 +58,7 @@ fn all_codes_round_trip_via_json() {
         DiagnosticCode::ECanaryDowngrade,
         DiagnosticCode::ECanaryConflict,
         DiagnosticCode::WCanaryNearExpiration,
-        DiagnosticCode::WCanaryExpired,
+        DiagnosticCode::ECanaryExpired,
         DiagnosticCode::WCanaryGap,
         DiagnosticCode::WCanaryUnavailable,
         DiagnosticCode::EBindPath,
@@ -81,7 +81,7 @@ fn all_codes_round_trip_via_json() {
         DiagnosticCode::EHistoricalNoAuthorization,
         DiagnosticCode::EHistoricalTrustBlocked,
         DiagnosticCode::WHistoricalRendered,
-        DiagnosticCode::WHistoricalRuntimeAmbiguous,
+        DiagnosticCode::EHistoricalRuntimeAmbiguous,
         DiagnosticCode::WImageHashMismatch,
         DiagnosticCode::WImageOversize,
         DiagnosticCode::WImageContentType,
@@ -104,8 +104,14 @@ fn severity_for_input_error_is_error() {
 }
 
 #[test]
-fn severity_for_canary_expired_is_warning() {
-    assert_eq!(DiagnosticCode::WCanaryExpired.severity(), Severity::Warning);
+fn severity_for_canary_expired_is_error() {
+    // §11 (rc.23 N64 / AMB-09): `W_CANARY_EXPIRED` was renamed to
+    // `E_CANARY_EXPIRED` and promoted from `warning` to `error` to
+    // align with the §08:183 MUST-block on rendering. The
+    // §08:185 per-session user-override is the spec-defined
+    // laxer-policy carve-out, distinct from a §11:87 client-side
+    // reclassification.
+    assert_eq!(DiagnosticCode::ECanaryExpired.severity(), Severity::Error);
 }
 
 #[test]
@@ -195,13 +201,15 @@ fn image_budget_serializes_exactly() {
 }
 
 #[test]
-fn origin_not_after_codes_are_stage_9_errors() {
-    // §11 v1.0-rc.14: E_ORIGIN_EXPIRED and E_ORIGIN_INVALID are cataloged
-    // under the Binding family (Stage 9), even though E_ORIGIN_INVALID is
-    // actually fired during Stage 5. Catalog stage drives precedence
-    // reporting and matches the §11 table.
+fn origin_not_after_codes_have_correct_stages() {
+    // §11 v1.0-rc.14 introduced both codes under the Binding family
+    // (Stage 9). §11 v1.0-rc.23 N65 (AMB-05) moved `E_ORIGIN_INVALID`
+    // to the Schema (Stage 5) catalog because the actual emission per
+    // §06:171 and §10:191 is a Stage 5 cross-field semantic check on
+    // `origin.not_after` and `canary.issued_at`. `E_ORIGIN_EXPIRED`
+    // (the Stage 9 clock check) stays in the Binding catalog.
     assert_eq!(DiagnosticCode::EOriginExpired.stage(), 9);
-    assert_eq!(DiagnosticCode::EOriginInvalid.stage(), 9);
+    assert_eq!(DiagnosticCode::EOriginInvalid.stage(), 5);
     assert_eq!(DiagnosticCode::EOriginExpired.severity(), Severity::Error);
     assert_eq!(DiagnosticCode::EOriginInvalid.severity(), Severity::Error);
     assert_eq!(
@@ -268,21 +276,25 @@ fn schema_duplicate_entry_serializes_exactly() {
 }
 
 #[test]
-fn historical_runtime_ambiguous_is_off_pipeline_warning() {
-    // §11 (rc.10): warning-severity historical-content diagnostic; document
-    // is rejected per §10 but the condition does not invalidate other
-    // content for the same publisher.
-    assert_eq!(DiagnosticCode::WHistoricalRuntimeAmbiguous.stage(), 0);
+fn historical_runtime_ambiguous_is_off_pipeline_error() {
+    // §11 (rc.23 N66): `W_HISTORICAL_RUNTIME_AMBIGUOUS` was renamed to
+    // `E_HISTORICAL_RUNTIME_AMBIGUOUS` and promoted from `warning` to
+    // `error` to align with the §10:553 MUST that the document is
+    // rejected and not rendered (the prior catalog row was the same
+    // catalog-vs-behavior mismatch pattern that N64 / AMB-09 closed
+    // for `W_CANARY_EXPIRED`). Stage classification remains 0
+    // (off-pipeline historical-content group).
+    assert_eq!(DiagnosticCode::EHistoricalRuntimeAmbiguous.stage(), 0);
     assert_eq!(
-        DiagnosticCode::WHistoricalRuntimeAmbiguous.severity(),
-        Severity::Warning
+        DiagnosticCode::EHistoricalRuntimeAmbiguous.severity(),
+        Severity::Error
     );
 }
 
 #[test]
 fn historical_runtime_ambiguous_serializes_exactly() {
-    let s = serde_json::to_string(&DiagnosticCode::WHistoricalRuntimeAmbiguous).unwrap();
-    assert_eq!(s, "\"W_HISTORICAL_RUNTIME_AMBIGUOUS\"");
+    let s = serde_json::to_string(&DiagnosticCode::EHistoricalRuntimeAmbiguous).unwrap();
+    assert_eq!(s, "\"E_HISTORICAL_RUNTIME_AMBIGUOUS\"");
 }
 
 #[test]

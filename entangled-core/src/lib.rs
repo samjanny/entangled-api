@@ -50,7 +50,7 @@
 /// byte-equality between this constant and the corpus's `rc_target`,
 /// so a corpus that drifts ahead of (or behind) the code fails CI
 /// instead of silently skipping new vectors.
-pub const SPEC_REVISION: &str = "1.0-rc.22";
+pub const SPEC_REVISION: &str = "1.0-rc.23";
 
 pub mod canon;
 pub mod crypto;

@@ -7,6 +7,91 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (spec v1.0-rc.23 alignment - Lotto 23: N64-N66)
+
+Two diagnostic codes are renamed and promoted from `warning` to
+`error`, and one stage tag is corrected, to align `entangled-core`
+with the v1.0-rc.23 spec catalog. The N63 / Lotto 22 source-cite
+discipline against external libraries is extended at rc.23 to the
+catalog-vs-behavior dimension via a full row-by-row sweep of section
+11 against the emission sections in section 02 through section 10
+(see upstream `docs/RELEASES.md` for the per-row verdict table).
+
+- **`W_CANARY_EXPIRED` renamed to `E_CANARY_EXPIRED`, severity
+  promoted `warning` -> `error`** (rc.23 N64 / AMB-09, closing
+  upstream `samjanny/entangled#10`). The pre-rc.23 catalog row was
+  cataloged as `warning` even though section 08:183 attaches a
+  MUST-block on rendering when the canary is in Expired state.
+  `entangled_core::validation::DiagnosticCode::WCanaryExpired` is
+  renamed to `ECanaryExpired`; the serde rename string moves from
+  `"W_CANARY_EXPIRED"` to `"E_CANARY_EXPIRED"`; the variant leaves
+  the `Severity::Warning` group in `severity()` and falls into the
+  default `_ => Severity::Error` branch. The `stage()` classifier
+  keeps the code at Stage 8. The module documentation in
+  `validation/canary.rs` and the workspace `README` section "Canary
+  state and the Expired user-override contract" are reworded to drop
+  the historical "catalog warning vs section 08 MUST-block tension"
+  framing (closed at rc.23) and to call out the section 08:185
+  per-session user-override and the section 08 permissive-canary
+  mode as spec-defined laxer-policy carve-outs to the default block,
+  distinct from a section 11:87 client-side reclassification of
+  severity.
+- **`E_ORIGIN_INVALID` stage tag corrected Stage 9 -> Stage 5**
+  (rc.23 N65 / AMB-05, closing upstream `samjanny/entangled#6`). The
+  pre-rc.23 catalog row was placed under the Binding (Stage 9)
+  section even though the actual emission per section 06:171 and
+  section 10:191 is a Stage 5 cross-field semantic check on
+  `origin.not_after` and `canary.issued_at`. The api's
+  `validate_origin_not_after` already fired at Stage 5 (PR4 audit
+  finding M-3); `DiagnosticCode::stage()` now returns `5` for
+  `EOriginInvalid` where prior versions returned `9`. No
+  emission-path change.
+- **`W_HISTORICAL_RUNTIME_AMBIGUOUS` renamed to
+  `E_HISTORICAL_RUNTIME_AMBIGUOUS`, severity promoted `warning` ->
+  `error`** (rc.23 N66, surfaced by the upstream sweep, not by a
+  filed issue). Same catalog-vs-behavior pattern as N64 / AMB-09:
+  the catalog row was `warning` even though section 10:553
+  normatively says "the client MUST reject the document and surface
+  `W_HISTORICAL_RUNTIME_AMBIGUOUS`. The document is not rendered."
+  `DiagnosticCode::WHistoricalRuntimeAmbiguous` is renamed to
+  `EHistoricalRuntimeAmbiguous`; the serde rename string moves from
+  `"W_HISTORICAL_RUNTIME_AMBIGUOUS"` to
+  `"E_HISTORICAL_RUNTIME_AMBIGUOUS"`; the variant leaves the
+  `Severity::Warning` group. Stage classification remains `0`
+  (off-pipeline historical-content group).
+
+### Changed (spec revision pin)
+
+- **`entangled_core::SPEC_REVISION`** bumped from `"1.0-rc.22"` to
+  `"1.0-rc.23"`.
+- **CI conformance corpus pin** in `.github/workflows/ci.yml` bumped
+  from `v1.0-rc.22` to `v1.0-rc.23`. The conformance harness asserts
+  `corpus.rc_target == SPEC_REVISION`; both are now `"1.0-rc.23"`.
+
+The diagnostic code renames are a public API break (downstream code
+matching `DiagnosticCode::WCanaryExpired` or
+`DiagnosticCode::WHistoricalRuntimeAmbiguous` will not compile
+against the rc.23-aligned crate). The serde wire form of the `code`
+field also changes: a diagnostic emitted by an rc.23-aligned
+implementation serializes `code` as `"E_CANARY_EXPIRED"` or
+`"E_HISTORICAL_RUNTIME_AMBIGUOUS"` where prior versions emitted the
+`W_*` variants. `code.stage()` returns `5` for `EOriginInvalid`
+where prior versions returned `9`. SEMVER MINOR bump in 0.x is the
+appropriate classification for this break and will accompany the
+next release tag.
+
+No wire-format change to any signed document. JCS canonicalization,
+NFC, byte caps, schema, and signature input construction are
+unchanged. `spec_version` remains `"1.0"`. Conformance corpus
+vectors are unchanged byte-for-byte (no vector targets the renamed
+codes); only `corpus.json` `rc_target` is bumped to `"1.0-rc.23"`,
+matching the upstream tag.
+
+Four regression-test updates in `tests/validation/diagnostic_codes.rs`
+pin the renamed-and-promoted codes at the corrected severity and the
+relocated stage; the round-trip serialization test set is updated to
+use the new enum variants and serde renames.
+
 ## [0.4.0] - 2026-05-28
 
 SEMVER MINOR in 0.x. Three upstream spec tags land in this release:

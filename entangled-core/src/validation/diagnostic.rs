@@ -186,8 +186,8 @@ pub enum DiagnosticCode {
     ECanaryRuntimeReuse,
     #[serde(rename = "W_CANARY_NEAR_EXPIRATION")]
     WCanaryNearExpiration,
-    #[serde(rename = "W_CANARY_EXPIRED")]
-    WCanaryExpired,
+    #[serde(rename = "E_CANARY_EXPIRED")]
+    ECanaryExpired,
     #[serde(rename = "W_CANARY_GAP")]
     WCanaryGap,
     #[serde(rename = "W_CANARY_UNAVAILABLE")]
@@ -308,8 +308,8 @@ pub enum DiagnosticCode {
     EHistoricalNoPublicationProof,
     #[serde(rename = "W_HISTORICAL_RENDERED")]
     WHistoricalRendered,
-    #[serde(rename = "W_HISTORICAL_RUNTIME_AMBIGUOUS")]
-    WHistoricalRuntimeAmbiguous,
+    #[serde(rename = "E_HISTORICAL_RUNTIME_AMBIGUOUS")]
+    EHistoricalRuntimeAmbiguous,
 
     // Image resource (off-pipeline; warnings)
     #[serde(rename = "W_IMAGE_HASH_MISMATCH")]
@@ -335,11 +335,9 @@ impl DiagnosticCode {
         match self {
             // Warning-severity codes.
             WCanaryNearExpiration
-            | WCanaryExpired
             | WCanaryGap
             | WCanaryUnavailable
             | WHistoricalRendered
-            | WHistoricalRuntimeAmbiguous
             | WImageHashMismatch
             | WImageOversize
             | WImageContentType
@@ -389,7 +387,13 @@ impl DiagnosticCode {
             // Stage 4 — Document kind discrimination.
             EKindMissingFields | EKindSpecVersion | EKindUnknown => 4,
 
-            // Stage 5 — Schema.
+            // Stage 5 — Schema. `E_ORIGIN_INVALID` was cataloged under
+            // Stage 9 in rc.14 through rc.22 even though §06:171 emits
+            // it as a Stage 5 cross-field semantic check on
+            // `origin.not_after` and `canary.issued_at`. rc.23 N65
+            // (AMB-05) corrected the catalog row to Stage 5 to match
+            // the actual emission stage; the api stage classifier now
+            // reflects that placement.
             ESchemaRequiredField
             | ESchemaUnknownField
             | ESchemaBlockNotPermitted
@@ -402,7 +406,8 @@ impl DiagnosticCode {
             | ESchemaNullValue
             | ESchemaNonInteger
             | ESchemaMalformedUnicode
-            | ESubmitBudget => 5,
+            | ESubmitBudget
+            | EOriginInvalid => 5,
 
             // Stage 6 — Signature, plus the manifest identity pre-check
             // detected during Stage 6 per §11 (rc.10): `E_TRUST_MISMATCH`
@@ -417,22 +422,25 @@ impl DiagnosticCode {
             // user-rejected codes moved to Stage 6 in rc.10.
             ITrustFirstContact | ITrustTofuPinned | ITrustVerified => 7,
 
-            // Stage 8 — Canary.
+            // Stage 8 — Canary. `E_CANARY_EXPIRED` was `W_CANARY_EXPIRED`
+            // at warning severity in rc.10 through rc.22; rc.23 N64
+            // (AMB-09) renamed and promoted it to error severity to
+            // align with the §08:183 MUST-block.
             ECanaryInvalid
             | ECanaryDowngrade
             | ECanaryConflict
             | ECanaryRuntimeReuse
             | WCanaryNearExpiration
-            | WCanaryExpired
+            | ECanaryExpired
             | WCanaryGap
             | WCanaryUnavailable => 8,
 
             // Stage 9 — Binding (incl. origin-migration codes from rc.13,
-            // origin not-after codes from rc.14, and content-index codes
-            // from rc.19). E_ORIGIN_INVALID is detected at Stage 5 but
-            // cataloged under the Binding family alongside the rest of the
-            // origin / migration codes; the catalog stage controls
-            // precedence reporting and matches §11.
+            // origin not-after expiry from rc.14, and content-index codes
+            // from rc.19). `E_ORIGIN_INVALID` was cataloged here from
+            // rc.14 through rc.22; rc.23 N65 (AMB-05) moved it to the
+            // Stage 5 group above to match the §06:171 / §10:191
+            // emission stage.
             EBindPath
             | EBindResponsePath
             | EBindRequestId
@@ -441,7 +449,6 @@ impl DiagnosticCode {
             | EMigrationMismatch
             | EMigrationInvalid
             | EOriginExpired
-            | EOriginInvalid
             | EContentIndexFetchFailed
             | EContentIndexHashMismatch
             | EContentIndexInvalid
@@ -464,7 +471,7 @@ impl DiagnosticCode {
             | EHistoricalTrustBlocked
             | EHistoricalNoPublicationProof
             | WHistoricalRendered
-            | WHistoricalRuntimeAmbiguous
+            | EHistoricalRuntimeAmbiguous
             | WImageHashMismatch
             | WImageOversize
             | WImageContentType
