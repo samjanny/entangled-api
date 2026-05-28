@@ -1,31 +1,37 @@
 //! Type-state wrappers for the manifest verification pipeline.
 //!
 //! [`crate::document::parse_and_verify_manifest`] returns
-//! [`ManifestSigVerified`], not a bare [`Manifest`]. To extract the bare
-//! `Manifest`, the caller may complete the pipeline explicitly via
-//! [`ManifestSigVerified::verify_canary`] and
-//! [`ManifestCanaryChecked::verify_origin`], or opt out of further stages
-//! explicitly via [`ManifestSigVerified::skip_canary_check`] or
-//! [`ManifestCanaryChecked::skip_origin_check`].
+//! [`ManifestSigVerified`], not a bare [`Manifest`]. To extract the
+//! bare `Manifest`, the caller may complete the pipeline explicitly via
+//! [`ManifestSigVerified::verify_canary`],
+//! [`ManifestCanaryChecked::verify_origin`], and
+//! [`ManifestOriginBound::verify_content_index`], or opt out of further
+//! stages explicitly via [`ManifestSigVerified::skip_canary_check`],
+//! [`ManifestCanaryChecked::skip_origin_check`], or
+//! [`ManifestOriginBound::skip_content_index_check`].
 //!
-//! This pattern structurally prevents extraction of a bare `Manifest` from
-//! incomplete-stage states. A caller obtains a `Manifest` value only by
-//! completing the chain via `into_parts` or by an explicit
-//! `skip_canary_check` / `skip_origin_check` opt-out. Per-field reads
-//! through `ManifestRead` remain available on incomplete states because
-//! Stage 7 (trust state lookup, §10) precedes Stage 8 and may need them.
-//! It does not
-//! introduce trust storage, UI, or transport concerns into this crate;
-//! Stage 7 (trust state machine) remains entirely the caller's
-//! responsibility, after the chain has been completed.
+//! This pattern structurally prevents extraction of a bare `Manifest`
+//! from incomplete-stage states. A caller obtains a `Manifest` value
+//! only by completing the chain via
+//! [`ManifestContentIndexVerified::into_parts`] or by an explicit
+//! `skip_canary_check` / `skip_origin_check` /
+//! `skip_content_index_check` opt-out. Per-field reads through
+//! `ManifestRead` remain available on incomplete states because
+//! Stage 7 (trust state lookup, Section 10) precedes Stage 8 and may
+//! need them. The wrappers do not introduce trust storage, UI, or
+//! transport concerns into this crate; Stage 7 (trust state machine)
+//! remains entirely the caller's responsibility, after the chain has
+//! been completed.
 //!
 //! The [`Manifest`] type itself is not accessible through the wrappers;
-//! only field-level accessors are exposed via the [`ManifestRead`] trait
-//! pre-canary, with [`Canary`] access available post-canary. To obtain a
+//! only field-level accessors are exposed via the [`ManifestRead`]
+//! trait pre-canary, with [`Canary`] access available post-canary, and
+//! [`ContentIndex`] access available post-Stage-9b. To obtain a
 //! `Manifest` value, callers must complete the chain via
-//! [`ManifestOriginBound::into_parts`] or explicitly opt out of further
-//! stages via [`ManifestSigVerified::skip_canary_check`] /
-//! [`ManifestCanaryChecked::skip_origin_check`]. This closes the
+//! [`ManifestContentIndexVerified::into_parts`] or explicitly opt out
+//! of further stages via [`ManifestSigVerified::skip_canary_check`] /
+//! [`ManifestCanaryChecked::skip_origin_check`] /
+//! [`ManifestOriginBound::skip_content_index_check`]. This closes the
 //! `manifest().clone()` bypass that an earlier draft of the wrappers
 //! permitted.
 //!
@@ -33,9 +39,10 @@
 //! other than `parse_and_verify_manifest` (test harnesses, conformance
 //! corpus runners, mock servers), the standalone helpers
 //! [`crate::validation::canary::validate_canary_structure`],
-//! [`crate::validation::canary::compute_canary_state`], and
-//! [`crate::tor::verify_origin_binding`] remain public as the explicit
-//! escape hatch.
+//! [`crate::validation::canary::compute_canary_state`],
+//! [`crate::tor::verify_origin_binding`], and
+//! [`crate::validation::content_index::validate_content_index`] remain
+//! public as the explicit escape hatch.
 
 use crate::tor::verify_origin_binding;
 use crate::types::canary::Canary;
@@ -44,7 +51,8 @@ use crate::types::manifest::{NavEntry, Origin};
 use crate::types::state::StatePolicyEntry;
 use crate::types::{EntangledTimestamp, Manifest, OnionAddress};
 use crate::validation::canary::{compute_canary_state, validate_canary_structure, CanaryState};
-use crate::validation::diagnostic::Diagnostic;
+use crate::validation::content_index::{validate_content_index, ContentIndex};
+use crate::validation::diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel};
 use crate::validation::migration::check_origin_not_after;
 
 mod sealed {
@@ -58,13 +66,14 @@ mod sealed {
     }
 }
 
-/// Field-level read access shared by the three manifest type-state
+/// Field-level read access shared by the four manifest type-state
 /// wrappers. The trait is sealed: it cannot be implemented outside this
-/// crate, and it deliberately does not expose a `&Manifest` accessor —
+/// crate, and it deliberately does not expose a `&Manifest` accessor;
 /// callers obtain a bare [`Manifest`] only by completing the chain via
-/// [`ManifestOriginBound::into_parts`] or by explicitly opting out via
-/// [`ManifestSigVerified::skip_canary_check`] /
-/// [`ManifestCanaryChecked::skip_origin_check`].
+/// [`ManifestContentIndexVerified::into_parts`] or by explicitly
+/// opting out via [`ManifestSigVerified::skip_canary_check`] /
+/// [`ManifestCanaryChecked::skip_origin_check`] /
+/// [`ManifestOriginBound::skip_content_index_check`].
 ///
 /// # `manifest().clone()` bypass is structurally impossible
 ///
@@ -106,6 +115,22 @@ mod sealed {
 ///     .verify_canary(now)
 ///     .unwrap()
 ///     .verify_origin(addr, now)
+///     .unwrap();
+/// let _: &Manifest = v.manifest(); // ERROR: no method named `manifest`
+/// # }
+/// ```
+///
+/// ```compile_fail
+/// use entangled_core::document::parse_and_verify_manifest;
+/// use entangled_core::types::{EntangledTimestamp, Manifest, OnionAddress};
+/// # fn _f(bytes: &[u8], now: &EntangledTimestamp, addr: &OnionAddress) {
+/// let v = parse_and_verify_manifest(bytes, now)
+///     .unwrap()
+///     .verify_canary(now)
+///     .unwrap()
+///     .verify_origin(addr, now)
+///     .unwrap()
+///     .verify_content_index(None)
 ///     .unwrap();
 /// let _: &Manifest = v.manifest(); // ERROR: no method named `manifest`
 /// # }
@@ -311,17 +336,19 @@ impl sealed::HasManifest for ManifestCanaryChecked {
 }
 impl ManifestRead for ManifestCanaryChecked {}
 
-/// Manifest after Stages 6, 8, and 9 succeeded.
+/// Manifest after Stages 6, 8, and 9 carrier-binding + `origin.not_after`
+/// succeeded. Section 09 content-index verification (Stage 9b) remains.
 ///
-/// This is the fully verified state. Stage 7 (trust state machine) and
-/// Stage 10 (rendering) remain the caller's responsibility, with this
-/// crate offering no further enforcement.
+/// The caller MUST proceed to Stage 9b via
+/// [`Self::verify_content_index`] or MUST opt out via
+/// [`Self::skip_content_index_check`].
 ///
 /// Field-level reads are available via the [`ManifestRead`] trait, plus
-/// [`Self::canary`] and [`Self::canary_state`]. To obtain the bare
-/// [`Manifest`] for downstream Stage 7 / Stage 10 handling, consume the
-/// wrapper via [`Self::into_parts`].
+/// [`Self::canary`] and [`Self::canary_state`]. The bare [`Manifest`]
+/// remains unreachable until the chain completes (or is explicitly
+/// opted out of).
 #[derive(Debug)]
+#[must_use = "manifest verification is incomplete; call verify_content_index or skip_content_index_check"]
 pub struct ManifestOriginBound {
     inner: Manifest,
     canary_state: CanaryState,
@@ -338,10 +365,63 @@ impl ManifestOriginBound {
         self.canary_state
     }
 
-    /// Consume the wrapper and return the bare manifest plus the
-    /// canary state for downstream Stage 7 / Stage 10 handling.
-    pub fn into_parts(self) -> (Manifest, CanaryState) {
-        (self.inner, self.canary_state)
+    /// Stage 9b: Section 09 content-index verification.
+    ///
+    /// Section 09:114 hard-fail model: when the manifest declares
+    /// `content_root`, the client MUST NOT render content documents
+    /// from the site unless `/content_index.json` has been obtained
+    /// and verified against `content_root`. This method enforces that
+    /// MUST structurally.
+    ///
+    /// Argument `content_index_bytes`:
+    ///
+    /// * `Some(bytes)`: the exact response body bytes of
+    ///   `/content_index.json`. Bytes are hash-verified against
+    ///   `content_root` and structurally validated; on success the
+    ///   parsed [`ContentIndex`] is carried into
+    ///   [`ManifestContentIndexVerified`].
+    /// * `None`: the caller has not (or could not) obtain the bytes.
+    ///   When the manifest declares `content_root`, this returns
+    ///   `E_CONTENT_INDEX_FETCH_FAILED` per the Section 09:114
+    ///   hard-fail. When the manifest does not declare `content_root`,
+    ///   this succeeds with `content_index()` returning `None`.
+    ///
+    /// Transport-layer caller obligations for the fetch itself
+    /// (Content-Type, Content-Length, encoding) are documented in
+    /// the [`crate::validation::content_index`] module docs.
+    pub fn verify_content_index(
+        self,
+        content_index_bytes: Option<&[u8]>,
+    ) -> Result<ManifestContentIndexVerified, Diagnostic> {
+        let content_index = match self.inner.content_root.as_ref() {
+            Some(content_root) => {
+                let bytes = content_index_bytes.ok_or_else(|| {
+                    Diagnostic::new(
+                        DiagnosticCode::EContentIndexFetchFailed,
+                        DocumentKindLabel::ContentIndex,
+                        "manifest declares content_root but no content index bytes were supplied to verify_content_index",
+                    )
+                })?;
+                Some(validate_content_index(bytes, content_root)?)
+            }
+            None => None,
+        };
+        Ok(ManifestContentIndexVerified {
+            inner: self.inner,
+            canary_state: self.canary_state,
+            content_index,
+        })
+    }
+
+    /// Explicit opt-out from Stage 9b. Returns the bare manifest.
+    ///
+    /// Suitable for offline tooling, conformance harnesses, or
+    /// callers that handle content-index verification at a different
+    /// layer. NOT suitable for client implementations rendering a
+    /// manifest that declares `content_root` to a user: Section
+    /// 09:114 attaches a hard-fail MUST to that case.
+    pub fn skip_content_index_check(self) -> Manifest {
+        self.inner
     }
 }
 
@@ -351,3 +431,54 @@ impl sealed::HasManifest for ManifestOriginBound {
     }
 }
 impl ManifestRead for ManifestOriginBound {}
+
+/// Manifest after Stages 6, 8, 9, and 9b succeeded.
+///
+/// This is the fully verified state. Stage 7 (trust state machine) and
+/// Stage 10 (rendering) remain the caller's responsibility, with this
+/// crate offering no further enforcement.
+///
+/// Field-level reads are available via the [`ManifestRead`] trait,
+/// plus [`Self::canary`], [`Self::canary_state`], and
+/// [`Self::content_index`]. To obtain the bare [`Manifest`] for
+/// downstream Stage 7 / Stage 10 handling, consume the wrapper via
+/// [`Self::into_parts`].
+#[derive(Debug)]
+pub struct ManifestContentIndexVerified {
+    inner: Manifest,
+    canary_state: CanaryState,
+    content_index: Option<ContentIndex>,
+}
+
+impl ManifestContentIndexVerified {
+    /// Borrow the validated canary block.
+    pub fn canary(&self) -> &Canary {
+        &self.inner.canary
+    }
+
+    /// Computed canary state (Fresh, NearExpiration, or Expired).
+    pub fn canary_state(&self) -> CanaryState {
+        self.canary_state
+    }
+
+    /// Borrow the validated content index when the manifest declared
+    /// `content_root`. `None` when no `content_root` was declared
+    /// (Stage 9b is a no-op in that case).
+    pub fn content_index(&self) -> Option<&ContentIndex> {
+        self.content_index.as_ref()
+    }
+
+    /// Consume the wrapper and return the bare manifest, the canary
+    /// state, and the optional validated content index for
+    /// downstream Stage 7 / Stage 10 handling.
+    pub fn into_parts(self) -> (Manifest, CanaryState, Option<ContentIndex>) {
+        (self.inner, self.canary_state, self.content_index)
+    }
+}
+
+impl sealed::HasManifest for ManifestContentIndexVerified {
+    fn manifest_ref(&self) -> &Manifest {
+        &self.inner
+    }
+}
+impl ManifestRead for ManifestContentIndexVerified {}

@@ -40,6 +40,16 @@
 //!   The standalone [`crate::tor::verify_origin_binding`] helper remains
 //!   available. For content and transaction documents,
 //!   path/in-response-to binding is the caller's check too.
+//! - **Stage 9b (content-index verification)** -- for manifests that
+//!   declare `content_root`, traverse the chain via
+//!   [`super::verified::ManifestOriginBound::verify_content_index`] (or
+//!   opt out via
+//!   [`super::verified::ManifestOriginBound::skip_content_index_check`]).
+//!   The Section 09:114 hard-fail MUST is enforced structurally: a
+//!   `None` bytes argument when `content_root` is declared yields
+//!   `E_CONTENT_INDEX_FETCH_FAILED`. The standalone
+//!   [`crate::validation::content_index::validate_content_index`] helper
+//!   remains available.
 //! - **Stage 10 (rendering decisions)** — chrome and UI concerns.
 //!
 //! Stage 5 includes `manifest.updated` clock-skew because that field is a
@@ -53,22 +63,25 @@
 //! `parse_and_verify_manifest` returns a [`super::verified::ManifestSigVerified`]
 //! type-state wrapper rather than a bare [`crate::types::Manifest`]. To
 //! extract a bare `Manifest`, the caller traverses the chain via
-//! `verify_canary` and
-//! `verify_origin`, or opts out explicitly via the corresponding `skip_*`
-//! methods. The bare `Manifest` is reachable only by completing the chain
-//! (`into_parts`) or by explicit `skip_canary_check` / `skip_origin_check`
-//! opt-out, making Stage 8 / Stage 9 omission a deliberate choice rather
-//! than an oversight.
+//! `verify_canary`, `verify_origin`, and `verify_content_index`, or
+//! opts out explicitly via the corresponding `skip_*` methods. The bare
+//! `Manifest` is reachable only by completing the chain
+//! ([`super::verified::ManifestContentIndexVerified::into_parts`]) or
+//! by explicit `skip_canary_check` / `skip_origin_check` /
+//! `skip_content_index_check` opt-out, making Stage 8 / Stage 9 /
+//! Stage 9b omission a deliberate choice rather than an oversight.
 //!
 //! The `Manifest` type itself is not accessible through the wrappers;
 //! only field-level accessors are exposed via the
 //! [`super::verified::ManifestRead`] trait pre-canary, with
-//! [`crate::types::Canary`] access available post-canary. To obtain a
+//! [`crate::types::Canary`] access available post-canary and the
+//! validated content index available post-Stage-9b. To obtain a
 //! `Manifest` value, callers must complete the chain via
-//! [`super::verified::ManifestOriginBound::into_parts`] or explicitly
-//! opt out of further stages via
+//! [`super::verified::ManifestContentIndexVerified::into_parts`] or
+//! explicitly opt out of further stages via
 //! [`super::verified::ManifestSigVerified::skip_canary_check`] /
-//! [`super::verified::ManifestCanaryChecked::skip_origin_check`].
+//! [`super::verified::ManifestCanaryChecked::skip_origin_check`] /
+//! [`super::verified::ManifestOriginBound::skip_content_index_check`].
 //!
 //! Content and transaction documents return bare [`ContentDocument`] and
 //! [`TransactionDocument`] because their signature verification already
@@ -114,10 +127,14 @@ use super::verified::ManifestSigVerified;
 ///
 /// Returns a [`ManifestSigVerified`] type-state wrapper. To extract the
 /// bare [`crate::types::Manifest`], traverse the chain via
-/// [`ManifestSigVerified::verify_canary`] (Stage 8) and
-/// [`super::verified::ManifestCanaryChecked::verify_origin`] (Stage 9), or
-/// opt out explicitly via [`ManifestSigVerified::skip_canary_check`] /
-/// [`super::verified::ManifestCanaryChecked::skip_origin_check`]. The
+/// [`ManifestSigVerified::verify_canary`] (Stage 8),
+/// [`super::verified::ManifestCanaryChecked::verify_origin`] (Stage 9),
+/// and
+/// [`super::verified::ManifestOriginBound::verify_content_index`]
+/// (Stage 9b), or opt out explicitly via
+/// [`ManifestSigVerified::skip_canary_check`] /
+/// [`super::verified::ManifestCanaryChecked::skip_origin_check`] /
+/// [`super::verified::ManifestOriginBound::skip_content_index_check`]. The
 /// `#[must_use]` annotation on each wrapper warns when a wrapper value
 /// is silently dropped without being used, catching the trivial
 /// "called but ignored" omission case. It does NOT prevent a caller from

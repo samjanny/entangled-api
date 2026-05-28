@@ -243,7 +243,12 @@ fn run_manifest_pipeline(
         let onion = OnionAddress::try_from(addr)
             .map_err(|e| format!("context.fetched_origin_address invalid: {e}"))?;
         match canary_checked.verify_origin(&onion, now) {
-            Ok(b) => b.into_parts().0,
+            // Stage 9b (content-index verification) is exercised in a
+            // separate code path against the standalone helper; the
+            // main pipeline runner skips it here to keep the harness
+            // contract per-stage and avoid coupling to a content_index
+            // corpus payload at every vector.
+            Ok(b) => b.skip_content_index_check(),
             Err(d) => return Ok(Err(d)),
         }
     } else {
@@ -319,7 +324,9 @@ fn run_successor_pipeline(
             };
         }
     };
-    let manifest = origin_bound.into_parts().0;
+    // Stage 9b is exercised separately; the successor pipeline skips
+    // it here for the same reason the main pipeline does.
+    let manifest = origin_bound.skip_content_index_check();
 
     SuccessorOutcome::Accept(manifest)
 }

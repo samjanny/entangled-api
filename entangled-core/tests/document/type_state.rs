@@ -1,8 +1,9 @@
 //! Type-state pipeline coverage for `parse_and_verify_manifest`.
 //!
-//! These tests exercise the chain shape — Stage 6 → Stage 8 → Stage 9 — and
-//! the explicit opt-out methods. They complement the per-stage standalone
-//! tests in `tests/canary/structure.rs` and `tests/tor/origin_binding.rs`.
+//! These tests exercise the chain shape -- Stage 6 -> Stage 8 -> Stage 9
+//! -> Stage 9b -- and the explicit opt-out methods. They complement the
+//! per-stage standalone tests in `tests/canary/structure.rs`,
+//! `tests/tor/origin_binding.rs`, and `tests/validation/content_index.rs`.
 //!
 //! The `#[must_use]` attribute on `ManifestSigVerified` and
 //! `ManifestCanaryChecked` warns when a wrapper value is silently dropped
@@ -26,12 +27,12 @@
 //! types.
 
 use data_encoding::BASE32;
-use entangled_core::crypto::PublisherSigningKey;
+use entangled_core::crypto::{sha256, PublisherSigningKey};
 use entangled_core::document::{
     build_manifest, parse_and_verify_manifest, ManifestRead, UnsignedManifest,
 };
 use entangled_core::types::canary::Canary;
-use entangled_core::types::keys::{OriginPubkey, SpecVersion};
+use entangled_core::types::keys::{ContentRoot, OriginPubkey, SpecVersion};
 use entangled_core::types::manifest::{Carrier, Manifest, OnionAddress, Origin};
 use entangled_core::types::EntangledTimestamp;
 use entangled_core::validation::canary::CanaryState;
@@ -125,21 +126,27 @@ fn build_default_consistent_manifest() -> (Manifest, Vec<u8>, OnionAddress) {
 }
 
 #[test]
-fn full_chain_stage_6_8_9_completes() {
+fn full_chain_stage_6_8_9_9b_completes() {
     let (built, bytes, onion) = build_default_consistent_manifest();
 
-    let (parsed, canary_state) = parse_and_verify_manifest(&bytes, &fixed_now())
+    let (parsed, canary_state, content_index) = parse_and_verify_manifest(&bytes, &fixed_now())
         .expect("Stage 6")
         .verify_canary(&fixed_now())
         .expect("Stage 8")
         .verify_origin(&onion, &fixed_now())
         .expect("Stage 9")
+        .verify_content_index(None)
+        .expect("Stage 9b: default fixture has no content_root")
         .into_parts();
 
     assert_eq!(parsed, built, "round-tripped manifest must match");
     // Default canary: issued 2026-05-07, expires 2026-06-06; at `fixed_now()`
-    // the full 30-day window is ahead → Fresh.
+    // the full 30-day window is ahead -> Fresh.
     assert_eq!(canary_state, CanaryState::Fresh);
+    assert!(
+        content_index.is_none(),
+        "default fixture has no content_root, so Stage 9b yields no index"
+    );
 }
 
 #[test]
@@ -201,10 +208,24 @@ fn manifest_and_canary_state_readable_pre_into_parts() {
     assert_eq!(origin_bound.canary(), &built.canary);
     assert_eq!(origin_bound.canary_state(), CanaryState::Fresh);
 
+    // Same for `ManifestContentIndexVerified` (the Stage 9b terminal).
+    let content_index_verified = origin_bound
+        .verify_content_index(None)
+        .expect("Stage 9b: default fixture has no content_root");
+    assert_eq!(
+        content_index_verified.publisher_pubkey(),
+        &built.publisher_pubkey
+    );
+    assert_eq!(content_index_verified.origin(), &built.origin);
+    assert_eq!(content_index_verified.canary(), &built.canary);
+    assert_eq!(content_index_verified.canary_state(), CanaryState::Fresh);
+    assert!(content_index_verified.content_index().is_none());
+
     // `into_parts` finally consumes and yields the bare `Manifest`.
-    let (m, s) = origin_bound.into_parts();
+    let (m, s, ci) = content_index_verified.into_parts();
     assert_eq!(m, built);
     assert_eq!(s, CanaryState::Fresh);
+    assert!(ci.is_none());
 }
 
 #[test]
@@ -340,5 +361,90 @@ fn non_expired_origin_not_after_passes_pipeline() {
         .verify_canary(&fixed_now())
         .expect("Stage 8")
         .verify_origin(&onion, &fixed_now())
-        .expect("future not_after must pass Stage 9");
+        .expect("future not_after must pass Stage 9")
+        .verify_content_index(None)
+        .expect("Stage 9b: no content_root");
+}
+
+/// Build a signed manifest that declares `content_root` matching the
+/// SHA-256 of an empty content index payload, plus the bytes of that
+/// payload, plus the onion address to feed into Stage 9.
+fn build_manifest_with_content_root() -> (Vec<u8>, OnionAddress, Vec<u8>) {
+    let content_index_bytes = br#"{"entries":{}}"#.to_vec();
+    let content_root = ContentRoot::from_bytes(sha256(&content_index_bytes));
+    let (publisher_key, onion, mut unsigned) = unsigned_manifest_with_consistent_origin(
+        0xD6,
+        0xE6,
+        ts("2026-05-07T00:00:00Z"),
+        ts("2026-06-06T00:00:00Z"),
+    );
+    unsigned.content_root = Some(content_root);
+    let (_manifest, bytes) =
+        build_manifest(&unsigned, &publisher_key, &fixed_now()).expect("build");
+    (bytes, onion, content_index_bytes)
+}
+
+#[test]
+fn verify_content_index_with_none_bytes_and_content_root_fails_with_fetch_failed() {
+    // C-2 regression: Section 09:114 hard-fail enforced structurally
+    // by Stage 9b. When the manifest declares `content_root` and the
+    // caller passes `None` for the bytes (signaling "could not obtain
+    // /content_index.json"), Stage 9b MUST reject with
+    // E_CONTENT_INDEX_FETCH_FAILED.
+    let (bytes, onion, _content_index_bytes) = build_manifest_with_content_root();
+
+    let err = parse_and_verify_manifest(&bytes, &fixed_now())
+        .expect("Stage 6")
+        .verify_canary(&fixed_now())
+        .expect("Stage 8")
+        .verify_origin(&onion, &fixed_now())
+        .expect("Stage 9")
+        .verify_content_index(None)
+        .expect_err("missing content_index bytes when content_root is declared must fail Stage 9b");
+
+    assert_eq!(err.code, DiagnosticCode::EContentIndexFetchFailed);
+}
+
+#[test]
+fn verify_content_index_with_matching_bytes_succeeds_and_yields_parsed_index() {
+    // C-2 happy path: manifest declares content_root, caller supplies
+    // the matching bytes, Stage 9b validates and surfaces the parsed
+    // ContentIndex via the terminal wrapper's accessors and into_parts.
+    let (bytes, onion, content_index_bytes) = build_manifest_with_content_root();
+
+    let (manifest, canary_state, content_index) = parse_and_verify_manifest(&bytes, &fixed_now())
+        .expect("Stage 6")
+        .verify_canary(&fixed_now())
+        .expect("Stage 8")
+        .verify_origin(&onion, &fixed_now())
+        .expect("Stage 9")
+        .verify_content_index(Some(&content_index_bytes))
+        .expect("Stage 9b: bytes match content_root and parse cleanly")
+        .into_parts();
+
+    assert!(manifest.content_root.is_some());
+    assert_eq!(canary_state, CanaryState::Fresh);
+    let idx = content_index.expect("content_index Some when content_root is declared");
+    assert!(
+        idx.is_empty(),
+        "empty content_index payload yields empty index"
+    );
+}
+
+#[test]
+fn skip_content_index_check_after_origin_yields_bare_manifest() {
+    // Stage 9b opt-out: the bare Manifest is reachable from
+    // ManifestOriginBound via the explicit skip method, mirroring
+    // skip_canary_check / skip_origin_check.
+    let (built, bytes, onion) = build_default_consistent_manifest();
+
+    let parsed: Manifest = parse_and_verify_manifest(&bytes, &fixed_now())
+        .expect("Stage 6")
+        .verify_canary(&fixed_now())
+        .expect("Stage 8")
+        .verify_origin(&onion, &fixed_now())
+        .expect("Stage 9")
+        .skip_content_index_check();
+
+    assert_eq!(parsed, built);
 }

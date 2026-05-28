@@ -85,12 +85,12 @@ fn full_pillar_b_closure() {
     // the public way to close Pillar B end-to-end; Stage 9 succeeds iff the
     // address we would have fetched from matches both `manifest.origin.address`
     // and the embedded origin pubkey.
-    let (parsed, _canary_state) = parse_and_verify_manifest(&bytes, &now)
+    let parsed = parse_and_verify_manifest(&bytes, &now)
         .expect("parse_and_verify_manifest")
         .verify_canary(&now)
         .expect("canary structure")
         .verify_origin(&onion, &now)
         .expect("origin binding must succeed")
-        .into_parts();
+        .skip_content_index_check();
     assert_eq!(parsed, manifest);
 }

@@ -8,18 +8,21 @@
 //!
 //! For manifests, [`parse_and_verify_manifest`] returns a
 //! [`ManifestSigVerified`] type-state wrapper rather than a bare
-//! [`crate::types::Manifest`], structurally preventing extraction of the
-//! bare type from incomplete-stage states. The bare `Manifest` is
-//! obtainable only via complete chain (`into_parts`) or explicit
-//! `skip_*` opt-out. Stage 7 (trust state) remains the
-//! caller's responsibility, applied after the chain completes.
+//! [`crate::types::Manifest`], structurally preventing extraction of
+//! the bare type from incomplete-stage states. The bare `Manifest` is
+//! obtainable only via complete chain (Stage 6 to Stage 9b
+//! [`ManifestContentIndexVerified::into_parts`]) or explicit `skip_*`
+//! opt-out. Stage 7 (trust state) remains the caller's responsibility,
+//! applied after the chain completes.
 //!
-//! The wrappers do not expose the bare [`crate::types::Manifest`]; only
-//! field-level accessors are exposed via the [`ManifestRead`] trait
-//! pre-canary, with [`crate::types::Canary`] access available
-//! post-canary. To obtain a `Manifest` value, callers must complete the
-//! chain via [`ManifestOriginBound::into_parts`] or explicitly opt out
-//! of further stages via `skip_canary_check` / `skip_origin_check`.
+//! The wrappers do not expose the bare [`crate::types::Manifest`];
+//! only field-level accessors are exposed via the [`ManifestRead`]
+//! trait pre-canary, with [`crate::types::Canary`] access available
+//! post-canary, and the validated content index available post-Stage-9b.
+//! To obtain a `Manifest` value, callers must complete the chain via
+//! [`ManifestContentIndexVerified::into_parts`] or explicitly opt out
+//! of further stages via `skip_canary_check` / `skip_origin_check` /
+//! `skip_content_index_check`.
 
 pub mod binding;
 pub mod builder;
@@ -37,4 +40,7 @@ pub use parser::{
     parse_and_verify_content, parse_and_verify_manifest, parse_and_verify_transaction,
 };
 pub use unsigned::{UnsignedContent, UnsignedManifest, UnsignedTransaction};
-pub use verified::{ManifestCanaryChecked, ManifestOriginBound, ManifestRead, ManifestSigVerified};
+pub use verified::{
+    ManifestCanaryChecked, ManifestContentIndexVerified, ManifestOriginBound, ManifestRead,
+    ManifestSigVerified,
+};
