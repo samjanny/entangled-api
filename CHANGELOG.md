@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-05-29
+
+SEMVER PATCH in 0.x. Spec alignment to v1.0-rc.26 (upstream Lotto 26),
+closing `samjanny/entangled-api#4`. No code or behavior change; the
+implementation already emitted `content_index` for content-index
+diagnostics. `spec_version` stays `"1.0"`.
+
+### Changed (spec v1.0-rc.26 alignment - Lotto 26)
+
+- **`SPEC_REVISION` bumped `1.0-rc.25` -> `1.0-rc.26`** and the CI
+  conformance-corpus pin (`.github/workflows/ci.yml`) moved to
+  `ref: v1.0-rc.26`. rc.26 adds `content_index` as a fifth `document_kind`
+  enum value (§11) and assigns it to the three `E_CONTENT_INDEX_*` codes,
+  which previously the catalog labelled `manifest`. This crate already
+  emitted `DocumentKindLabel::ContentIndex` (serialized `content_index`)
+  for those diagnostics (the L-1 regression test pins it), so the spec
+  now matches the implementation; no code change. The rc.26 corpus is
+  byte-equal to rc.25 at the vector level (only `rc_target` moved).
+
 ## [0.5.3] - 2026-05-29
 
 SEMVER PATCH in 0.x. Spec alignment to v1.0-rc.25 (upstream Lotto 25) and
