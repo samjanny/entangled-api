@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.7] - 2026-05-29
+
+SEMVER PATCH in 0.x. Spec alignment to v1.0-rc.29 (upstream Lotto 29),
+which closed upstream `samjanny/entangled#13` (AMB-12). No code or
+behavior change; the implementation already follows the pinned reading.
+`spec_version` stays `"1.0"`.
+
+### Changed (spec v1.0-rc.29 alignment - Lotto 29)
+
+- **`SPEC_REVISION` bumped `1.0-rc.28` -> `1.0-rc.29`** and the CI
+  conformance-corpus pin (`.github/workflows/ci.yml`) moved to
+  `ref: v1.0-rc.29`. rc.29 pins that the Expired canary determination is
+  a Stage 10 render-block, not a Stage 8 pipeline halt: the pipeline
+  continues through Stage 9, so a manifest that is both canary-Expired
+  and origin-expired reports the Stage 9 `E_ORIGIN_EXPIRED` first.
+  `document::ManifestSigVerified::verify_canary` already computes the
+  canary state (including `CanaryState::Expired`) and returns
+  `Ok(ManifestCanaryChecked)` for the pipeline to carry forward, halting
+  only on a structural `E_CANARY_INVALID`; the Expired render-block and
+  the section 08:185 per-session override live in the embedding client.
+  The crate passes the rc.29 corpus (notably migration vector 200,
+  whose `underlying_diagnostic_code` is `E_ORIGIN_EXPIRED`) unchanged; no
+  vector input bytes change.
+
 ## [0.5.6] - 2026-05-29
 
 SEMVER PATCH in 0.x. Spec alignment to v1.0-rc.28 (upstream Lotto 28),

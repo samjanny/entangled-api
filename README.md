@@ -16,7 +16,7 @@ A site built with Entangled is not a web application. It is a set of signed JSON
 
 - [`entangled-core`](./entangled-core): the protocol core library.
 
-Current crate version: `0.5.6`.
+Current crate version: `0.5.7`.
 
 Implemented in `entangled-core`:
 
