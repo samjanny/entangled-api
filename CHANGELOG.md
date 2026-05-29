@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-05-29
+
+SEMVER PATCH in 0.x. Spec alignment to v1.0-rc.27 (upstream Lotto 27),
+closing `samjanny/entangled-api#5`. No code or behavior change; the
+implementation already serializes integers as exact decimal.
+`spec_version` stays `"1.0"`.
+
+### Changed (spec v1.0-rc.27 alignment - Lotto 27)
+
+- **`SPEC_REVISION` bumped `1.0-rc.26` -> `1.0-rc.27`** and the CI
+  conformance-corpus pin (`.github/workflows/ci.yml`) moved to
+  `ref: v1.0-rc.27`. rc.27 pins the canonical serialization of Entangled
+  integers to exact decimal across the whole `[0, 2^63 - 1]` range,
+  including above `2^53`, and adds a positive vector
+  (`007-content-valid-large-seq`, `seq = 9007199254740993`) signed over
+  the exact-decimal canonical form. This crate already serializes
+  integers as exact decimal through the native `u64` path (no binary64
+  conversion), so it accepts the vector with no code change. The rc.27
+  corpus adds one vector; no existing vector input bytes change.
+
 ## [0.5.4] - 2026-05-29
 
 SEMVER PATCH in 0.x. Spec alignment to v1.0-rc.26 (upstream Lotto 26),
