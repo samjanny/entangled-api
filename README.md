@@ -117,6 +117,76 @@ assert_eq!(recovered, publisher_pubkey);
 
 The PIP is public. It is not a seed phrase, password, recovery secret, or private key. It is a human-readable fingerprint of the publisher identity key.
 
+## Building and signing documents
+
+The `document` module mirrors each signed wire type with an `Unsigned*` counterpart (`UnsignedManifest`, `UnsignedContent`, `UnsignedTransaction`) and a `build_*` function. The builder validates the unsigned value against the closed schema, canonicalizes it (JCS), signs the canonical payload with the role-appropriate key, and returns the signed struct plus its exact serialized wire bytes. Manifests are signed by `K_publisher`; content and transaction documents by `K_runtime`.
+
+A content document is signed by the runtime key:
+
+```rust
+use entangled_core::crypto::RuntimeSigningKey;
+use entangled_core::document::{build_content, UnsignedContent};
+use entangled_core::types::blocks::Block;
+use entangled_core::types::inline::{InlineElement, TextMark};
+use entangled_core::types::keys::SpecVersion;
+use entangled_core::types::meta::Meta;
+use entangled_core::types::path::EntangledPath;
+use entangled_core::types::timestamp::EntangledTimestamp;
+
+# fn demo() -> Result<(), entangled_core::document::DocumentError> {
+let runtime = RuntimeSigningKey::from_seed(&[0x01; 32]);
+
+let unsigned = UnsignedContent {
+    spec_version: SpecVersion,
+    path: EntangledPath::try_from("/articles/first-post")
+        .expect("valid content path"),
+    meta: Meta {
+        title: "First post".to_owned(),
+        published_at: EntangledTimestamp::try_from("2026-05-07T00:00:00Z")
+            .expect("valid timestamp"),
+    },
+    blocks: vec![Block::Paragraph {
+        content: vec![InlineElement::Text {
+            value: "Hello, world.".to_owned(),
+            marks: Vec::<TextMark>::new(),
+        }],
+    }],
+    // Optional content sequence number; required only when the manifest
+    // declares `content_root` and the path is indexed (see the content
+    // index section).
+    seq: None,
+};
+
+let (content, wire_bytes) = build_content(&unsigned, &runtime)?;
+// `wire_bytes` is the exact byte sequence to serve at `content.path`.
+# let _ = (content, wire_bytes);
+# Ok(())
+# }
+```
+
+Manifests follow the same shape with `build_manifest`, which additionally takes the current time to enforce the `updated` clock-skew bound at build time. `UnsignedManifest` carries the nested `origin` and `canary` blocks; once assembled, signing is one call:
+
+```rust
+use entangled_core::crypto::PublisherSigningKey;
+use entangled_core::document::{build_manifest, UnsignedManifest};
+use entangled_core::types::timestamp::EntangledTimestamp;
+
+# // The full UnsignedManifest construction (origin, canary, state_policy, ...)
+# // is elided here; see tests/tor/integration_full.rs for a complete value.
+# fn demo(unsigned: &UnsignedManifest) -> Result<(), entangled_core::document::DocumentError> {
+let publisher = PublisherSigningKey::from_seed(&[0x42; 32]);
+let now = EntangledTimestamp::try_from("2026-05-07T00:00:00Z")
+    .expect("valid timestamp");
+
+let (manifest, wire_bytes) = build_manifest(unsigned, &publisher, &now)?;
+// `wire_bytes` is the exact byte sequence to serve at `/manifest.json`.
+# let _ = (manifest, wire_bytes);
+# Ok(())
+# }
+```
+
+`build_transaction` is analogous (signed by `K_runtime`, taking an `UnsignedTransaction`). On failure the builders return `DocumentError`; its `DocumentError::Validation(Diagnostic)` variant carries the normative diagnostic, so a caller can match on the contained `Diagnostic.code` (a `DiagnosticCode` per the specification's section 11). The produced `wire_bytes` round-trip exactly: feeding them back into `parse_and_verify_*` (below) reproduces the signed struct.
+
 ## Security model at a glance
 
 Entangled uses three key roles:
