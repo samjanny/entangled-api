@@ -23,6 +23,17 @@
 //!   guard is a client-chrome concern (user-confirmation cadence, see
 //!   §10) and is out of scope for this crate.
 //!
+//! Caller obligation: the cross-session migration recall-window check
+//! (§10:454-466) is NOT performed here. `check_migration_chain_cycle`
+//! covers only the per-flow, in-session `visited_origins` guard. The
+//! recall window (consulting persistent publisher history for a successor
+//! that appears as a previously-replaced successor within a window: 7-day
+//! floor, 30-day recommended, 365-day cap; persistence across sessions is
+//! a MUST; and applying elevated friction) depends on the publisher
+//! history store, which this crate declares out of scope (see the crate
+//! root). A caller building the cross-session trust-state layer MUST
+//! implement it.
+//!
 //! rc.15 extends the `E_MIGRATION_MISMATCH` `details` schema additively;
 //! rc.16 renames one field for clarity:
 //!

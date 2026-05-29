@@ -324,7 +324,17 @@ pub enum DiagnosticCode {
     #[serde(rename = "E_HISTORICAL_RUNTIME_AMBIGUOUS")]
     EHistoricalRuntimeAmbiguous,
 
-    // Image resource (off-pipeline; warnings)
+    // Image resource (off-pipeline; warnings).
+    //
+    // Caller obligation: image fetch-time validation (§03) lives in the
+    // caller's image-fetch/render layer, which this crate declares out of
+    // scope (see the crate root: "image decoding and rendering"). The crate
+    // defines these codes for §11 catalog completeness but does NOT emit
+    // them: it performs no image fetch, no SHA-256 verification of image
+    // bytes, no 2 MiB response-cap enforcement (the `MAX_IMAGE_RESPONSE_BYTES`
+    // constant is provided for callers but not read here), no decode, no
+    // dimension or animated-WebP check. A caller building the image layer is
+    // responsible for emitting these codes per the §03 fetch-time MUSTs.
     #[serde(rename = "W_IMAGE_HASH_MISMATCH")]
     WImageHashMismatch,
     #[serde(rename = "W_IMAGE_OVERSIZE")]

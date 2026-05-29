@@ -14,6 +14,16 @@
 //! re-fetched (`canary.issued_at` for an unchanged canary). Per-field rules
 //! that further constrain "how far in the past" live with the field's other
 //! validations (e.g. anti-downgrade in [`super::canary`]).
+//!
+//! Caller obligation (clock reliability, §10:851-855): this helper assumes
+//! the caller supplies a `now` derived from a reliable clock. §10:852 says a
+//! client WITHOUT a reliable clock MUST NOT hard-reject a manifest on a
+//! future-skew determination, and §10:855 says `T_verified` is a lower bound
+//! and MUST NOT be used as the future-skew reference. Clock acquisition is the
+//! caller's concern and is out of scope for this crate, so a caller with no
+//! reliable current-time reference MUST NOT call this check (and MUST NOT pass
+//! a `now` derived from `T_verified`); doing so would hard-reject in violation
+//! of §10:852.
 
 use crate::types::manifest::Manifest;
 use crate::types::EntangledTimestamp;
