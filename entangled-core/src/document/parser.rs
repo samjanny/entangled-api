@@ -45,7 +45,7 @@
 //!   [`super::verified::ManifestOriginBound::verify_content_index`] (or
 //!   opt out via
 //!   [`super::verified::ManifestOriginBound::skip_content_index_check`]).
-//!   The Section 09:114 hard-fail MUST is enforced structurally: a
+//!   The Section 09:116 hard-fail MUST is enforced structurally: a
 //!   `None` bytes argument when `content_root` is declared yields
 //!   `E_CONTENT_INDEX_FETCH_FAILED`. The standalone
 //!   [`crate::validation::content_index::validate_content_index`] helper

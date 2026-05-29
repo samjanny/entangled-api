@@ -38,7 +38,7 @@
 //! be obtained for any of the above reasons, the client MUST NOT
 //! render content documents from the site under that manifest: the
 //! spec treats failure to honor a signed `content_root` commitment as
-//! indistinguishable from server compromise (Section 09:114).
+//! indistinguishable from server compromise (Section 09:116).
 
 use std::collections::HashMap;
 

@@ -171,7 +171,7 @@ let runtime_pubkey = manifest.canary.runtime_pubkey;
 # }
 ```
 
-`verify_content_index` enforces the Section 09:114 hard-fail model when the manifest declares `content_root`: callers MUST supply the `/content_index.json` response body bytes, which are hash-verified against `content_root` and structurally validated. A manifest that omits `content_root` accepts `None` here and yields `content_index = None`.
+`verify_content_index` enforces the Section 09:116 hard-fail model when the manifest declares `content_root`: callers MUST supply the `/content_index.json` response body bytes, which are hash-verified against `content_root` and structurally validated. A manifest that omits `content_root` accepts `None` here and yields `content_index = None`.
 
 If a caller is building offline tooling, conformance tests, or another context where canary/origin/content-index checks are intentionally not applicable, the API provides explicit opt-out methods such as `skip_canary_check`, `skip_origin_check`, and `skip_content_index_check`.
 

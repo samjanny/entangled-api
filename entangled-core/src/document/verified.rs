@@ -367,7 +367,7 @@ impl ManifestOriginBound {
 
     /// Stage 9b: Section 09 content-index verification.
     ///
-    /// Section 09:114 hard-fail model: when the manifest declares
+    /// Section 09:116 hard-fail model: when the manifest declares
     /// `content_root`, the client MUST NOT render content documents
     /// from the site unless `/content_index.json` has been obtained
     /// and verified against `content_root`. This method enforces that
@@ -382,7 +382,7 @@ impl ManifestOriginBound {
     ///   [`ManifestContentIndexVerified`].
     /// * `None`: the caller has not (or could not) obtain the bytes.
     ///   When the manifest declares `content_root`, this returns
-    ///   `E_CONTENT_INDEX_FETCH_FAILED` per the Section 09:114
+    ///   `E_CONTENT_INDEX_FETCH_FAILED` per the Section 09:116
     ///   hard-fail. When the manifest does not declare `content_root`,
     ///   this succeeds with `content_index()` returning `None`.
     ///
@@ -419,7 +419,7 @@ impl ManifestOriginBound {
     /// callers that handle content-index verification at a different
     /// layer. NOT suitable for client implementations rendering a
     /// manifest that declares `content_root` to a user: Section
-    /// 09:114 attaches a hard-fail MUST to that case.
+    /// 09:116 attaches a hard-fail MUST to that case.
     pub fn skip_content_index_check(self) -> Manifest {
         self.inner
     }

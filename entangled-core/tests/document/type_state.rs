@@ -386,7 +386,7 @@ fn build_manifest_with_content_root() -> (Vec<u8>, OnionAddress, Vec<u8>) {
 
 #[test]
 fn verify_content_index_with_none_bytes_and_content_root_fails_with_fetch_failed() {
-    // C-2 regression: Section 09:114 hard-fail enforced structurally
+    // C-2 regression: Section 09:116 hard-fail enforced structurally
     // by Stage 9b. When the manifest declares `content_root` and the
     // caller passes `None` for the bytes (signaling "could not obtain
     // /content_index.json"), Stage 9b MUST reject with
