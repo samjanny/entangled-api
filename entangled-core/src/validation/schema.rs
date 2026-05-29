@@ -704,6 +704,20 @@ fn is_range_message(msg: &str) -> bool {
         || msg.contains("out of range")
         || msg.contains("out-of-range")
         || msg.contains("between")
+        || is_integer_width_message(msg)
+}
+
+/// serde reports an integer that is a valid JSON integer but does not fit
+/// the field's target width (e.g. `min_refresh_interval = 5000000000`
+/// against a `u32`, or a negative value against an unsigned field) as
+/// `invalid value: integer `N`, expected u32`. The JSON type is correct
+/// (an integer); only the field's numeric range is violated, so this is
+/// `E_SCHEMA_FIELD_RANGE` (§11), not `E_SCHEMA_FIELD_TYPE`. The lexical
+/// `> i64::MAX` case is caught earlier as `E_SCHEMA_NON_INTEGER` by
+/// `schema_prepass`; this handles the in-grammar but over-width band.
+fn is_integer_width_message(msg: &str) -> bool {
+    msg.contains("invalid value: integer")
+        && (msg.contains("expected u") || msg.contains("expected i"))
 }
 
 fn is_length_message(msg: &str) -> bool {

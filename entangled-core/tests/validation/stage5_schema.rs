@@ -81,6 +81,27 @@ fn t04_min_refresh_interval_100_rejected_with_field_range() {
 }
 
 #[test]
+fn t04b_min_refresh_interval_over_u32_rejected_with_field_range() {
+    // A valid JSON integer that fits the protocol's 64-bit signed grammar
+    // (so schema_prepass accepts it) but overflows the field's u32 width.
+    // serde reports "invalid value: integer `5000000000`, expected u32";
+    // the JSON type is an integer, so this is a range violation, not a
+    // type violation (11:153). Regression for entangled-api#2.
+    let mut v = manifest_value();
+    v.as_object_mut()
+        .unwrap()
+        .insert("min_refresh_interval".to_owned(), json!(5_000_000_000u64));
+    let err = parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now()).unwrap_err();
+    assert_eq!(
+        err.code,
+        DiagnosticCode::ESchemaFieldRange,
+        "u32-overflow integer must be E_SCHEMA_FIELD_RANGE, got {:?}: {}",
+        err.code,
+        err.message
+    );
+}
+
+#[test]
 fn t05_state_policy_duplicate_namespace_key_rejected() {
     let mut v = manifest_value();
     let entry = json!({
