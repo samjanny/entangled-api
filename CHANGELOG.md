@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-05-29
+
+SEMVER PATCH in 0.x. Spec alignment to v1.0-rc.28 (upstream Lotto 28),
+which closed upstream `samjanny/entangled#11` (AMB-10) and
+`samjanny/entangled#12` (AMB-11). No code or behavior change; the
+implementation already produces both pinned Stage 5 codes. `spec_version`
+stays `"1.0"`.
+
+### Changed (spec v1.0-rc.28 alignment - Lotto 28)
+
+- **`SPEC_REVISION` bumped `1.0-rc.27` -> `1.0-rc.28`** and the CI
+  conformance-corpus pin (`.github/workflows/ci.yml`) moved to
+  `ref: v1.0-rc.28`. rc.28 pins two Stage 5 origin-field rejection codes
+  that the spec text had left open:
+  - a non-`tor-v3` `origin.carrier` (and
+    `migration_pointer.successor_origin.carrier`) is
+    `E_SCHEMA_ENUM_VIOLATION`. The crate's `Carrier` is a single-variant
+    serde enum, so an unknown variant already maps to that code.
+  - a non-canonical (e.g. uppercase) `origin.address` is
+    `E_SCHEMA_FIELD_SYNTAX` at Stage 5, distinct from the Stage 9
+    `E_BIND_ORIGIN` binding check. The crate's `OnionAddress` newtype
+    already rejects a non-lowercase body at Stage 5 field
+    deserialization.
+  The rc.28 corpus adds two negative vectors
+  (`144-schema-carrier-enum-violation`,
+  `145-schema-address-uppercase-syntax`) which the crate passes
+  unchanged; no existing vector input bytes change.
+
 ## [0.5.5] - 2026-05-29
 
 SEMVER PATCH in 0.x. Spec alignment to v1.0-rc.27 (upstream Lotto 27),
