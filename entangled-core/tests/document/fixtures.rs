@@ -29,8 +29,8 @@ pub fn unsigned_manifest_with_publisher(
         },
         canary: Canary {
             runtime_pubkey: runtime_key_zero(),
-            issued_at: ts("2026-05-07T00:00:00Z"),
-            next_expected: ts("2026-06-06T00:00:00Z"),
+            issued_at: ts("2026-05-07T00:00:00Z").into(),
+            next_expected: ts("2026-06-06T00:00:00Z").into(),
             statement: "All clear.".to_owned(),
             freshness_proof: None,
         },

@@ -38,4 +38,4 @@ pub use meta::Meta;
 pub use path::{EntangledPath, PathError};
 pub use slug::{Slug, SlugError};
 pub use state::{StateMode, StatePolicyEntry, StateUpdateOp};
-pub use timestamp::{EntangledTimestamp, TimestampError};
+pub use timestamp::{EntangledTimestamp, MaybeTimestamp, TimestampError};

@@ -153,8 +153,8 @@ fn unsigned_manifest_with_dates(
         },
         canary: Canary {
             runtime_pubkey: RuntimePubkey::try_from(KEY_ZEROS).unwrap(),
-            issued_at: canary_issued_at,
-            next_expected: canary_next_expected,
+            issued_at: canary_issued_at.into(),
+            next_expected: canary_next_expected.into(),
             statement: "All clear.".to_owned(),
             freshness_proof: None,
         },

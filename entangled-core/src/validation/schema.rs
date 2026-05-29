@@ -509,8 +509,15 @@ pub fn validate_origin_not_after(origin: &Origin, canary: &Canary) -> Result<(),
     let Some(not_after) = origin.not_after else {
         return Ok(());
     };
+    // AMB-16: a malformed canary.issued_at is a Stage 8 canary-integrity
+    // failure (E_CANARY_INVALID), not a Stage 5 origin error. If issued_at is
+    // not a valid timestamp, defer this cross-field check; Stage 8 reports the
+    // canary failure.
+    let Ok(issued_at) = canary.issued_at.validate() else {
+        return Ok(());
+    };
 
-    if not_after <= canary.issued_at {
+    if not_after <= issued_at {
         return Err(Diagnostic::new(
             DiagnosticCode::EOriginInvalid,
             DocumentKindLabel::Manifest,
@@ -520,11 +527,11 @@ pub fn validate_origin_not_after(origin: &Origin, canary: &Canary) -> Result<(),
             "field_path": "origin.not_after",
             "reason": "not_after_not_later_than_issued_at",
             "not_after": not_after.to_string(),
-            "issued_at": canary.issued_at.to_string(),
+            "issued_at": issued_at.to_string(),
         })));
     }
 
-    let horizon = not_after.unix_timestamp() - canary.issued_at.unix_timestamp();
+    let horizon = not_after.unix_timestamp() - issued_at.unix_timestamp();
     if horizon > ORIGIN_NOT_AFTER_MAX_HORIZON_SECS {
         return Err(Diagnostic::new(
             DiagnosticCode::EOriginInvalid,
@@ -535,7 +542,7 @@ pub fn validate_origin_not_after(origin: &Origin, canary: &Canary) -> Result<(),
             "field_path": "origin.not_after",
             "reason": "not_after_beyond_5y",
             "not_after": not_after.to_string(),
-            "issued_at": canary.issued_at.to_string(),
+            "issued_at": issued_at.to_string(),
             "horizon_seconds": horizon,
             "max_horizon_seconds": ORIGIN_NOT_AFTER_MAX_HORIZON_SECS,
         })));

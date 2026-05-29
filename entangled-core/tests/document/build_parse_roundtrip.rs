@@ -65,7 +65,13 @@ fn build_manifest_rejects_origin_not_after_at_or_before_issued_at() {
     let publisher_key = PublisherSigningKey::from_seed(&[0xA4; 32]);
     let publisher_pk = publisher_key.verifying_key();
     let mut unsigned = unsigned_manifest_with_publisher(publisher_pk);
-    unsigned.origin.not_after = Some(unsigned.canary.issued_at);
+    unsigned.origin.not_after = Some(
+        unsigned
+            .canary
+            .issued_at
+            .validate()
+            .expect("fixture issued_at is valid"),
+    );
     let now = fixed_now();
 
     let err = build_manifest(&unsigned, &publisher_key, &now)

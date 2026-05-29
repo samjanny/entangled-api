@@ -207,12 +207,16 @@ fn run_manifest_pipeline(
 
     if let Some(retained) = immediate.as_ref() {
         let canary = canary_checked.canary();
-        if let Err(d) = check_anti_downgrade(&canary.issued_at, Some(&retained.issued_at)) {
+        let issued_at = canary
+            .issued_at
+            .validate()
+            .expect("canary timestamps validated at Stage 8");
+        if let Err(d) = check_anti_downgrade(&issued_at, Some(&retained.issued_at)) {
             return Ok(Err(d));
         }
         let new_payload_hash = manifest_payload_hash(raw)?;
         if let Err(d) = check_canary_conflict(
-            &canary.issued_at,
+            &issued_at,
             &canary.runtime_pubkey,
             &new_payload_hash,
             Some(retained),
@@ -223,9 +227,13 @@ fn run_manifest_pipeline(
 
     if immediate.is_some() || !history.is_empty() {
         let canary = canary_checked.canary();
+        let issued_at = canary
+            .issued_at
+            .validate()
+            .expect("canary timestamps validated at Stage 8");
         if let Err(d) = check_runtime_pubkey_rotation(
             &canary.runtime_pubkey,
-            &canary.issued_at,
+            &issued_at,
             immediate.as_ref(),
             &history,
         ) {
@@ -565,7 +573,10 @@ fn build_retained_record(
 
     let payload_hash = manifest_payload_hash(&raw)?;
     Ok(RetainedManifestRecord {
-        issued_at: canary.issued_at,
+        issued_at: canary
+            .issued_at
+            .validate()
+            .expect("previously-verified canary has valid timestamps"),
         runtime_pubkey: canary.runtime_pubkey,
         manifest_payload_hash: payload_hash,
     })

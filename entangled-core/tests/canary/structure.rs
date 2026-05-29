@@ -18,8 +18,8 @@ fn canary_with(issued: EntangledTimestamp, expected: EntangledTimestamp) -> Cana
         // to exercise interval / ordering / future-skew without tripping the
         // §05 pubkey check.
         runtime_pubkey: runtime_key_real(),
-        issued_at: issued,
-        next_expected: expected,
+        issued_at: issued.into(),
+        next_expected: expected.into(),
         statement: "All clear.".to_owned(),
         freshness_proof: None,
     }
@@ -113,8 +113,8 @@ fn small_order_runtime_pubkey_rejected_with_field_path_detail() {
     let weak = RuntimePubkey::try_from(KEY_ZEROS).unwrap();
     let mut c = Canary {
         runtime_pubkey: weak,
-        issued_at: ts("2026-05-01T00:00:00Z"),
-        next_expected: ts("2026-05-31T00:00:00Z"),
+        issued_at: ts("2026-05-01T00:00:00Z").into(),
+        next_expected: ts("2026-05-31T00:00:00Z").into(),
         statement: "All clear.".to_owned(),
         freshness_proof: None,
     };

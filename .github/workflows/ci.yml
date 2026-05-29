@@ -31,7 +31,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: samjanny/entangled
-          ref: v1.0-rc.29
+          ref: v1.0-rc.37
           path: docs-spec
       - uses: dtolnay/rust-toolchain@master
         with:

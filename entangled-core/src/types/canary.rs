@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::keys::RuntimePubkey;
-use super::timestamp::EntangledTimestamp;
+use super::timestamp::MaybeTimestamp;
 
 /// Liveness canary embedded in a manifest (§02 schema, §08 anti-downgrade).
 ///
@@ -18,10 +18,10 @@ pub struct Canary {
     /// Runtime Ed25519 public key for canary statements.
     pub runtime_pubkey: RuntimePubkey,
     /// Time at which this canary was issued by the publisher.
-    pub issued_at: EntangledTimestamp,
+    pub issued_at: MaybeTimestamp,
     /// Latest time at which the next canary should be observed; clients
     /// reject manifests whose `next_expected` regresses.
-    pub next_expected: EntangledTimestamp,
+    pub next_expected: MaybeTimestamp,
     /// Free-form publisher statement of liveness/control.
     pub statement: String,
     /// Optional out-of-band freshness proof (e.g., a recent block hash).

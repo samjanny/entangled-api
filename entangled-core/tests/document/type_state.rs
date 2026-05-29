@@ -95,8 +95,8 @@ fn unsigned_manifest_with_consistent_origin(
         },
         canary: Canary {
             runtime_pubkey: runtime_key_real(),
-            issued_at: canary_issued_at,
-            next_expected: canary_next_expected,
+            issued_at: canary_issued_at.into(),
+            next_expected: canary_next_expected.into(),
             statement: "All clear.".to_owned(),
             freshness_proof: None,
         },

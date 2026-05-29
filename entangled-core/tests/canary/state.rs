@@ -14,11 +14,21 @@ fn ts(s: &str) -> EntangledTimestamp {
 fn canary(issued_at: &str, next_expected: &str) -> Canary {
     Canary {
         runtime_pubkey: RuntimePubkey::try_from(KEY_ZEROS).unwrap(),
-        issued_at: ts(issued_at),
-        next_expected: ts(next_expected),
+        issued_at: ts(issued_at).into(),
+        next_expected: ts(next_expected).into(),
         statement: "All clear.".to_owned(),
         freshness_proof: None,
     }
+}
+
+// The canary fields are lenient MaybeTimestamp (AMB-16); these state tests use
+// well-formed timestamps, so promote them before exercising the time arithmetic.
+fn state_of(c: &Canary, now: &EntangledTimestamp) -> CanaryState {
+    compute_canary_state(
+        &c.issued_at.validate().unwrap(),
+        &c.next_expected.validate().unwrap(),
+        now,
+    )
 }
 
 #[test]
@@ -27,7 +37,7 @@ fn fresh_well_inside_window() {
     // near-window = max(3 days, 24h) = 3 days. Plenty of room.
     let c = canary("2026-04-30T00:00:00Z", "2026-05-30T00:00:00Z");
     let now = ts("2026-05-01T00:00:00Z");
-    assert_eq!(compute_canary_state(&c, &now), CanaryState::Fresh);
+    assert_eq!(state_of(&c, &now), CanaryState::Fresh);
 }
 
 #[test]
@@ -37,7 +47,7 @@ fn near_expiration_24h_floor() {
     // inside the near window.
     let c = canary("2026-04-08T00:00:00Z", "2026-05-08T00:00:00Z");
     let now = ts("2026-05-07T00:00:00Z");
-    assert_eq!(compute_canary_state(&c, &now), CanaryState::NearExpiration);
+    assert_eq!(state_of(&c, &now), CanaryState::NearExpiration);
 }
 
 #[test]
@@ -48,7 +58,7 @@ fn near_expiration_ten_percent_rule() {
     // NearExpiration.
     let c = canary("2026-04-07T00:00:00Z", "2026-05-07T00:00:00Z");
     let now = ts("2026-05-05T00:00:00Z"); // 2 days before next_expected
-    assert_eq!(compute_canary_state(&c, &now), CanaryState::NearExpiration);
+    assert_eq!(state_of(&c, &now), CanaryState::NearExpiration);
 }
 
 #[test]
@@ -57,28 +67,22 @@ fn fresh_to_near_boundary() {
     // Exactly 3 days remaining -> NearExpiration (boundary inclusive).
     let c = canary("2026-04-07T00:00:00Z", "2026-05-07T00:00:00Z");
     let now_at_boundary = ts("2026-05-04T00:00:00Z");
-    assert_eq!(
-        compute_canary_state(&c, &now_at_boundary),
-        CanaryState::NearExpiration
-    );
+    assert_eq!(state_of(&c, &now_at_boundary), CanaryState::NearExpiration);
     // One second earlier -> still Fresh.
     let now_just_before = ts("2026-05-03T23:59:59Z");
-    assert_eq!(
-        compute_canary_state(&c, &now_just_before),
-        CanaryState::Fresh
-    );
+    assert_eq!(state_of(&c, &now_just_before), CanaryState::Fresh);
 }
 
 #[test]
 fn expired_after_next_expected() {
     let c = canary("2026-04-07T00:00:00Z", "2026-05-06T00:00:00Z");
     let now = ts("2026-05-07T00:00:00Z");
-    assert_eq!(compute_canary_state(&c, &now), CanaryState::Expired);
+    assert_eq!(state_of(&c, &now), CanaryState::Expired);
 }
 
 #[test]
 fn expired_at_exact_second() {
     let c = canary("2026-04-07T00:00:00Z", "2026-05-07T00:00:00Z");
     let now = ts("2026-05-07T00:00:00Z");
-    assert_eq!(compute_canary_state(&c, &now), CanaryState::Expired);
+    assert_eq!(state_of(&c, &now), CanaryState::Expired);
 }

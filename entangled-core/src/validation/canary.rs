@@ -109,10 +109,14 @@ pub enum CanaryState {
 ///
 /// The "near-expiration window" is `max(10% of the interval, 24 hours)`
 /// (§08). A canary is `Expired` if `now >= next_expected` (inclusive).
-pub fn compute_canary_state(canary: &Canary, now: &EntangledTimestamp) -> CanaryState {
+pub fn compute_canary_state(
+    issued_at: &EntangledTimestamp,
+    next_expected: &EntangledTimestamp,
+    now: &EntangledTimestamp,
+) -> CanaryState {
     let now_unix = now.unix_timestamp();
-    let issued_unix = canary.issued_at.unix_timestamp();
-    let expected_unix = canary.next_expected.unix_timestamp();
+    let issued_unix = issued_at.unix_timestamp();
+    let expected_unix = next_expected.unix_timestamp();
 
     if now_unix >= expected_unix {
         return CanaryState::Expired;
@@ -135,18 +139,37 @@ pub fn compute_canary_state(canary: &Canary, now: &EntangledTimestamp) -> Canary
 pub fn validate_canary_structure(
     canary: &Canary,
     now: &EntangledTimestamp,
-) -> Result<(), Diagnostic> {
+) -> Result<(EntangledTimestamp, EntangledTimestamp), Diagnostic> {
+    // AMB-16: malformed canary timestamps are a Stage 8 canary-integrity
+    // failure (E_CANARY_INVALID), not a Stage 5 schema/parse error. The
+    // issued_at / next_expected fields deserialize leniently (MaybeTimestamp)
+    // and are validated here, after Stage 6 has verified the signature.
+    let issued_at = canary.issued_at.validate().map_err(|_| {
+        Diagnostic::new(
+            DiagnosticCode::ECanaryInvalid,
+            DocumentKindLabel::Manifest,
+            "canary.issued_at is not a valid YYYY-MM-DDTHH:MM:SSZ timestamp",
+        )
+    })?;
+    let next_expected = canary.next_expected.validate().map_err(|_| {
+        Diagnostic::new(
+            DiagnosticCode::ECanaryInvalid,
+            DocumentKindLabel::Manifest,
+            "canary.next_expected is not a valid YYYY-MM-DDTHH:MM:SSZ timestamp",
+        )
+    })?;
+
     // (a) issued_at not too far in the future.
     check_future_timestamp(
-        &canary.issued_at,
+        &issued_at,
         now,
         CANARY_ISSUED_AT_FIELD,
         DocumentKindLabel::Manifest,
     )?;
 
     // (b) next_expected strictly after issued_at.
-    let issued_unix = canary.issued_at.unix_timestamp();
-    let expected_unix = canary.next_expected.unix_timestamp();
+    let issued_unix = issued_at.unix_timestamp();
+    let expected_unix = next_expected.unix_timestamp();
     if expected_unix <= issued_unix {
         return Err(Diagnostic::new(
             DiagnosticCode::ECanaryInvalid,
@@ -198,7 +221,7 @@ pub fn validate_canary_structure(
         })));
     }
 
-    Ok(())
+    Ok((issued_at, next_expected))
 }
 
 /// Anti-downgrade against publisher history (§08).

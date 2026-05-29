@@ -208,3 +208,35 @@ impl<'de> Deserialize<'de> for EntangledTimestamp {
         Self::try_from(raw).map_err(serde::de::Error::custom)
     }
 }
+
+/// A canary timestamp captured leniently for deferred (Stage 8) validation.
+///
+/// `canary.issued_at` and `canary.next_expected` deserialize into this type so
+/// that a syntactically malformed value does not fail at deserialization (which
+/// would otherwise surface as a Stage 5 schema/parse error). Per §08 / AMB-16
+/// the canary Invalid state covers malformed timestamp syntax, so validation is
+/// deferred to Stage 8 and reported as `E_CANARY_INVALID`.
+/// [`MaybeTimestamp::validate`] promotes the raw value to a strict
+/// [`EntangledTimestamp`].
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct MaybeTimestamp(String);
+
+impl MaybeTimestamp {
+    /// Validate and promote to a strict [`EntangledTimestamp`], or report why
+    /// the raw value is not a valid `YYYY-MM-DDTHH:MM:SSZ` timestamp.
+    pub fn validate(&self) -> Result<EntangledTimestamp, TimestampError> {
+        EntangledTimestamp::try_from(self.0.as_str())
+    }
+
+    /// The raw, unvalidated wire string.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl From<EntangledTimestamp> for MaybeTimestamp {
+    fn from(ts: EntangledTimestamp) -> Self {
+        MaybeTimestamp(ts.to_string())
+    }
+}

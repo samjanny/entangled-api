@@ -235,8 +235,8 @@ impl ManifestSigVerified {
         self,
         now: &EntangledTimestamp,
     ) -> Result<ManifestCanaryChecked, Diagnostic> {
-        validate_canary_structure(&self.inner.canary, now)?;
-        let canary_state = compute_canary_state(&self.inner.canary, now);
+        let (issued_at, next_expected) = validate_canary_structure(&self.inner.canary, now)?;
+        let canary_state = compute_canary_state(&issued_at, &next_expected, now);
         Ok(ManifestCanaryChecked {
             inner: self.inner,
             canary_state,

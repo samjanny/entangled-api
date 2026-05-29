@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-05-29
+
+SEMVER MINOR in 0.x (breaking; see Breaking below). Spec alignment to
+v1.0-rc.37, covering upstream rc.30 through rc.37. The only behavioral change
+is the canary malformed-timestamp diagnostic (AMB-16); the rc.30-rc.33
+(AMB-13, AMB-14, AMB-15, AMB-17) and rc.34-rc.37 coverage vectors were already
+handled by this crate and now pass under the bumped corpus pin. `spec_version`
+stays `"1.0"`.
+
+### Changed (spec v1.0-rc.37 alignment)
+
+- **`SPEC_REVISION` bumped `1.0-rc.29` -> `1.0-rc.37`** and the CI
+  conformance-corpus pin (`.github/workflows/ci.yml`) moved to
+  `ref: v1.0-rc.37`. The crate passes the rc.37 corpus (74 vectors).
+- **AMB-16 (upstream rc.32): a syntactically malformed `canary.issued_at` or
+  `canary.next_expected` is now a Stage 8 `E_CANARY_INVALID`, not a Stage 5
+  parse/schema error.** Previously these fields deserialized directly as
+  `EntangledTimestamp`, so a malformed value failed at deserialization, before
+  Stage 6 signature verification. They now deserialize leniently as the new
+  `MaybeTimestamp` and are validated at Stage 8, after the signature has been
+  verified, matching the upstream pinned reading (corpus vector 186). This also
+  reconciles the prior internal split where a badly-shaped timestamp and an
+  out-of-range component reported at different stages.
+
+### Breaking
+
+- `types::Canary::issued_at` and `::next_expected` are now `MaybeTimestamp`
+  (were `EntangledTimestamp`); call `.validate()` to promote to a strict
+  `EntangledTimestamp`.
+- `validation::canary::validate_canary_structure` now returns
+  `Result<(EntangledTimestamp, EntangledTimestamp), Diagnostic>` (the validated
+  `issued_at` / `next_expected`) instead of `Result<(), Diagnostic>`.
+- `validation::canary::compute_canary_state` now takes the validated
+  `issued_at` and `next_expected` as `&EntangledTimestamp` instead of `&Canary`.
+- New public type `types::MaybeTimestamp`.
+
 ## [0.5.7] - 2026-05-29
 
 SEMVER PATCH in 0.x. Spec alignment to v1.0-rc.29 (upstream Lotto 29),
