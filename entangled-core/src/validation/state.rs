@@ -39,30 +39,27 @@ use super::strings::{check_nfc, no_control_chars};
 /// `namespace` and `key`).
 pub const REQUEST_STATE_ENTRY_ENVELOPE_BYTES: usize = 36;
 
-/// Encoded wire contribution of a single `request_state` entry given the
-/// concrete byte lengths of `namespace`, `key`, and `value` — i.e. the
-/// JSON shape `{"namespace":"...","key":"...","value":"..."}` measured
-/// on the wire. Used by:
+/// Raw-byte (envelope-level) contribution of a single `request_state`
+/// entry: the JSON shape `{"namespace":"...","key":"...","value":"..."}`
+/// counted as the fixed 36-byte envelope plus the raw UTF-8 byte lengths
+/// of `namespace`, `key`, and `value`.
 ///
-/// * the Stage 5 N62 satisfiability invariant
-///   ([`validate_state_policy`]), where `value_bytes` is the entry's
-///   declared `max_size`;
-/// * the runtime [`crate::state::StateStore`] transmit-budget check
-///   ([`E_STATE_TRANSMIT_BUDGET`](crate::validation::DiagnosticCode::EStateTransmitBudget)),
-///   where `value_bytes` is the actual `value.len()` retained.
+/// This is the Stage 5 N62 satisfiability invariant's accounting only
+/// ([`validate_state_policy`]), where `value_bytes` is the entry's declared
+/// `max_size` (a raw UTF-8 byte length per §07 `max_size`, rc.24 AMB-08).
+/// The `value` is NOT JSON-escape-expanded here, by design: the Stage 5
+/// aggregate is a *necessary* envelope bound computed from the declared
+/// policy, which does not know the concrete retained values (§07:109).
 ///
-/// `value_bytes` is a raw UTF-8 byte length in both call sites: the
-/// declared `max_size` (also a raw UTF-8 byte length per §07 max_size,
-/// rc.24 AMB-08) at Stage 5, and `String::len()` (UTF-8 bytes) at
-/// runtime. The `value` is NOT JSON-escape-expanded here. The fixed
-/// 36-byte envelope assumes `namespace`/`key`/`value` carry no
-/// escape-bearing characters; slug syntax guarantees this for
-/// `namespace` and `key`, and the Stage 5 aggregate is an envelope-level
-/// necessary bound that does not escape-expand the value (the runtime
-/// `E_STATE_TRANSMIT_BUDGET` check is where actual escaped wire bytes
-/// are accounted; rc.24 §09 "Submit body budget partition").
-///
-/// [`E_STATE_TRANSMIT_BUDGET`]: crate::validation::DiagnosticCode::EStateTransmitBudget
+/// This function is deliberately NOT used for the runtime
+/// `E_STATE_TRANSMIT_BUDGET` check. That check is the *sufficient*
+/// condition (§07:480, §09:264) and MUST measure the exact UTF-8 JSON byte
+/// sequence the client would transmit, including escaping of `\"`, `\\`,
+/// and `\u00XX` control characters; it does so by serializing the actual
+/// minimal submit body (`StateStore::projected_minimal_submit_bytes`),
+/// not via this raw-byte helper. The fixed 36-byte envelope assumes
+/// `namespace`/`key` carry no escape-bearing characters, which slug syntax
+/// guarantees.
 #[must_use]
 pub fn encoded_request_state_entry_bytes(
     namespace_bytes: usize,

@@ -14,7 +14,7 @@ use crate::types::slug::Slug;
 use crate::types::state::{StateMode, StatePolicyEntry, StateUpdateOp};
 use crate::types::timestamp::EntangledTimestamp;
 use crate::validation::diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel};
-use crate::validation::limits::{SUBMIT_BODY_MAX_BYTES, SUBMIT_OVERHEAD_RESERVE_BYTES};
+use crate::validation::limits::SUBMIT_BODY_MAX_BYTES;
 use crate::validation::policy_check::validate_state_update_against_policy;
 
 /// One state entry, as stored client-side. The `mode` is preserved from the
@@ -270,8 +270,7 @@ impl StateStore {
         // (client-only state is never transmitted). A client-only set
         // therefore cannot trigger this diagnostic.
         if mode == StateMode::Request {
-            let projected =
-                self.projected_minimal_submit_bytes(publisher, ns, key, value.len(), now);
+            let projected = self.projected_minimal_submit_bytes(publisher, ns, key, value, now);
             if projected > SUBMIT_BODY_MAX_BYTES {
                 return Err(Diagnostic::new(
                     DiagnosticCode::EStateTransmitBudget,
@@ -539,12 +538,20 @@ impl StateStore {
     /// result if a request-mode `set` of `(set_ns, set_key) = set_value`
     /// were committed under `publisher` right now.
     ///
-    /// The minimal submit body is `envelope_reserve + request_state` —
-    /// no `fields` portion, no oversized envelope. `request_state`
-    /// includes every currently-retained, non-expired, non-superseded
-    /// request-mode entry for `publisher`, plus the proposed new entry
-    /// (with `value.len() == set_value_len`) substituting any existing
-    /// retained value at the same `(ns, key)`.
+    /// The minimal submit body is the body the client would transmit with
+    /// `fields = {}`, `request_state` equal to every currently-retained,
+    /// non-expired, non-superseded request-mode entry for `publisher` (the
+    /// proposed new value substituting, or being appended at, the `(ns, key)`
+    /// slot), and a syntactically valid 22-character `request_id` (§07:474).
+    ///
+    /// Per §07:480 the returned length is the byte length of the EXACT UTF-8
+    /// JSON byte sequence the client would transmit for that body. It is
+    /// computed by serializing the actual [`SubmitBody`] and measuring the
+    /// result, so JSON string escaping (`\"`, `\\`, and `\u00XX` for control
+    /// characters in U+0000..=U+001F) is accounted for: a value's wire
+    /// contribution can exceed its raw UTF-8 byte length. Measuring raw byte
+    /// lengths here would underestimate the wire load and could admit
+    /// retained state whose real minimal submit body exceeds the cap (§09:260).
     ///
     /// Used by the transmit-budget check that fires
     /// `E_STATE_TRANSMIT_BUDGET` (§07:466-482) before commit.
@@ -553,11 +560,10 @@ impl StateStore {
         publisher: &PublisherPubkey,
         set_ns: &Slug,
         set_key: &Slug,
-        set_value_len: usize,
+        set_value: &str,
         now: &EntangledTimestamp,
     ) -> usize {
-        let mut total = SUBMIT_OVERHEAD_RESERVE_BYTES;
-        let mut included = 0usize;
+        let mut request_state: Vec<super::submit::RequestStateItem> = Vec::new();
         let mut found_overwrite = false;
         for (k, e) in &self.inner {
             if k.publisher != *publisher {
@@ -573,36 +579,42 @@ impl StateStore {
                 continue;
             }
             let same_slot = &k.namespace == set_ns && &k.key == set_key;
-            let value_len = if same_slot {
+            let value = if same_slot {
                 found_overwrite = true;
-                set_value_len
+                set_value.to_owned()
             } else {
-                e.value.len()
+                e.value.clone()
             };
-            total =
-                total.saturating_add(crate::validation::state::encoded_request_state_entry_bytes(
-                    k.namespace.as_str().len(),
-                    k.key.as_str().len(),
-                    value_len,
-                ));
-            included += 1;
+            request_state.push(super::submit::RequestStateItem {
+                namespace: k.namespace.clone(),
+                key: k.key.clone(),
+                value,
+            });
         }
         if !found_overwrite {
             // The proposed entry is a fresh slot, not an overwrite.
-            total =
-                total.saturating_add(crate::validation::state::encoded_request_state_entry_bytes(
-                    set_ns.as_str().len(),
-                    set_key.as_str().len(),
-                    set_value_len,
-                ));
-            included += 1;
+            request_state.push(super::submit::RequestStateItem {
+                namespace: set_ns.clone(),
+                key: set_key.clone(),
+                value: set_value.to_owned(),
+            });
         }
-        // Inter-entry array commas (N - 1) when the request_state array
-        // has at least one entry.
-        if included > 1 {
-            total = total.saturating_add(included - 1);
-        }
-        total
+        // Build the exact minimal submit body and measure the wire bytes it
+        // serializes to. `request_id` is a fixed-length placeholder: every
+        // valid 22-char request_id has the same wire length (§07:478), and
+        // its bytes are escape-free base64url, so the concrete value does not
+        // affect the measured length.
+        let body = super::submit::SubmitBody {
+            fields: std::collections::BTreeMap::new(),
+            request_state,
+            request_id: crate::types::keys::RequestId::from_bytes([0u8; 16]),
+        };
+        // Serializing a SubmitBody cannot fail (all fields are plain JSON
+        // types); fall back to a length that trips the cap rather than
+        // silently under-counting on the impossible error path.
+        serde_json::to_vec(&body)
+            .map(|v| v.len())
+            .unwrap_or(usize::MAX)
     }
 }
 

@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-05-29
+
+SEMVER PATCH in 0.x. Bug fix: the runtime request-state transmit-budget
+check now measures the exact JSON-escaped wire byte length the spec
+mandates, instead of a raw UTF-8 byte length. Closes
+`samjanny/entangled-api#1`. No public API signature change, no spec text
+change (the fix aligns the implementation to the existing 07:480 MUST;
+`SPEC_REVISION` stays `1.0-rc.24`).
+
+### Fixed
+
+- **E_STATE_TRANSMIT_BUDGET measured raw UTF-8 byte length, not the
+  JSON-escaped wire length (07:480 / 09:260).** `StateStore` rejected a
+  request-mode `set` whose retained state would overflow the minimal
+  submit body, but it projected the body size from raw `value.len()`
+  with no escape expansion. A retained `value` containing `"`, `\`, or
+  control characters in U+0000 through U+001F is larger on the wire
+  (control characters expand to the 6-byte `\u00XX` form), so the check
+  under-counted and could admit retained state whose real minimal submit
+  body exceeds the 64 KiB cap, which is the deadlock the rule exists to
+  prevent. `StateStore::projected_minimal_submit_bytes` now builds the
+  actual minimal `SubmitBody` (`fields = {}`, retained request-mode
+  entries, a fixed-length `request_id`) and serializes it, taking the
+  byte length of the result, which is literally the "exact UTF-8 JSON
+  byte sequence it would transmit" 07:480 specifies. This also drops the
+  prior approximation that seeded the projection with the 4096-byte 09
+  partition reserve in place of the real envelope, so the projection is
+  now exact rather than over-reserved. Behavior change: at the wire
+  boundary, some control-character-heavy values previously accepted are
+  now correctly rejected, and some ASCII values previously rejected by
+  the over-reservation are now correctly accepted. A control-character
+  regression test is added (`tests/state/transmit_budget.rs`).
+
+### Changed
+
+- **`encoded_request_state_entry_bytes` doc-comment corrected; it
+  previously over-claimed about runtime accounting.** The comment
+  (added in 0.5.1) stated that the runtime E_STATE_TRANSMIT_BUDGET check
+  "is where actual escaped wire bytes are accounted." That was false:
+  the runtime check did not escape-expand. The helper is now documented
+  as the Stage 5 raw-byte envelope bound only (the necessary condition),
+  and is no longer called by the runtime path, which serializes the body
+  directly (the sufficient condition). The Stage 5 E_SUBMIT_BUDGET
+  aggregate is unchanged and remains correct.
+- **Historical-content caller-obligation documentation.** The crate root
+  and the `E_HISTORICAL_*` diagnostic-code group now state explicitly
+  that historical-content authorization (10:510-553), including the
+  10:522 publication-existence MUST that fires
+  `E_HISTORICAL_NO_PUBLICATION_PROOF`, lives in the caller's trust-state
+  and publisher-history layer and is out of scope for this crate. The
+  codes are defined for 11 catalog completeness but are not emitted here;
+  a caller building that layer must implement the check. This is a
+  security-relevant caller obligation (an exfiltrated former
+  `K_runtime_priv` can forge historically-verifying documents without
+  the publication-existence check). Documentation only; no behavior
+  change.
+
 ## [0.5.1] - 2026-05-29
 
 SEMVER PATCH in 0.x. Spec alignment to v1.0-rc.24 (upstream Lotto 24):

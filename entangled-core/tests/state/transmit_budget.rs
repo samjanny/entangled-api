@@ -78,8 +78,9 @@ fn client_only_set_never_triggers_transmit_budget() {
 #[test]
 fn single_request_set_above_minimal_submit_cap_rejected() {
     // A single request-mode entry whose value alone pushes the minimal
-    // submit body over 64 KiB. Use a 62 KiB value: overhead reserve
-    // (4 KiB) + entry envelope (~40 B) + value (62 KiB) = 66 KiB > 64 KiB.
+    // submit body over 64 KiB. With ASCII (raw == wire), a 64 KiB value
+    // serializes to the minimal body `{"fields":{},"request_state":[{...
+    // "value":"<64 KiB>"}],"request_id":"<22>"}` = ~65645 bytes > 65536.
     let pub_a = pub_from_seed(152);
     let now = ts("2026-05-07T00:00:00Z");
     let rt = default_runtime();
@@ -90,7 +91,7 @@ fn single_request_set_above_minimal_submit_cap_rejected() {
     let err = store
         .set(
             &pub_a,
-            &big_set("ns", "k", 62 * 1024, 3600),
+            &big_set("ns", "k", 64 * 1024, 3600),
             StateMode::Request,
             ACCEPTED,
             &rt,
@@ -113,8 +114,9 @@ fn accumulated_request_state_overflowing_minimal_submit_rejected() {
     // Multiple medium-sized request-state entries that, taken together,
     // overflow the minimal submit body even though each one alone fits.
     //
-    // 4 KiB overhead reserve + 16 entries × (~4 KiB value + ~40 B
-    // envelope) ≈ 64 KiB + change. The 17th smaller entry tips it over.
+    // Each entry serializes to ~4 KiB value + ~46 B object framing + 1
+    // inter-entry comma. 15 entries project to ~62139 bytes (under cap);
+    // the 16th tips the serialized minimal body past 65536.
     let pub_a = pub_from_seed(153);
     let now = ts("2026-05-07T00:00:00Z");
     let rt = default_runtime();
@@ -122,8 +124,8 @@ fn accumulated_request_state_overflowing_minimal_submit_rejected() {
         bytes_per_publisher: 256 * 1024,
     });
 
-    // 14 entries × 4 KiB fit; the 15th tips it over the 64 KiB cap.
-    for i in 0..14 {
+    // 15 entries x 4 KiB fit; the 16th tips it over the 64 KiB cap.
+    for i in 0..15 {
         let key_name = format!("k{i:02}");
         store
             .set(
@@ -137,7 +139,7 @@ fn accumulated_request_state_overflowing_minimal_submit_rejected() {
             .unwrap_or_else(|e| panic!("entry {i} must commit but got {e:?}"));
     }
 
-    // The 15th 4 KiB entry should overflow the projected minimal body.
+    // The 16th 4 KiB entry should overflow the projected minimal body.
     let err = store
         .set(
             &pub_a,
@@ -174,8 +176,8 @@ fn overwrite_of_existing_slot_does_not_double_count() {
         )
         .expect("first 30 KiB commit");
 
-    // Overwriting the same slot with another 30 KiB must succeed:
-    // 4 KiB overhead + 1 entry ≈ 34 KiB << 64 KiB.
+    // Overwriting the same slot with another 30 KiB must succeed: the
+    // minimal body holds a single ~30 KiB entry, well under 64 KiB.
     store
         .set(
             &pub_a,
@@ -186,6 +188,48 @@ fn overwrite_of_existing_slot_does_not_double_count() {
             &now,
         )
         .expect("overwrite of same slot must not double-count");
+}
+
+#[test]
+fn control_char_value_counted_at_escaped_wire_length() {
+    // Regression for the §07:480 / §09:260 wire-length rule: a value
+    // containing control characters serializes to far more bytes on the
+    // wire than its raw UTF-8 length (each U+0000..=U+001F byte becomes the
+    // 6-byte `\u00XX` escape). The transmit-budget projection MUST measure
+    // the escaped wire length, so a value whose RAW length fits but whose
+    // ESCAPED length overflows MUST be rejected.
+    let pub_a = pub_from_seed(156);
+    let now = ts("2026-05-07T00:00:00Z");
+    let rt = default_runtime();
+    let mut store = StateStore::with_cap(StorageCap {
+        bytes_per_publisher: 256 * 1024,
+    });
+
+    // 12 KiB of U+0001: raw UTF-8 length = 12288 bytes (well under the cap),
+    // but escaped wire length = 12288 * 6 = 73728 bytes > 65536. A raw-byte
+    // projection would ACCEPT this; an escaped-wire projection MUST REJECT.
+    let value = "\u{0001}".repeat(12 * 1024);
+    assert_eq!(value.len(), 12 * 1024, "raw value fits comfortably");
+
+    let err = store
+        .set(
+            &pub_a,
+            &set_op("ns", "k", &value, 3600),
+            StateMode::Request,
+            ACCEPTED,
+            &rt,
+            &now,
+        )
+        .expect_err("control-char value over escaped wire cap MUST reject");
+    assert_eq!(err.code, DiagnosticCode::EStateTransmitBudget);
+    let projected = err.details.as_ref().unwrap()["projected_bytes"]
+        .as_u64()
+        .expect("projected_bytes integer");
+    assert!(
+        projected > 65_536,
+        "projection must reflect escaped wire length (>{}), got {projected}",
+        65_536
+    );
 }
 
 #[test]

@@ -8,7 +8,11 @@
 //! store ([`state`]), and Tor v3 onion-address handling ([`tor`]).
 //!
 //! Transport, the trust-state machine (Stage 7), publisher history persistence,
-//! and consent UI are out of scope for this crate.
+//! consent UI, and historical-content authorization (the §10 publisher-history
+//! layer, including the §10:522 publication-existence MUST) are out of scope
+//! for this crate. The `E_HISTORICAL_*` diagnostic codes are defined for §11
+//! catalog completeness but are not emitted here; a caller building that layer
+//! is responsible for them (see `validation::DiagnosticCode`).
 //!
 //! The full protocol specification lives at
 //! <https://github.com/samjanny/entangled>.

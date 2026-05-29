@@ -293,7 +293,20 @@ pub enum DiagnosticCode {
     #[serde(rename = "I_STATE_CONSENT_REMEMBERED")]
     IStateConsentRemembered,
 
-    // Historical content (off-pipeline)
+    // Historical content (off-pipeline).
+    //
+    // Caller obligation: historical-content authorization (§10:510-553)
+    // lives in the caller's trust-state and publisher-history layer, which
+    // this crate declares out of scope (see the crate root). The crate
+    // defines these codes for §11 catalog completeness but does NOT emit
+    // them: it has no authorization-history store, no key-trial order
+    // (§10:545), and no rendering-record store. A caller building that layer
+    // is responsible for emitting them, and in particular MUST implement the
+    // §10:522 publication-existence check that fires
+    // `E_HISTORICAL_NO_PUBLICATION_PROOF` - it is security-critical, because
+    // without it an attacker holding an exfiltrated former `K_runtime_priv`
+    // can fabricate documents that verify as historically authentic but were
+    // never published.
     #[serde(rename = "E_HISTORICAL_NO_AUTHORIZATION")]
     EHistoricalNoAuthorization,
     #[serde(rename = "E_HISTORICAL_TRUST_BLOCKED")]
