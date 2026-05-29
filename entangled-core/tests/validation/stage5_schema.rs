@@ -5,8 +5,8 @@ use entangled_core::validation::{
 use serde_json::{json, Value};
 
 use crate::common::{
-    fixed_now, minimal_canary, minimal_content_doc, minimal_manifest, REQUEST_ID_ZEROS,
-    SHA256_PREFIXED_ZEROS, SIG_ZEROS,
+    fixed_now, minimal_canary, minimal_content_doc, minimal_manifest, onion_for, origin_key_real,
+    REQUEST_ID_ZEROS, SHA256_PREFIXED_ZEROS, SIG_ZEROS,
 };
 
 fn manifest_value() -> Value {
@@ -820,17 +820,53 @@ fn migration_pointer_null_rejected_by_prepass() {
 
 #[test]
 fn migration_pointer_well_formed_accepted_at_schema_level() {
+    // successor_origin.address must decode to successor_origin.origin_pubkey
+    // (§06:383). Use a coherent (address, pubkey) pair derived from a real
+    // strict-profile-clean key so the announcement-internal binding holds.
+    let succ_key = origin_key_real();
     let mp = json!({
         "successor_origin": {
             "carrier": "tor-v3",
-            "address": "ssssssssssssssssssssssssssssssssssssssssssssssssssssssss.onion",
-            "origin_pubkey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            "address": onion_for(&succ_key),
+            "origin_pubkey": succ_key.to_string(),
         },
         "announced_at": "2026-05-06T12:00:00Z",
     });
     let v = manifest_value_with_migration_pointer(mp);
     parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now())
         .expect("well-formed migration_pointer must pass schema validation");
+}
+
+#[test]
+fn migration_pointer_successor_key_mismatch_rejected() {
+    // §06:383 (rc.25): for Tor v3 the client MUST verify that
+    // successor_origin.address decodes to successor_origin.origin_pubkey.
+    // Here the address decodes to origin_key_real() but the declared
+    // origin_pubkey is the all-zero key, so the binding fails. Reported as
+    // E_MIGRATION_INVALID with details.reason="successor_key_mismatch" (the
+    // closed-enum value added in rc.25). Announcement-internal: no successor
+    // fetch. Regression for entangled-api#3.
+    let addr_key = origin_key_real();
+    let mp = json!({
+        "successor_origin": {
+            "carrier": "tor-v3",
+            "address": onion_for(&addr_key),
+            "origin_pubkey": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        },
+        "announced_at": "2026-05-06T12:00:00Z",
+    });
+    let v = manifest_value_with_migration_pointer(mp);
+    let err = parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now())
+        .expect_err("successor address-to-key mismatch must reject");
+    assert_eq!(err.code, DiagnosticCode::EMigrationInvalid);
+    let details = err.details.as_ref().expect("details payload");
+    assert_eq!(
+        details["reason"].as_str(),
+        Some("successor_key_mismatch"),
+        "got reason {:?}",
+        details["reason"]
+    );
+    assert!(details["successor_origin_address"].is_string());
 }
 
 #[test]

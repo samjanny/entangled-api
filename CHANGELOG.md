@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-05-29
+
+SEMVER PATCH in 0.x. Spec alignment to v1.0-rc.25 (upstream Lotto 25) and
+implementation of the section 06:383 announcement-internal successor
+address-to-key binding check, closing `samjanny/entangled-api#3`. No
+public API signature change; `spec_version` stays `"1.0"`.
+
+### Added
+
+- **migration_pointer successor address-to-key binding check (06:383).**
+  `validate_migration_pointer` now verifies, for Tor v3, that
+  `successor_origin.address` decodes to a public key equal to
+  `successor_origin.origin_pubkey` (the same binding rule as for the
+  top-level `origin`, per section 05). This is announcement-internal: it
+  checks the two declared fields and does not fetch the successor
+  (distinct from the section 10 fetch-time `E_MIGRATION_MISMATCH`
+  checks). A decode failure or key mismatch is reported as
+  `E_MIGRATION_INVALID` with `details.reason = "successor_key_mismatch"`,
+  the closed-enum reason value added in spec rc.25. Before this release
+  the check was not enforced at the announcement level; an inconsistent
+  successor binding was caught only later, at the section 10 fetch step
+  (which is the caller's transport layer). Behavior change: an announcing
+  manifest whose `successor_origin` address and pubkey are inconsistent
+  is now rejected at Stage 5 validation.
+
+### Changed (spec v1.0-rc.25 alignment - Lotto 25)
+
+- **`SPEC_REVISION` bumped `1.0-rc.24` -> `1.0-rc.25`** and the CI
+  conformance-corpus pin (`.github/workflows/ci.yml`) moved to
+  `ref: v1.0-rc.25`. The rc.25 corpus adds one vector
+  (`202-migration-successor-key-mismatch`) exercising the new check; no
+  existing vector input bytes change.
+
 ## [0.5.2] - 2026-05-29
 
 SEMVER PATCH in 0.x. Bug fix: the runtime request-state transmit-budget

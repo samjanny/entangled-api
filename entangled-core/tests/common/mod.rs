@@ -69,6 +69,26 @@ pub fn origin_key_real() -> OriginPubkey {
     OriginPubkey::from_bytes(*runtime.as_bytes())
 }
 
+/// Derive the Tor v3 `.onion` address that decodes to `pubkey`, so that the
+/// pair `(address, pubkey)` satisfies the §06 address-to-key binding.
+/// Mirrors the encoding in `tor::address` (base32 of pubkey || checksum ||
+/// version, where checksum = SHA3-256(".onion checksum" || pubkey || 0x03)).
+pub fn onion_for(pubkey: &OriginPubkey) -> String {
+    use data_encoding::BASE32;
+    use sha3::{Digest, Sha3_256};
+    let pk = pubkey.as_bytes();
+    let mut hasher = Sha3_256::new();
+    hasher.update(b".onion checksum");
+    hasher.update(pk);
+    hasher.update([0x03]);
+    let digest = hasher.finalize();
+    let mut payload = [0u8; 35];
+    payload[..32].copy_from_slice(pk);
+    payload[32..34].copy_from_slice(&[digest[0], digest[1]]);
+    payload[34] = 0x03;
+    format!("{}.onion", BASE32.encode(&payload).to_ascii_lowercase())
+}
+
 pub fn signature_zero() -> Signature {
     Signature::try_from(SIG_ZEROS).unwrap()
 }

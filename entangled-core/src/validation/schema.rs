@@ -370,9 +370,15 @@ pub(crate) fn validate_manifest_fields(
 ///   the rule is normative);
 /// * `announced_at` is not later than the announcing manifest's `updated`
 ///   (the publisher cannot retroactively post-date an announcement).
+/// * for Tor v3, `successor_origin.address` decodes to a public key equal
+///   to `successor_origin.origin_pubkey` (§06:383 rc.25, the same
+///   address-to-key binding rule as for the top-level `origin`). This is
+///   announcement-internal and does not fetch the successor; failure is
+///   `details.reason = "successor_key_mismatch"`. It is distinct from the
+///   §10 fetch-time successor checks, which fail as `E_MIGRATION_MISMATCH`.
 ///
-/// All four failures are reported as `E_MIGRATION_INVALID` (§11 rc.13,
-/// row extended in rc.14). The structural well-formedness check fires
+/// All five failures are reported as `E_MIGRATION_INVALID` (§11 rc.13,
+/// row extended in rc.14 and rc.25). The structural well-formedness check fires
 /// before `verify_migration_announcement`, which compares publisher
 /// pubkeys across the announcing and successor manifests after both
 /// have cleared their own pipeline. The per-flow chain-cycle check is
@@ -442,6 +448,33 @@ pub fn validate_migration_pointer(
         .with_details(serde_json::json!({
             "field_path": "migration_pointer.announced_at",
             "reason": "announced_at_after_updated",
+            "announcing_origin_address": announcing_origin.address.as_str(),
+            "successor_origin_address": mp.successor_origin.address.as_str(),
+        })));
+    }
+    // §06:383 (rc.25): for Tor v3, the client MUST verify, before treating
+    // the announcement as valid, that `successor_origin.address` decodes to
+    // a public key equal to `successor_origin.origin_pubkey` (the same
+    // address-to-key binding rule as for the top-level `origin`, per §05).
+    // This is announcement-internal: it checks the two declared fields of
+    // the pointer and does not fetch the successor (distinct from the §10
+    // fetch-time `E_MIGRATION_MISMATCH` checks). A decode failure or a key
+    // mismatch is `E_MIGRATION_INVALID` with reason `successor_key_mismatch`.
+    let binds = mp
+        .successor_origin
+        .address
+        .verify_strict()
+        .map(|decoded| decoded.pubkey == mp.successor_origin.origin_pubkey)
+        .unwrap_or(false);
+    if !binds {
+        return Err(Diagnostic::new(
+            DiagnosticCode::EMigrationInvalid,
+            DocumentKindLabel::Manifest,
+            "migration_pointer.successor_origin.address does not decode to successor_origin.origin_pubkey",
+        )
+        .with_details(serde_json::json!({
+            "field_path": "migration_pointer.successor_origin.origin_pubkey",
+            "reason": "successor_key_mismatch",
             "announcing_origin_address": announcing_origin.address.as_str(),
             "successor_origin_address": mp.successor_origin.address.as_str(),
         })));
