@@ -1,5 +1,9 @@
 # Entangled API
 
+[![CI](https://github.com/samjanny/entangled-api/actions/workflows/ci.yml/badge.svg)](https://github.com/samjanny/entangled-api/actions/workflows/ci.yml)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
+[![MSRV](https://img.shields.io/badge/MSRV-1.88-orange.svg)](#install)
+
 Rust implementation of the Entangled v1.0 protocol: typed signed documents, closed-schema validation, JCS canonicalization, Ed25519 signing and verification, Publisher Identity Phrase derivation, Tor v3 origin binding, canary checks, and client-side state helpers.
 
 Entangled is a protocol for publishing signed, structured documents over hostile or anonymity-oriented carrier networks. It is designed for small content sites where the reader should be able to verify publisher identity while the client keeps the rendering attack surface deliberately narrow.
