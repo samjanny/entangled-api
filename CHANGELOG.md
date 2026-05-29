@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-05-29
+
+SEMVER PATCH in 0.x. Spec alignment to v1.0-rc.24 (upstream Lotto 24):
+seven specification ambiguities are pinned to the reading this crate
+already takes, closing upstream `samjanny/entangled#2`, `#3`, `#4`,
+`#5`, `#7`, `#8`, and `#9` (AMB-01 through AMB-08). No public API
+change, no behavior change, no wire-format change; the crate already
+implemented every pinned reading. `spec_version` remains `"1.0"`.
+
+### Changed (spec v1.0-rc.24 alignment - Lotto 24: AMB-01..AMB-08)
+
+- **`SPEC_REVISION` bumped `1.0-rc.23` -> `1.0-rc.24`** and the CI
+  conformance-corpus pin (`.github/workflows/ci.yml`) moved to
+  `ref: v1.0-rc.24` in lockstep. The conformance harness asserts the
+  corpus `rc_target` equals `SPEC_REVISION`; the rc.24 corpus is
+  byte-identical to rc.23 at the vector level (only `rc_target`
+  moved), so the existing 60 vectors pass unchanged.
+- **No emission-path, type, or severity change.** Each of the seven
+  upstream ambiguities pins a reading this crate already takes, so no
+  code change was required to remain conformant:
+  - AMB-01/02 (`samjanny/entangled#2`, `#3`): for `/content_index.json`,
+    transport violations map to `E_CONTENT_INDEX_FETCH_FAILED`,
+    displacing the generic Stage 1 transport codes. Already documented
+    as a caller obligation in `validation/content_index.rs` module docs
+    (PR5 / audit finding M-4).
+  - AMB-03 (`samjanny/entangled#4`): an empty content-index `entries`
+    map is valid. `ContentIndex::is_empty()` already exposes this state
+    as legitimate.
+  - AMB-04 (`samjanny/entangled#5`): when the content-index fetch
+    fails, the per-document checks are not evaluated.
+    `verify_content_against_index` requires a `ContentIndex` argument
+    that a failed fetch never produces, so these checks already cannot
+    run without a verified index.
+  - AMB-06 (`samjanny/entangled#7`): the 5-year `origin.not_after`
+    ceiling is evaluated per manifest against that manifest's own
+    `canary.issued_at`. `validate_origin_not_after` already checks the
+    horizon against the current manifest's `canary.issued_at`.
+  - AMB-07 (`samjanny/entangled#8`): the `request_state`/`fields`
+    array-wrapper bytes count against `SUBMIT_OVERHEAD_RESERVE_BYTES`;
+    only per-entry payload and inter-entry commas count against the
+    per-array budget. `aggregate_request_state_bytes` already counts
+    the 36-byte per-entry envelope plus field lengths plus inter-entry
+    commas, with the array wrapper provided for in the 4096-byte
+    overhead reserve.
+  - AMB-08 (`samjanny/entangled#9`): the per-value `max_size` cap and
+    the 4096 ceiling are raw UTF-8 byte lengths, not JSON-escaped wire
+    lengths. The crate already checks `value.len()` (raw UTF-8 bytes)
+    against the cap and plugs the raw `max_size` into the Stage 5
+    budget aggregate with no escape expansion. The
+    `encoded_request_state_entry_bytes` doc comment in
+    `validation/state.rs` is sharpened to state explicitly that
+    `value_bytes` is a raw UTF-8 byte length in both call sites and is
+    not escape-expanded for the Stage 5 envelope bound.
+
+### Fixed
+
+- **README stale crate version.** The Status section read
+  `Current crate version: 0.1.0`; it now reads `0.5.1`, matching the
+  package version. This line had not been updated since the 0.1.0
+  release and was unrelated to any single feature change.
+
 ## [0.5.0] - 2026-05-28
 
 SEMVER MINOR in 0.x. Public API break driven by the v1.0-rc.23 spec

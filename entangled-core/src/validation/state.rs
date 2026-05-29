@@ -51,6 +51,17 @@ pub const REQUEST_STATE_ENTRY_ENVELOPE_BYTES: usize = 36;
 ///   ([`E_STATE_TRANSMIT_BUDGET`](crate::validation::DiagnosticCode::EStateTransmitBudget)),
 ///   where `value_bytes` is the actual `value.len()` retained.
 ///
+/// `value_bytes` is a raw UTF-8 byte length in both call sites: the
+/// declared `max_size` (also a raw UTF-8 byte length per §07 max_size,
+/// rc.24 AMB-08) at Stage 5, and `String::len()` (UTF-8 bytes) at
+/// runtime. The `value` is NOT JSON-escape-expanded here. The fixed
+/// 36-byte envelope assumes `namespace`/`key`/`value` carry no
+/// escape-bearing characters; slug syntax guarantees this for
+/// `namespace` and `key`, and the Stage 5 aggregate is an envelope-level
+/// necessary bound that does not escape-expand the value (the runtime
+/// `E_STATE_TRANSMIT_BUDGET` check is where actual escaped wire bytes
+/// are accounted; rc.24 §09 "Submit body budget partition").
+///
 /// [`E_STATE_TRANSMIT_BUDGET`]: crate::validation::DiagnosticCode::EStateTransmitBudget
 #[must_use]
 pub fn encoded_request_state_entry_bytes(
