@@ -761,17 +761,31 @@ fn is_integer_width_message(msg: &str) -> bool {
 }
 
 fn is_length_message(msg: &str) -> bool {
+    // Variable-size cap overruns on the Phase 1 newtypes. (In practice the slug
+    // and path messages also contain "slug"/"path" and so are caught by
+    // `is_syntax_message` first; this branch is the explicit length signal.)
     msg.contains("exceeds maximum length")
-        || msg.contains("expected ")
-            && (msg.contains("base64url characters") || msg.contains("ASCII characters"))
 }
 
 fn is_syntax_message(msg: &str) -> bool {
-    // Phase 1 newtype error messages.
+    // Phase 1 newtype error messages. A fixed-form field whose value violates
+    // its declared syntax -- including a wrong exact length -- is a
+    // `E_SCHEMA_FIELD_SYNTAX` violation (§04:180-183), not a length code: the
+    // length code (`is_length_message`) is reserved for fields whose syntax
+    // permits a variable size up to a declared cap.
     msg.contains("slug")
         || msg.contains("path")
         || msg.contains("timestamp")
         || msg.contains("base64url")
         || msg.contains("onion")
         || msg.contains("spec_version")
+        // `sha-256:<base64url>` digest decode errors (`content_root`,
+        // `image.sha256`, `request_hash`): wrong exact length ("expected 51
+        // ASCII characters"), a missing/wrong "sha-256:" prefix, a non-base64url
+        // digest, or a wrong decoded-digest byte length. All are fixed-form
+        // syntax violations per §04:180-183 -> E_SCHEMA_FIELD_SYNTAX, matching
+        // the Java reference (`sha256Field`).
+        || msg.contains("sha-256:")
+        || msg.contains("digest")
+        || msg.contains("ASCII characters")
 }

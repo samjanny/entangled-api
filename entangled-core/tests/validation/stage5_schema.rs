@@ -1055,3 +1055,90 @@ fn t21_inline_link_nested_inside_link_label_rejected() {
     let err = parse_and_validate_content(&manifest_bytes(&v)).unwrap_err();
     assert_eq!(err.code, DiagnosticCode::ESchemaBlockNotPermitted);
 }
+
+// Malformed `sha-256:<base64url>` fields (`content_root`, `request_hash`,
+// `image.sha256`) are fixed-form syntax violations per §04:180-183 and MUST be
+// E_SCHEMA_FIELD_SYNTAX, not the generic length/type codes. Each reachable
+// sub-case of the digest decode error (wrong exact length, missing prefix,
+// non-base64url digest) is checked. This matches the Java reference
+// (`sha256Field`).
+
+// Not 51 ASCII characters -> InvalidLength ("expected 51 ASCII characters").
+const SHA256_BAD_LENGTH: &str = "sha-256:tooshort";
+// Exactly 51 chars but the prefix is not the lowercase "sha-256:" tag.
+const SHA256_BAD_PREFIX: &str = "sXa-256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+// Exactly 51 chars, correct prefix, but the digest segment is not base64url
+// (contains '+', which is outside the URL-safe alphabet).
+const SHA256_BAD_DIGEST: &str = "sha-256:+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
+#[test]
+fn t24_manifest_content_root_malformed_is_field_syntax() {
+    for bad in [SHA256_BAD_LENGTH, SHA256_BAD_PREFIX, SHA256_BAD_DIGEST] {
+        let mut v = manifest_value();
+        v.as_object_mut()
+            .unwrap()
+            .insert("content_root".to_owned(), json!(bad));
+        let err = parse_and_validate_manifest(&manifest_bytes(&v), &fixed_now())
+            .expect_err("malformed content_root must reject");
+        assert_eq!(
+            err.code,
+            DiagnosticCode::ESchemaFieldSyntax,
+            "content_root {bad:?} must be E_SCHEMA_FIELD_SYNTAX, got {:?}",
+            err.code
+        );
+    }
+}
+
+#[test]
+fn t24_transaction_request_hash_malformed_is_field_syntax() {
+    for bad in [SHA256_BAD_LENGTH, SHA256_BAD_PREFIX, SHA256_BAD_DIGEST] {
+        let v = json!({
+            "spec_version": "1.0",
+            "kind": "transaction",
+            "in_response_to": "/contact",
+            "request_id": REQUEST_ID_ZEROS,
+            "request_hash": bad,
+            "state_updates": [],
+            "blocks": [
+                { "kind": "feedback", "variant": "success",
+                  "content": [{ "kind": "text", "value": "ok", "marks": [] }] }
+            ],
+            "sig": SIG_ZEROS
+        });
+        let err = parse_and_validate_transaction(&serde_json::to_vec(&v).unwrap())
+            .expect_err("malformed request_hash must reject");
+        assert_eq!(
+            err.code,
+            DiagnosticCode::ESchemaFieldSyntax,
+            "request_hash {bad:?} must be E_SCHEMA_FIELD_SYNTAX, got {:?}",
+            err.code
+        );
+    }
+}
+
+#[test]
+fn t24_content_image_sha256_malformed_is_field_syntax() {
+    for bad in [SHA256_BAD_LENGTH, SHA256_BAD_PREFIX, SHA256_BAD_DIGEST] {
+        let mut v = content_value();
+        let blocks = v.as_object_mut().unwrap().get_mut("blocks").unwrap();
+        *blocks = json!([
+            {
+                "kind": "image",
+                "src": "/a.png",
+                "sha256": bad,
+                "media_type": "image/png",
+                "width": 800,
+                "height": 600,
+                "alt": "diagram"
+            }
+        ]);
+        let err = parse_and_validate_content(&manifest_bytes(&v))
+            .expect_err("malformed image.sha256 must reject");
+        assert_eq!(
+            err.code,
+            DiagnosticCode::ESchemaFieldSyntax,
+            "image.sha256 {bad:?} must be E_SCHEMA_FIELD_SYNTAX, got {:?}",
+            err.code
+        );
+    }
+}
