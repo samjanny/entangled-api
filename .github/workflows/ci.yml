@@ -26,12 +26,12 @@ jobs:
       - name: Checkout spec corpus
         # Pinned in lockstep with entangled_core::SPEC_REVISION
         # (entangled-core/src/lib.rs). The conformance harness asserts
-        # they match — a mismatch fails CI loudly instead of degrading
+        # they match - a mismatch fails CI loudly instead of degrading
         # silently.
         uses: actions/checkout@v4
         with:
           repository: samjanny/entangled
-          ref: v1.0-rc.40
+          ref: v1.0-rc.41
           path: docs-spec
       - uses: dtolnay/rust-toolchain@master
         with:
