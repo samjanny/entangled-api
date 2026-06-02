@@ -1,4 +1,4 @@
-//! Stage 5 — standalone state validators (no policy lookup).
+//! Stage 5 - standalone state validators (no policy lookup).
 //!
 //! Cross-checks against the manifest's declared `state_policy` (such as the
 //! `(namespace, key)` declaration check or `value.len() <= max_size`) belong

@@ -36,7 +36,7 @@ fn keys_differing_only_in_last_character() {
 #[test]
 fn utf16_distinguishing_supplementary_vs_pua() {
     // This case rigorously distinguishes UTF-8 byte ordering from
-    // UTF-16-code-unit ordering — the previous test (~ vs 😀) sorts the same
+    // UTF-16-code-unit ordering - the previous test (~ vs 😀) sorts the same
     // way under both, so it could not catch a regression to byte ordering.
     //
     // 😀 (U+1F600): UTF-8 starts with 0xF0; UTF-16 high surrogate 0xD83D.

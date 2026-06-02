@@ -1,4 +1,4 @@
-//! Stage 3 — JSON parsing with parser-enforced limits. §10.
+//! Stage 3 - JSON parsing with parser-enforced limits. §10.
 //!
 //! Deserialization goes through a custom `serde::Visitor` that produces a
 //! `serde_json::Value` while rejecting **duplicate object keys** at parse
@@ -77,11 +77,11 @@ pub fn parse_with_limits(s: &str) -> Result<Value, Diagnostic> {
 /// numbers in parsed `Value`s. This pass closes the remaining gaps that
 /// neither catches:
 ///
-/// * `-0` — silently parsed as `0` by typical JSON readers, which would
+/// * `-0` - silently parsed as `0` by typical JSON readers, which would
 ///   conflate negative zero with positive zero.
-/// * any negative integer — Entangled has no signed integer fields; a
+/// * any negative integer - Entangled has no signed integer fields; a
 ///   value like `-1` outside a typed deserializer would slip through.
-/// * any integer whose decimal value exceeds `2^63 − 1` — fits in
+/// * any integer whose decimal value exceeds `2^63 - 1` - fits in
 ///   `serde_json::Number::PosInt(u64)` but is out of the protocol-wide
 ///   range.
 /// * float-shaped tokens (`1.0`, `1e0`, `1E1`) as a defence-in-depth
@@ -130,8 +130,8 @@ fn enforce_integer_grammar(input: &str) -> Result<(), Diagnostic> {
 ///
 /// §04 (rc.5) defines the protocol's numeric domain as
 /// `integer = "0" / non-zero-digit *digit` with a value range
-/// `[0, 2^63 - 1]`. Any token that fails this grammar — float-shaped,
-/// negative, or out of range — is rejected with `E_SCHEMA_NON_INTEGER`
+/// `[0, 2^63 - 1]`. Any token that fails this grammar - float-shaped,
+/// negative, or out of range - is rejected with `E_SCHEMA_NON_INTEGER`
 /// per §04 line 95 ("A document containing a numeric token that fails
 /// the integer grammar is rejected with `E_SCHEMA_NON_INTEGER`").
 /// `E_SCHEMA_FIELD_RANGE` is reserved for in-grammar integers that

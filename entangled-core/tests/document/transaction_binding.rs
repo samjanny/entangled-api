@@ -82,7 +82,7 @@ fn mismatched_request_id_emits_bind_request_id() {
 
 #[test]
 fn mismatched_request_hash_emits_bind_request_hash() {
-    // Path and request_id match; only the canonical-body digest differs —
+    // Path and request_id match; only the canonical-body digest differs -
     // the helper recomputes the digest from `submit_body` and rejects.
     let rid = RequestId::from_bytes([0u8; 16]);
     let body = ok_submit_body(rid);
@@ -107,7 +107,7 @@ fn mismatched_request_hash_emits_bind_request_hash() {
 #[test]
 fn checks_run_in_path_then_id_then_hash_order() {
     // When all three would fail, the helper reports the path failure first
-    // — matching §10's stage-ordered "first failure" rule.
+    // - matching §10's stage-ordered "first failure" rule.
     let rid_body = RequestId::from_bytes([0u8; 16]);
     let body = ok_submit_body(rid_body);
 

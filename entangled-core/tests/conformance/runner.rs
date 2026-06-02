@@ -42,7 +42,7 @@ pub enum VectorOutcome {
 
 /// Run a single vector against the implementation. The `Result` outer layer
 /// is reserved for harness-internal errors (missing fixture file, malformed
-/// context, etc.) — those are reported separately from a vector mismatch.
+/// context, etc.) - those are reported separately from a vector mismatch.
 pub fn run_vector(vector: &Vector, corpus: &Corpus) -> Result<VectorOutcome, String> {
     let now = parse_clock(&corpus.clock_now)?;
     let raw = read_input(corpus, &vector.input)?;
@@ -302,7 +302,7 @@ fn run_successor_pipeline(
             return if d.stage >= 6 {
                 // Stage 6+ failure raised by parse_and_verify_manifest
                 // means schema passed. Re-extract the pubkey from the raw
-                // payload — this is a best-effort read, not validation.
+                // payload - this is a best-effort read, not validation.
                 match read_successor_pubkey_unchecked(raw) {
                     Some(pk) => SuccessorOutcome::RejectAfterSchema(d, pk),
                     None => SuccessorOutcome::RejectBeforeSchema(d),
@@ -340,7 +340,7 @@ fn run_successor_pipeline(
 }
 
 /// Best-effort extraction of `publisher_pubkey` from raw manifest bytes
-/// after a Stage 6+ rejection — Stage 5 has already passed at that point,
+/// after a Stage 6+ rejection - Stage 5 has already passed at that point,
 /// so the field is present and well-formed.
 fn read_successor_pubkey_unchecked(
     raw: &[u8],
@@ -360,7 +360,7 @@ fn run_content(vector: &Vector, raw: &[u8]) -> Result<Verdict, String> {
     // Parse-stage rejections (Stages 2-5) never reach signature
     // verification, so vectors that fail early may legitimately omit
     // `expected_runtime_pubkey` from their context. Fall back to a
-    // placeholder key in that case — if the implementation reaches Stage
+    // placeholder key in that case - if the implementation reaches Stage
     // 6 with the placeholder, signature verification will simply fail and
     // the diagnostic mismatch will surface in `compare`.
     let has_key_source = vector.context.expected_runtime_pubkey.is_some()
@@ -393,7 +393,7 @@ fn run_content(vector: &Vector, raw: &[u8]) -> Result<Verdict, String> {
         }
     };
 
-    // Stage 9: path binding. The crate exposes no helper for this — it is
+    // Stage 9: path binding. The crate exposes no helper for this - it is
     // intentionally the caller's responsibility (parser.rs documents this).
     if let Some(fetched) = vector.context.fetched_path.as_deref() {
         let fetched_path = EntangledPath::try_from(fetched)

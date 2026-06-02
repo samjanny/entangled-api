@@ -108,7 +108,7 @@ pub enum Carrier {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Origin {
-    /// Transport carrier — only `tor-v3` in v1.0.
+    /// Transport carrier - only `tor-v3` in v1.0.
     pub carrier: Carrier,
     /// `.onion` address of the origin.
     pub address: OnionAddress,

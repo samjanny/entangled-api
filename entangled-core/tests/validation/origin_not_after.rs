@@ -5,9 +5,9 @@
 //! `stage5_schema.rs`. This file targets the Stage 9 helpers exported
 //! from `crate::validation`:
 //!
-//! * `check_origin_not_after` — E_ORIGIN_EXPIRED on expired manifests,
+//! * `check_origin_not_after` - E_ORIGIN_EXPIRED on expired manifests,
 //!   honouring the §10 clock-skew tolerance in the publisher's favour.
-//! * `check_migration_chain_cycle` — E_MIGRATION_INVALID with
+//! * `check_migration_chain_cycle` - E_MIGRATION_INVALID with
 //!   `details.reason = "chain_cycle"` when the announced successor
 //!   address is already in the per-flow `visited_origins` set; on
 //!   acceptance the helper inserts the address so the caller can thread
@@ -83,7 +83,7 @@ fn not_after_far_in_the_past_rejected() {
 #[test]
 fn details_now_rounds_down_at_seconds_59_boundary() {
     // §11 v1.0-rc.18 (N18): `details.now` rounds *down* to minute
-    // precision. The same-minute boundary case — :59 truncated to :00 —
+    // precision. The same-minute boundary case - :59 truncated to :00 -
     // is the one most likely to surface a bug if rounding were
     // mis-implemented as nearest-minute or as truncation of the minute.
     let m = manifest_with_not_after(Some("2026-05-07T00:00:00Z"));

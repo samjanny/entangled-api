@@ -9,7 +9,7 @@
 //! `ManifestCanaryChecked` warns when a wrapper value is silently dropped
 //! without being used, catching the trivial "called but ignored" case.
 //! It does not prevent a caller from reading fields via `ManifestRead`
-//! and then dropping the wrapper — that flow is permitted by design,
+//! and then dropping the wrapper - that flow is permitted by design,
 //! since per-field reads on incomplete states are needed for Stage 7
 //! (trust state lookup, §10) which precedes Stage 8. We assert chain
 //! shape here at runtime by walking every supported chain shape; the
@@ -18,9 +18,9 @@
 //! compile_fail doctests on `ManifestRead` in
 //! `entangled-core/src/document/verified.rs`.
 //!
-//! Closing the related `manifest().clone()` bypass — i.e. the
+//! Closing the related `manifest().clone()` bypass - i.e. the
 //! short-circuit that previously let a caller obtain a bare `Manifest`
-//! without traversing Stage 8 / Stage 9 — is enforced by the
+//! without traversing Stage 8 / Stage 9 - is enforced by the
 //! `compile_fail` doctests on `ManifestRead` in
 //! `entangled-core/src/document/verified.rs`, which assert that
 //! `wrapper.manifest()` does not resolve for any of the three wrapper
@@ -185,7 +185,7 @@ fn manifest_and_canary_state_readable_pre_into_parts() {
         .expect("Stage 8");
 
     // Field-level read-only access via `ManifestRead` and the
-    // post-canary `canary()` accessor — neither consumes the wrapper, and
+    // post-canary `canary()` accessor - neither consumes the wrapper, and
     // neither hands out a bare `&Manifest`.
     assert_eq!(canary_checked.publisher_pubkey(), &built.publisher_pubkey);
     assert_eq!(canary_checked.origin(), &built.origin);
@@ -266,9 +266,9 @@ fn expired_canary_propagates_as_state_not_error() {
         build_manifest(&unsigned, &publisher_key, &fixed_now()).expect("build");
 
     let canary_checked = parse_and_verify_manifest(&bytes, &fixed_now())
-        .expect("Stage 6 — signature still verifies for an expired canary")
+        .expect("Stage 6 - signature still verifies for an expired canary")
         .verify_canary(&fixed_now())
-        .expect("Stage 8 — Expired is a state, not a structural error");
+        .expect("Stage 8 - Expired is a state, not a structural error");
 
     assert_eq!(
         canary_checked.canary_state(),
@@ -279,7 +279,7 @@ fn expired_canary_propagates_as_state_not_error() {
 
 #[test]
 fn structurally_invalid_canary_fails_with_e_canary_invalid() {
-    // 1-day interval — below the §08 minimum of 7 days.
+    // 1-day interval - below the §08 minimum of 7 days.
     let (publisher_key, _onion, unsigned) = unsigned_manifest_with_consistent_origin(
         0xD3,
         0xE3,

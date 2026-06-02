@@ -1,4 +1,4 @@
-//! `compute_canary_state` — Fresh / NearExpiration / Expired classification.
+//! `compute_canary_state` - Fresh / NearExpiration / Expired classification.
 
 use entangled_core::types::canary::Canary;
 use entangled_core::types::keys::RuntimePubkey;
@@ -53,7 +53,7 @@ fn near_expiration_24h_floor() {
 #[test]
 fn near_expiration_ten_percent_rule() {
     // 30-day interval (max, rc.18 N42). 10% = 3 days, 24h floor = 1 day.
-    // 2 days remaining: inside the 10% window and above the 24h floor —
+    // 2 days remaining: inside the 10% window and above the 24h floor -
     // so the 10%-of-interval rule (not the floor) is what triggers
     // NearExpiration.
     let c = canary("2026-04-07T00:00:00Z", "2026-05-07T00:00:00Z");

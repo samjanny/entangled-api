@@ -27,7 +27,7 @@ fn kind_error_takes_precedence_over_schema_error() {
         "spec_version": "1.1",
         "kind": "manifest",
         "sig": "x"
-        // No publisher_pubkey, no origin, etc. — Stage 5 would also fail.
+        // No publisher_pubkey, no origin, etc. - Stage 5 would also fail.
     });
     let err =
         parse_and_validate_manifest(&serde_json::to_vec(&bad).unwrap(), &fixed_now()).unwrap_err();

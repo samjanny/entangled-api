@@ -2,8 +2,8 @@
 //!
 //! Each entry point runs:
 //!
-//! - Stage 2 (input): byte cap, BOM, UTF-8 — via [`crate::validation::check_input`].
-//! - Stage 3 (parsing): JSON limits — via [`crate::validation::parse_with_limits`].
+//! - Stage 2 (input): byte cap, BOM, UTF-8 - via [`crate::validation::check_input`].
+//! - Stage 3 (parsing): JSON limits - via [`crate::validation::parse_with_limits`].
 //! - Stage 4 (kind discrimination): cross-kind rejection.
 //! - Stage 5 (schema): closed-schema, field types, ranges, lengths, syntax.
 //!   For manifests, this includes the §06 clock-skew check on
@@ -17,10 +17,10 @@
 //! family cover Stages 2 through 6 of §10. The remaining stages are
 //! deliberately the **caller's responsibility**:
 //!
-//! - **Stage 7 (trust state machine)** — TOFU pinning, externally-verified
+//! - **Stage 7 (trust state machine)** - TOFU pinning, externally-verified
 //!   identity, mismatch resolution. Out of scope for this crate; handled by
 //!   a higher-level client layer (e.g. a future `entangled-client`).
-//! - **Stage 8 (canary state and structure)** — for manifests, traverse the
+//! - **Stage 8 (canary state and structure)** - for manifests, traverse the
 //!   type-state chain returned by `parse_and_verify_manifest`: call
 //!   [`super::verified::ManifestSigVerified::verify_canary`], or opt out
 //!   explicitly via
@@ -28,13 +28,13 @@
 //!   canary `issued_at` clock-skew check lives there, not in this parse
 //!   pipeline, because it is paired with the canary state machine
 //!   (fresh / stale / expired) and anti-downgrade comparisons against
-//!   previously seen canaries — neither of which is a closed-schema
+//!   previously seen canaries - neither of which is a closed-schema
 //!   concern. Standalone helpers
 //!   [`crate::validation::canary::validate_canary_structure`] and
 //!   [`crate::validation::canary::compute_canary_state`] remain available
 //!   for callers operating on a `Manifest` not obtained from
 //!   `parse_and_verify_manifest`.
-//! - **Stage 9 (binding)** — for manifests, traverse the chain via
+//! - **Stage 9 (binding)** - for manifests, traverse the chain via
 //!   [`super::verified::ManifestCanaryChecked::verify_origin`] (or opt out
 //!   via [`super::verified::ManifestCanaryChecked::skip_origin_check`]).
 //!   The standalone [`crate::tor::verify_origin_binding`] helper remains
@@ -50,7 +50,7 @@
 //!   `E_CONTENT_INDEX_FETCH_FAILED`. The standalone
 //!   [`crate::validation::content_index::validate_content_index`] helper
 //!   remains available.
-//! - **Stage 10 (rendering decisions)** — chrome and UI concerns.
+//! - **Stage 10 (rendering decisions)** - chrome and UI concerns.
 //!
 //! Stage 5 includes `manifest.updated` clock-skew because that field is a
 //! pure schema-level range check on a single self-contained timestamp; it
@@ -89,7 +89,7 @@
 //! for stage omission.
 //!
 //! The parser only proves that whoever signed the manifest knew the private
-//! key matching `manifest.publisher_pubkey` — it does not prove that this
+//! key matching `manifest.publisher_pubkey` - it does not prove that this
 //! pubkey is the one the user expects.
 //!
 //! ## Stage 5 / Stage 6 boundary for `sig` shape
@@ -101,7 +101,7 @@
 //! field-syntax validation does not apply (e.g. signatures handed to
 //! [`crate::document::extract_sig`] from a non-pipeline source). The
 //! pipeline already runs the schema deserializer first, so on the wire the
-//! malformed-sig path is reached as Stage 5 syntax — the
+//! malformed-sig path is reached as Stage 5 syntax - the
 //! [`crate::types::keys::Signature`] newtype's decoder errors flow through
 //! [`crate::validation::schema`]'s serde-error mapper and surface as
 //! `E_SCHEMA_FIELD_SYNTAX`.
@@ -139,11 +139,11 @@ use super::verified::ManifestSigVerified;
 /// is silently dropped without being used, catching the trivial
 /// "called but ignored" omission case. It does NOT prevent a caller from
 /// reading individual fields via `ManifestRead` and then dropping the
-/// wrapper without completing the chain — that pattern is permitted
+/// wrapper without completing the chain - that pattern is permitted
 /// because per-field reads on incomplete states are needed for Stage 7
 /// (trust state lookup, §10) which precedes Stage 8.
 ///
-/// The verification key is `manifest.publisher_pubkey` — the parser
+/// The verification key is `manifest.publisher_pubkey` - the parser
 /// performs "Stage 6 self-verification" only. Stage 7 trust-state
 /// resolution (TOFU pinning, externally verified PIP, mismatch detection)
 /// remains the caller's responsibility, after the chain has been
@@ -152,7 +152,7 @@ use super::verified::ManifestSigVerified;
 /// `now` is the local wall-clock time used for the §06 / §10 clock-skew
 /// check on `manifest.updated` (Stage 5). Pass a deterministic timestamp in
 /// tests; pass `OffsetDateTime::now_utc().into()` (or equivalent) in
-/// production callers — `entangled-core` deliberately does not query the
+/// production callers - `entangled-core` deliberately does not query the
 /// system clock itself.
 pub fn parse_and_verify_manifest(
     raw: &[u8],
@@ -164,7 +164,7 @@ pub fn parse_and_verify_manifest(
     // the signed payload and canonicalize that directly. Computing the
     // signature input from the wire Value rather than from
     // `serde_json::to_value(&manifest)` pins the signed bytes to the bytes
-    // the parser actually observed — see the module-level note on the
+    // the parser actually observed - see the module-level note on the
     // Serialize/Deserialize faithfulness invariant.
     let sig = extract_sig(&mut value, DocumentKindLabel::Manifest)?;
     let input = build_manifest_signature_input(&value).map_err(|e| {
@@ -250,7 +250,7 @@ fn crypto_to_diagnostic(err: CryptoError, kind: DocumentKindLabel) -> Diagnostic
         // §05 v1.0-rc.4: a public key that fails the strict profile (non-canonical
         // encoding or small-order point) causes the document being verified under
         // that key to be rejected as a signature failure, reported as
-        // E_SIG_VERIFICATION (§11) — not E_SIG_INVALID_KEY, which is reserved for
+        // E_SIG_VERIFICATION (§11) - not E_SIG_INVALID_KEY, which is reserved for
         // "the expected verification key is not available".
         CryptoError::InvalidPublicKey => Diagnostic::new(
             DiagnosticCode::ESigVerification,

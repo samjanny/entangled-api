@@ -1,4 +1,4 @@
-//! `StateStore::set_with_policy` — atomic policy validation + commit (§07).
+//! `StateStore::set_with_policy` - atomic policy validation + commit (§07).
 
 use entangled_core::state::{ConsentDecision, SetOutcome, StateStore};
 use entangled_core::types::state::StateMode;
@@ -183,7 +183,7 @@ fn set_with_policy_rejects_delete_op() {
 }
 
 // -----------------------------------------------------------------------------
-// `StateStore::delete_with_policy` — the symmetric atomic-validation entry
+// `StateStore::delete_with_policy` - the symmetric atomic-validation entry
 // point that enforces §07:319 ("(namespace, key) MUST be declared in the
 // current state_policy") before committing the delete. The bare
 // `StateStore::delete` deliberately skips this so callers with no policy

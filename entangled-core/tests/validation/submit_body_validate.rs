@@ -178,7 +178,7 @@ fn distinct_keys_in_same_namespace_accepted() {
 #[test]
 fn request_state_value_above_4096_bytes_rejected() {
     // §09 (rc.10): each `request_state[].value` MUST be a UTF-8 string not
-    // exceeding 4096 bytes — the protocol's absolute state-value ceiling
+    // exceeding 4096 bytes - the protocol's absolute state-value ceiling
     // restated for the submit-body schema.
     let body = SubmitBody {
         fields: BTreeMap::new(),

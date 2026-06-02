@@ -4,7 +4,7 @@
 //! commitment in the manifest's `content_root`. §02:208 normatively
 //! requires that two conforming parsers produce identical interpretations
 //! of the same content index bytes; this implies the same input
-//! disciplines as Entangled documents — strict UTF-8, no BOM, no
+//! disciplines as Entangled documents - strict UTF-8, no BOM, no
 //! duplicate JSON keys (rejection on duplicate, not first-wins or
 //! last-wins), §04 integer grammar, and the Stage 3 JSON limits.
 //!
@@ -107,7 +107,7 @@ fn invalid_utf8_rejected() {
 fn hash_mismatch_rejected_before_parse() {
     // A content_root that does NOT match the bytes' SHA-256 surfaces
     // E_CONTENT_INDEX_HASH_MISMATCH; the bytes themselves can be
-    // structurally valid — the hash check fires first.
+    // structurally valid - the hash check fires first.
     let bytes = br#"{"entries":{}}"#.to_vec();
     let wrong = ContentRoot::from_bytes([0u8; 32]);
     let err = validate_content_index(&bytes, &wrong).expect_err("hash mismatch MUST be rejected");

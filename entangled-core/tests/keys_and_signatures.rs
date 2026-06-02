@@ -29,7 +29,7 @@ fn pubkey_rejects_long_string() {
 
 #[test]
 fn pubkey_rejects_padding() {
-    // 44 chars including '=' — should be rejected on length first.
+    // 44 chars including '=' - should be rejected on length first.
     let with_padding = format!("{}=", "A".repeat(43));
     let parsed = PublisherPubkey::try_from(with_padding.as_str());
     assert!(parsed.is_err());
@@ -100,8 +100,8 @@ fn pubkey_rejects_non_canonical_trailing_bits() {
     // zero. For a 32-byte / 43-char base64url value the last char encodes
     // only the top 4 bits; the bottom 2 bits MUST be zero.
     //
-    // "A" decodes to 0b000000 — canonical.
-    // "B" decodes to 0b000001 — last two bits = 0b01, non-canonical for the
+    // "A" decodes to 0b000000 - canonical.
+    // "B" decodes to 0b000001 - last two bits = 0b01, non-canonical for the
     // trailing position.
     let non_canonical = format!("{}{}", "A".repeat(42), "B");
     assert!(
@@ -128,7 +128,7 @@ fn pubkey_rejects_non_ascii_byte() {
     // an otherwise-43-char string; even if the *char* count happens to look
     // right, the decoder MUST reject anything outside `[A-Za-z0-9_-]`.
     let mut s = "A".repeat(42);
-    s.push('é'); // U+00E9 — outside the base64url alphabet
+    s.push('é'); // U+00E9 - outside the base64url alphabet
     assert!(PublisherPubkey::try_from(s.as_str()).is_err());
 }
 

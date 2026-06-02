@@ -1,4 +1,4 @@
-//! `check_anti_downgrade` — comparison vs publisher history.
+//! `check_anti_downgrade` - comparison vs publisher history.
 
 use entangled_core::types::timestamp::EntangledTimestamp;
 use entangled_core::validation::canary::check_anti_downgrade;

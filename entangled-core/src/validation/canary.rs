@@ -2,15 +2,15 @@
 //!
 //! Three concerns live here:
 //!
-//! * [`compute_canary_state`] — pure time arithmetic; classifies a structurally
+//! * [`compute_canary_state`] - pure time arithmetic; classifies a structurally
 //!   valid canary into Fresh / NearExpiration / Expired given the current
 //!   wall clock. Never returns `Invalid` or `Unavailable`.
-//! * [`validate_canary_structure`] — Stage 8 structural checks: future-skew,
+//! * [`validate_canary_structure`] - Stage 8 structural checks: future-skew,
 //!   ordering, and the [7..=30] day interval bound (§08; ceiling
 //!   tightened from 90 to 30 days in v1.0-rc.18, N42).
-//! * [`check_anti_downgrade`] — comparison against the most recent
+//! * [`check_anti_downgrade`] - comparison against the most recent
 //!   `issued_at` known for the same publisher pubkey in publisher history
-//!   (§08 — "MUST NOT accept a canary older than the freshest one previously
+//!   (§08 - "MUST NOT accept a canary older than the freshest one previously
 //!   pinned for this publisher").
 //!
 //! String length caps for `statement` and `freshness_proof` are part of Stage
@@ -105,7 +105,7 @@ pub enum CanaryState {
 }
 
 /// Classify a canary by `now`. Assumes the canary has already passed
-/// [`validate_canary_structure`] — does no structural checks itself.
+/// [`validate_canary_structure`] - does no structural checks itself.
 ///
 /// The "near-expiration window" is `max(10% of the interval, 24 hours)`
 /// (§08). A canary is `Expired` if `now >= next_expected` (inclusive).
@@ -260,7 +260,7 @@ pub fn check_anti_downgrade(
 ///
 /// The 32-byte `manifest_payload_hash` is the SHA-256 digest of the
 /// manifest's JCS-canonical signed payload (the bytes signed under
-/// `K_publisher.pub` — i.e., the manifest object minus `sig`, with the
+/// `K_publisher.pub` - i.e., the manifest object minus `sig`, with the
 /// `kind` discriminator attached, then JCS-canonicalized). Two manifests
 /// with the same `issued_at` but different `manifest_payload_hash` are a
 /// conflict; two manifests with the same `manifest_payload_hash` are by
@@ -289,9 +289,9 @@ pub struct RetainedManifestRecord {
 /// payload (matching `manifest_payload_hash`) is not a conflict.
 ///
 /// Caller provides:
-/// * `new_issued_at`, `new_runtime_pubkey`, `new_manifest_payload_hash` —
+/// * `new_issued_at`, `new_runtime_pubkey`, `new_manifest_payload_hash` -
 ///   from the freshly fetched manifest;
-/// * `retained` — the previously accepted record for the same
+/// * `retained` - the previously accepted record for the same
 ///   `K_publisher.pub`, or `None` if none.
 ///
 /// Returns `Err` only when `retained.issued_at == new_issued_at` and the
@@ -362,13 +362,13 @@ pub fn check_canary_conflict(
 ///
 /// Arguments:
 ///
-/// * `new_runtime_pubkey`, `new_issued_at` — fields of the freshly
+/// * `new_runtime_pubkey`, `new_issued_at` - fields of the freshly
 ///   verified manifest;
-/// * `immediately_preceding` — the most recently retained manifest
+/// * `immediately_preceding` - the most recently retained manifest
 ///   record for the same `K_publisher.pub`, or `None` if none (first
 ///   contact). When `Some(r)` and `r.runtime_pubkey == new_runtime_pubkey`,
 ///   a MUST-level rejection fires with `window_position = 1`;
-/// * `extended_history` — optional ordered history of prior manifests
+/// * `extended_history` - optional ordered history of prior manifests
 ///   for the same `K_publisher.pub`, *most-recent-first* and *excluding*
 ///   the immediately-preceding entry already supplied above. Empty for
 ///   stateless clients. When non-empty and any entry matches the new

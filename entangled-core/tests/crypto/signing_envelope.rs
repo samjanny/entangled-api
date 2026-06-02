@@ -1,4 +1,4 @@
-//! High-level sign/verify helpers — round-trip per signed-object kind plus
+//! High-level sign/verify helpers - round-trip per signed-object kind plus
 //! domain-separation checks across kinds.
 
 use entangled_core::crypto::{
@@ -42,7 +42,7 @@ fn transaction_round_trip() {
 
 #[test]
 fn domain_separation_manifest_signature_does_not_verify_as_content() {
-    // The same physical key bytes under two role wrappers — exercising
+    // The same physical key bytes under two role wrappers - exercising
     // the §05 domain-separation property: a manifest sig made with
     // K_publisher does not verify as content under the byte-equal
     // K_runtime, because the per-context preamble differs.

@@ -1,6 +1,6 @@
 # entangled-core
 
-Rust implementation of the Entangled v1.0 protocol — typed documents, closed-schema validation, JCS canonicalization, Ed25519 signing/verification, BIP-39 PIP derivation, Tor v3 origin binding, and client-side state management.
+Rust implementation of the Entangled v1.0 protocol - typed documents, closed-schema validation, JCS canonicalization, Ed25519 signing/verification, BIP-39 PIP derivation, Tor v3 origin binding, and client-side state management.
 
 The full protocol specification is at [github.com/samjanny/entangled](https://github.com/samjanny/entangled).
 
@@ -56,10 +56,10 @@ This crate has `#![forbid(unsafe_code)]` at the top of `lib.rs`. Some dependenci
 
 ## Module guide
 
-- [`types`](https://docs.rs/entangled-core/latest/entangled_core/types/) — wire format types
-- [`canon`](https://docs.rs/entangled-core/latest/entangled_core/canon/) — JCS canonicalization
-- [`crypto`](https://docs.rs/entangled-core/latest/entangled_core/crypto/) — Ed25519, SHA-256, BIP-39
-- [`validation`](https://docs.rs/entangled-core/latest/entangled_core/validation/) — pipeline stages 2-5 + canary + clock skew + state policy
-- [`document`](https://docs.rs/entangled-core/latest/entangled_core/document/) — high-level builder/parser API
-- [`state`](https://docs.rs/entangled-core/latest/entangled_core/state/) — client-side state management
-- [`tor`](https://docs.rs/entangled-core/latest/entangled_core/tor/) — Tor v3 onion address handling
+- [`types`](https://docs.rs/entangled-core/latest/entangled_core/types/) - wire format types
+- [`canon`](https://docs.rs/entangled-core/latest/entangled_core/canon/) - JCS canonicalization
+- [`crypto`](https://docs.rs/entangled-core/latest/entangled_core/crypto/) - Ed25519, SHA-256, BIP-39
+- [`validation`](https://docs.rs/entangled-core/latest/entangled_core/validation/) - pipeline stages 2-5 + canary + clock skew + state policy
+- [`document`](https://docs.rs/entangled-core/latest/entangled_core/document/) - high-level builder/parser API
+- [`state`](https://docs.rs/entangled-core/latest/entangled_core/state/) - client-side state management
+- [`tor`](https://docs.rs/entangled-core/latest/entangled_core/tor/) - Tor v3 onion address handling

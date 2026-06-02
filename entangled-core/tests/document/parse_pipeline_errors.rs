@@ -109,7 +109,7 @@ fn stage6_well_formed_sig_but_wrong_signature_rejected() {
     let bytes = build_valid_manifest_bytes();
     let mut value: Value = serde_json::from_slice(&bytes).unwrap();
     // Replace sig with a syntactically valid base64url-no-pad 86-char string
-    // that decodes to 64 zero bytes — almost certainly not the right sig.
+    // that decodes to 64 zero bytes - almost certainly not the right sig.
     let zeros = "A".repeat(86);
     if let Value::Object(ref mut map) = value {
         map.insert("sig".to_owned(), Value::String(zeros));

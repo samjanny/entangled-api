@@ -19,7 +19,7 @@ fn manifest_bytes_parsed_as_content_rejected() {
     let seed = [0x11; 32];
     let publisher_key = PublisherSigningKey::from_seed(&seed);
     let publisher_pk = publisher_key.verifying_key();
-    // Same physical key bytes presented under the runtime role — only used
+    // Same physical key bytes presented under the runtime role - only used
     // as the verifier for the cross-kind parse-as-content attempt.
     let runtime_pk = RuntimeSigningKey::from_seed(&seed).verifying_key();
     let unsigned = unsigned_manifest_with_publisher(publisher_pk);
@@ -89,6 +89,6 @@ fn manifest_with_kind_rewritten_to_content_rejected() {
     // E_SCHEMA_UNKNOWN_FIELD ("unknown field `canary`") because the content
     // schema does not declare manifest-only fields. Stage 6 is never
     // reached, but if it were, the divergent context string would also
-    // cause E_SIG_VERIFICATION — the parser provides defense in depth.
+    // cause E_SIG_VERIFICATION - the parser provides defense in depth.
     assert_eq!(err.code, DiagnosticCode::ESchemaUnknownField);
 }

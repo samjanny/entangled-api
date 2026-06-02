@@ -1,4 +1,4 @@
-//! Stage 4 — document kind discrimination. §02, §10.
+//! Stage 4 - document kind discrimination. §02, §10.
 
 use serde_json::Value;
 

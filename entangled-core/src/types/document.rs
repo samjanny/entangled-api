@@ -91,7 +91,7 @@ pub struct TransactionDocument {
 /// Wire form: a JSON object with a `kind` discriminator (`"manifest"`,
 /// `"content"`, `"transaction"`) plus the kind-specific fields inlined.
 ///
-/// `Manifest` is the largest variant — `Manifest` itself is ~400 bytes
+/// `Manifest` is the largest variant - `Manifest` itself is ~400 bytes
 /// because of the optional `migration_pointer` and `content_root` (an
 /// inlined `Origin` plus a timestamp, and a 32-byte hash). We deliberately
 /// do not box it: this enum is only

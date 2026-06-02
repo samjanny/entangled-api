@@ -1,7 +1,7 @@
 //! Helpers to manipulate the top-level `sig` field on a parsed `Value`.
 //!
 //! The §05 signed payload is the envelope object with `sig` removed. These
-//! helpers do the surgery for callers — the signer adds `sig` back after
+//! helpers do the surgery for callers - the signer adds `sig` back after
 //! computing it, the verifier removes `sig` before reconstructing the
 //! signature input.
 
@@ -55,7 +55,7 @@ pub fn extract_sig(value: &mut Value, kind: DocumentKindLabel) -> Result<Signatu
 
 /// Insert (or overwrite) the top-level `sig` field on a `Value::Object`.
 ///
-/// Errors only when `value` is not an object — the caller is expected to have
+/// Errors only when `value` is not an object - the caller is expected to have
 /// constructed the value through serialization of a struct.
 pub fn attach_sig(
     value: &mut Value,

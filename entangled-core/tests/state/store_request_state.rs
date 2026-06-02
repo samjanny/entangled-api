@@ -30,7 +30,7 @@ fn returns_only_request_mode_non_expired() {
             &now,
         )
         .unwrap();
-    // ClientOnly, fresh — must NOT appear.
+    // ClientOnly, fresh - must NOT appear.
     store
         .set(
             &pub_a,
@@ -41,7 +41,7 @@ fn returns_only_request_mode_non_expired() {
             &now,
         )
         .unwrap();
-    // Request, expired by `later` — ttl 300s, +30min → expired.
+    // Request, expired by `later` - ttl 300s, +30min → expired.
     store
         .set(
             &pub_a,
@@ -89,7 +89,7 @@ fn excludes_request_entries_dropped_from_current_policy() {
         )
         .unwrap();
 
-    // Old policy declared the entry — present here. New policy does not.
+    // Old policy declared the entry - present here. New policy does not.
     let new_policy = vec![policy_entry(
         "session",
         "csrf",

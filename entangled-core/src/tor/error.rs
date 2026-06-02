@@ -14,7 +14,7 @@
 //! `WrongVersion` and `BadChecksum` are mapped to `E_BIND_ORIGIN` (§10 Stage
 //! 9). Although `WrongVersion` is arguably also a syntactic constraint on the
 //! field, both checks operate on the cryptographic relationship between the
-//! address and the embedded public key — they are part of the address↔pubkey
+//! address and the embedded public key - they are part of the address↔pubkey
 //! binding rather than mere field-shape checks. We mirror the §05 framing
 //! ("checksum verification" sits next to "binding origin to pubkey") and emit
 //! both under the binding code so callers can distinguish "the address looked

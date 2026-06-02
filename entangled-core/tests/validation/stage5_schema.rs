@@ -286,7 +286,7 @@ fn t14_navigation_label_101_bytes_rejected() {
 
 #[test]
 fn t15_navigation_label_200_bytes_rejected_too() {
-    // The cap is 100, not 200 — this test catches an implementation that
+    // The cap is 100, not 200 - this test catches an implementation that
     // accidentally used the generic 200 cap.
     let label = "x".repeat(200);
     let mut v = manifest_value();
@@ -806,7 +806,7 @@ fn migration_pointer_null_rejected_by_prepass() {
     // would accept `null` as `None` and the subsequent round-trip
     // (`to_value(&manifest)` with `skip_serializing_if = "Option::is_none"`)
     // would omit the field, producing JCS bytes different from the wire input
-    // — a signature-input asymmetry. The prepass closes this gap at Stage 5
+    // - a signature-input asymmetry. The prepass closes this gap at Stage 5
     // before deserialization, so any future refactor that reorders the prepass
     // breaks this test rather than the signature invariant.
     let mut v = manifest_value();

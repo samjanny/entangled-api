@@ -1,4 +1,4 @@
-//! `validate_canary_structure` — Stage 8 structural checks.
+//! `validate_canary_structure` - Stage 8 structural checks.
 
 use entangled_core::types::canary::Canary;
 use entangled_core::types::keys::RuntimePubkey;

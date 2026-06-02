@@ -1,4 +1,4 @@
-//! `verify_migration_announcement` and `wrap_successor_stage9_failure` —
+//! `verify_migration_announcement` and `wrap_successor_stage9_failure` -
 //! Stage 9 publisher-identity continuity check and the rc.15 wrapper that
 //! preserves a successor's underlying Stage 1-9 failure under
 //! `E_MIGRATION_MISMATCH` (§10 v1.0-rc.13; details schema in v1.0-rc.15).
@@ -129,7 +129,7 @@ fn wrap_successor_stage9_failure_preserves_underlying_code_for_stage_5_plus() {
         Some(successor_pubkey.to_string().as_str())
     );
 
-    // Code identifier only — rc.16 N22.
+    // Code identifier only - rc.16 N22.
     assert_eq!(
         details["underlying_diagnostic_code"].as_str(),
         Some("E_ORIGIN_EXPIRED")

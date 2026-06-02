@@ -3,8 +3,8 @@
 //! verification) into a single call.
 //!
 //! These functions are the building blocks Phase 5 will use to construct the
-//! envelope `{ signed_payload, sig }`. They operate on the **signed payload**
-//! — the document body without the `sig` field. Stripping `sig` before
+//! envelope `{ signed_payload, sig }`. They operate on the **signed payload** -
+//! the document body without the `sig` field. Stripping `sig` before
 //! calling these functions is the caller's responsibility (per §05): callers
 //! that hold a complete envelope must remove the signature before computing
 //! `signature_input`, otherwise the input includes the signature itself.
@@ -93,8 +93,8 @@ pub fn verify_content_payload(
 }
 
 /// Sign a transaction payload (the transaction body without `sig`) under the
-/// runtime key. Per §05, transaction documents are signed by `K_runtime` —
-/// the same operational key used for content — and verified against the
+/// runtime key. Per §05, transaction documents are signed by `K_runtime` -
+/// the same operational key used for content - and verified against the
 /// runtime pubkey authorized by the relevant publication cycle's manifest.
 ///
 /// # Errors

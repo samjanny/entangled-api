@@ -1,4 +1,4 @@
-//! PIP (Publisher Identity Phrase) — 24-word BIP-39 representation of a
+//! PIP (Publisher Identity Phrase) - 24-word BIP-39 representation of a
 //! 32-byte `PublisherPubkey`, per §05.
 //!
 //! Uses the BIP-39 English wordlist (2048 words) embedded as

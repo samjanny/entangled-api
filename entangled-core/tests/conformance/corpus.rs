@@ -127,7 +127,7 @@ impl Corpus {
     /// Honours `ENTANGLED_CORPUS_PATH` when set (a CI runner that has
     /// vendored the upstream spec repository points this at the
     /// checked-out `corpus/` directory). Otherwise falls back to the
-    /// workspace-local `docs-spec/corpus/` mirror — the layout used by
+    /// workspace-local `docs-spec/corpus/` mirror - the layout used by
     /// developers who clone the spec repo alongside this one.
     fn corpus_root() -> PathBuf {
         if let Some(p) = env::var_os("ENTANGLED_CORPUS_PATH") {

@@ -1,4 +1,4 @@
-//! Stage 5 — block validators. §03.
+//! Stage 5 - block validators. §03.
 
 use std::collections::HashSet;
 

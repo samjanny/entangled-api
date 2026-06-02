@@ -97,7 +97,7 @@ pub fn build_manifest(
 ///
 /// # Errors
 ///
-/// See [`build_manifest`] — same set of failures, applied to content.
+/// See [`build_manifest`] - same set of failures, applied to content.
 pub fn build_content(
     unsigned: &UnsignedContent,
     runtime_key: &RuntimeSigningKey,
@@ -127,7 +127,7 @@ pub fn build_content(
 ///
 /// # Errors
 ///
-/// See [`build_manifest`] — same set of failures, applied to transactions.
+/// See [`build_manifest`] - same set of failures, applied to transactions.
 pub fn build_transaction(
     unsigned: &UnsignedTransaction,
     runtime_key: &RuntimeSigningKey,

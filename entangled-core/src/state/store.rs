@@ -310,9 +310,9 @@ impl StateStore {
     /// Atomic "validate against policy and commit".
     ///
     /// Performs the full §07 cross-check the bare [`Self::set`] entry point
-    /// leaves to the caller — `(namespace, key)` declaration, per-entry
+    /// leaves to the caller - `(namespace, key)` declaration, per-entry
     /// `max_size`, and `ttl` against `max_lifetime` and the absolute
-    /// `[300, 7_776_000]` hard range — and only then runs the
+    /// `[300, 7_776_000]` hard range - and only then runs the
     /// consent-and-storage commit. The entry's mode is taken from the
     /// matching policy entry, eliminating the "caller passes the wrong
     /// mode" failure class.

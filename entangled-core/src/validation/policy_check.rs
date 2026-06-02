@@ -128,9 +128,9 @@ pub fn validate_state_update_against_policy<'a>(
 /// borrowed from `policy`).
 ///
 /// Diagnostic codes (off-pipeline, §11):
-/// - `E_STATE_UNDECLARED` — `(namespace, key)` not in `policy`.
-/// - `E_STATE_VALUE_SIZE` — `value` exceeds policy `max_size`.
-/// - `E_STATE_TTL` — `ttl` exceeds policy `max_lifetime`, or is outside
+/// - `E_STATE_UNDECLARED` - `(namespace, key)` not in `policy`.
+/// - `E_STATE_VALUE_SIZE` - `value` exceeds policy `max_size`.
+/// - `E_STATE_TTL` - `ttl` exceeds policy `max_lifetime`, or is outside
 ///   the absolute hard range `[300, 7_776_000]` reasserted here.
 pub fn validate_state_updates_against_policy<'a>(
     updates: &[StateUpdateOp],

@@ -41,7 +41,7 @@ pub enum LinkTarget {
     /// hand the URL to a component that would resolve the host through
     /// public DNS (§03 / §09).
     Carrier {
-        /// Carrier profile identifier — only `tor-v3` in v1.
+        /// Carrier profile identifier - only `tor-v3` in v1.
         carrier: Carrier,
         /// `http://`-scheme URL whose host is a valid carrier address for
         /// `carrier`. Validated by

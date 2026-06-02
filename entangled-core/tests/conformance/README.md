@@ -7,7 +7,7 @@ field, and runs every vector through the appropriate
 `parse_and_verify_*` plus, where context dictates, Stage 8 canary checks
 and Stage 9 binding.
 
-A single integration test — `corpus_vectors_match_spec` — fails on the
+A single integration test - `corpus_vectors_match_spec` - fails on the
 first divergence with a message naming the vector id.
 
 ```

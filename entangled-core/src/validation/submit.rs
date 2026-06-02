@@ -67,7 +67,7 @@ pub fn validate_submit_body(body: &SubmitBody) -> Result<(), Diagnostic> {
     }
     // RequestStateItem.namespace / key are already `Slug` (validated at
     // deserialize). §09 (rc.10) places a 4096-byte schema cap on each
-    // `value` — the protocol's absolute state-value ceiling restated for the
+    // `value` - the protocol's absolute state-value ceiling restated for the
     // submit body. Per-policy `max_size` (≤ 4096) was enforced at `set`
     // time; this cap is the wire-side defence-in-depth check.
     for entry in &body.request_state {

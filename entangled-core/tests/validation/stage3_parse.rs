@@ -2,7 +2,7 @@ use entangled_core::validation::{parse_with_limits, DiagnosticCode};
 
 #[test]
 fn nesting_depth_17_rejected() {
-    // 17 nested arrays — the innermost element is at depth 17.
+    // 17 nested arrays - the innermost element is at depth 17.
     let mut s = String::new();
     for _ in 0..17 {
         s.push('[');
@@ -17,7 +17,7 @@ fn nesting_depth_17_rejected() {
 
 #[test]
 fn nesting_depth_16_accepted() {
-    // 16 nested arrays — innermost element at depth 16, allowed.
+    // 16 nested arrays - innermost element at depth 16, allowed.
     let mut s = String::new();
     for _ in 0..16 {
         s.push('[');
@@ -157,7 +157,7 @@ fn float_token_rejected_lexically() {
 
 #[test]
 fn negative_lookalike_inside_string_value_accepted() {
-    // The lexical scan must skip JSON string contents — a `-0` inside a
+    // The lexical scan must skip JSON string contents - a `-0` inside a
     // string value is just text, not a numeric token.
     parse_with_limits(r#"{"v": "-0"}"#).expect("strings are not numeric tokens");
 }

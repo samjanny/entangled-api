@@ -1,7 +1,7 @@
 //! Submit body wire format (§09).
 //!
 //! `SubmitBody` is the JSON object posted to a transaction endpoint. The
-//! schema is closed: exactly three top-level fields — `fields`,
+//! schema is closed: exactly three top-level fields - `fields`,
 //! `request_state`, and `request_id` (§09). `build_submit_body` composes
 //! the body from the caller-supplied user input, the publisher-scoped
 //! request state held by [`StateStore`], and a freshly generated

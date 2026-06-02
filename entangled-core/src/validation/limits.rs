@@ -201,7 +201,7 @@ pub const SUBMIT_OVERHEAD_RESERVE_BYTES: usize = 4096;
 /// request_state (§09 v1.0-rc.21, N62). 8192 bytes.
 pub const SUBMIT_FIELD_MIN_RESERVE_BYTES: usize = 8192;
 
-/// `state_policy` aggregate worst-case wire budget — the limit against
+/// `state_policy` aggregate worst-case wire budget - the limit against
 /// which a manifest's `state_policy` aggregate request-mode encoded
 /// contribution is evaluated at Stage 5 (§09 v1.0-rc.21, N62; §07
 /// "Submit budget satisfiability"). Equal to
@@ -271,7 +271,7 @@ pub const CLOCK_SKEW_TOLERANCE_SECS: i64 = 300;
 // -----------------------------------------------------------------------------
 
 /// Maximum permitted gap between `canary.issued_at` and `origin.not_after`
-/// (§06 v1.0-rc.14). Five years, in seconds — exactly 157_680_000.
+/// (§06 v1.0-rc.14). Five years, in seconds - exactly 157_680_000.
 ///
 /// The constant is computed as `5 * 365 * 86_400` (no leap-year accounting)
 /// to match the spec's literal value byte-for-byte.

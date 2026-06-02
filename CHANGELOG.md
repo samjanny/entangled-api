@@ -613,13 +613,13 @@ PR5:
   matching bytes, and the explicit `skip_content_index_check`
   opt-out.
 
-### Changed (spec v1.0-rc.22 alignment — Lotto 22)
+### Changed (spec v1.0-rc.22 alignment - Lotto 22)
 
 - **§05:174 small-order `R` rejection alignment** (Lotto 22, N63).
   Pre-N63 §05:174 wrongly claimed `verify_strict` accepts small-order
   `R`; rc.22 inverts the rule (the strict profile MUST reject small-
   order `R`), matching what `ed25519_dalek 2.x verify_strict` always
-  did. No code change was needed in this crate — `crypto::ed25519`
+  did. No code change was needed in this crate - `crypto::ed25519`
   uses `verify_strict`, so we were already conformant under rc.22
   semantics. The `VerifyingKey::verify` docstring is updated to drop
   the "known divergence" note (no longer divergent) and cite N63 as
@@ -628,7 +628,7 @@ PR5:
   `E_SIG_VERIFICATION` and passes end-to-end against the existing
   pipeline.
 
-### Changed (spec v1.0-rc.21 alignment — Lotto 21)
+### Changed (spec v1.0-rc.21 alignment - Lotto 21)
 
 - **§07 / §09 submit budget satisfiability invariant** (Lotto 21, N62).
   `validate_state_policy` now rejects a manifest whose `state_policy`
@@ -648,7 +648,7 @@ PR5:
   field_min + state_budget == SUBMIT_BODY_MAX_BYTES` so a future
   re-tune cannot silently break the cap.
 
-### Changed (spec v1.0-rc.19 catch-up — Lotti 14-19, N52-N60)
+### Changed (spec v1.0-rc.19 catch-up - Lotti 14-19, N52-N60)
 
 These changes had landed in upstream rc.19 alongside Lotti 11-13
 but were not in the prior 0.3.x line. They are landed here as part
@@ -664,7 +664,7 @@ of the rc.21 bump.
   preceding match and `>= 2` walks publisher history backwards.
 - **`E_HISTORICAL_NO_PUBLICATION_PROOF`** (Lotto 14 N52). New
   off-pipeline diagnostic (severity Error, document_kind Content).
-  Catalog entry only — the check itself is the caller's
+  Catalog entry only - the check itself is the caller's
   responsibility, since publication-existence proof relies on either
   a previously verified content index or a rendering record, both
   outside the crate's scope.
@@ -683,7 +683,7 @@ of the rc.21 bump.
   matched. The helper `check_migration_chain_cycle` gains an
   `announcing_origin_address` parameter so the diagnostic can name
   both ends of the rejected hop (callers must pass the announcing
-  origin's address — typically the announcing manifest's
+  origin's address - typically the announcing manifest's
   `origin.address`).
 - **`E_ORIGIN_INVALID.details.reason` typo fixed** (Lotto 15 N56).
   The strict-later-than constraint now reports `details.reason =
@@ -691,7 +691,7 @@ of the rc.21 bump.
   The pre-N56 identifier (`not_after_not_after_issued_at`) carried
   an obvious stutter.
 
-### Changed (conformance harness — rc.19/rc.21 alignment)
+### Changed (conformance harness - rc.19/rc.21 alignment)
 
 - **`previously_verified_history` context field** wired into the
   harness. Carries the publisher's ordered prior-manifest history
@@ -746,7 +746,7 @@ byte-equivalent under 0.3.1.
   discriminator, stripping `sig`, and JCS-canonicalizing the result.
   The bytes the verifier actually checked against the Ed25519
   signature were therefore mediated by the faithfulness of every
-  `Serialize`/`Deserialize` impl in the workspace — a structural
+  `Serialize`/`Deserialize` impl in the workspace - a structural
   invariant that holds today but would silently break the next time
   a struct grows a field with on-the-way-in normalization or an
   `Option` whose `skip_serializing_if` semantics drift. The verifier
@@ -758,7 +758,7 @@ byte-equivalent under 0.3.1.
 
 ### Added
 
-- `entangled_core::types::keys::RequestId::generate()` — production
+- `entangled_core::types::keys::RequestId::generate()` - production
   constructor that draws 16 bytes of OS entropy via `getrandom`
   (audit finding L-1). Documented panic on RNG unavailability,
   matching the existing internal `SigningKey::generate` pattern.
@@ -768,7 +768,7 @@ byte-equivalent under 0.3.1.
   is not silently bypassed by a counter-derived id.
 - `entangled_core::types::Manifest::canonical_payload_hash() -> [u8; 32]`
   and the matching default method on `ManifestRead` (audit finding
-  L-4). Computes the SHA-256 of the JCS-canonical signed payload —
+  L-4). Computes the SHA-256 of the JCS-canonical signed payload -
   the same digest required for
   `RetainedManifestRecord::manifest_payload_hash` in the §08
   anti-conflict check. Available on every type-state wrapper so
@@ -776,7 +776,7 @@ byte-equivalent under 0.3.1.
   the helper's output byte-equal to the digest derived from the
   wire path.
 - `entangled_core::validation::parse_and_validate_{manifest,content,
-  transaction}_with_value` — variants that return both the typed
+  transaction}_with_value` - variants that return both the typed
   model and the parsed wire `Value`. Backing the H-1 verifier
   refactor; useful in their own right for callers that need the
   validated `Value` (e.g. higher-level diagnostic surfaces).
@@ -806,9 +806,9 @@ narrows from 90 to 30 days. The rc.18 Lotto 7 clarifications
 (N18/N21/N30/N31) shipped in 0.2.0; this tag adds only the Lotto 10
 normative tightening.
 
-### Changed (spec v1.0-rc.18 alignment — Lotto 10)
+### Changed (spec v1.0-rc.18 alignment - Lotto 10)
 
-- **§08 Canary interval ceiling — 90 days → 30 days** (Lotto 10, N42).
+- **§08 Canary interval ceiling - 90 days → 30 days** (Lotto 10, N42).
   `CANARY_INTERVAL_MAX_SECS` drops from `90 * 86_400` (7,776,000 s) to
   `30 * 86_400` (2,592,000 s), aligning the protocol-level MUST with
   the operational upper bound previously recommended by the operator
@@ -850,7 +850,7 @@ here verbatim.
 - **Security audit follow-ups** (3374b1d): `StoreKey` strongly typed at
   the state-store boundary; `migration_pointer` null guard at parse.
 
-### Changed (spec v1.0-rc.18 alignment — Lotto 7, anticipating tag)
+### Changed (spec v1.0-rc.18 alignment - Lotto 7, anticipating tag)
 
 The rc.18 tag was in soak on rc.17 at the time of this release. The
 Lotto 7 errata are textual clarifications and one diagnostic-precision
@@ -863,14 +863,14 @@ constraint, all behaviorally compatible with rc.16 / rc.17 emitters.
   channels). Minute-level resolution remains sufficient for clock-skew
   troubleshooting. `details.not_after` is publisher-declared and
   exposed as-is. New `minute_precision_utc` helper inside the module.
-- **§10 Cross-session migration history — module docs tightened to
+- **§10 Cross-session migration history - module docs tightened to
   rc.18 wording.** `validation/migration.rs` records the N30 rule
   (Replacement events fire at every Adoption against the pre-Adoption
   current origin, closing the `A → B → A → B` direction gap) and the
   N31 365-day SHOULD-NOT-exceed upper bound (plus the
   bounded-storage event-count alternative). Storage and confirmation
   surface remain caller concerns; the crate adds no new types.
-- **§10 Chain depth and cycle prevention — post-rejection state
+- **§10 Chain depth and cycle prevention - post-rejection state
   clarified** (N21). `check_migration_chain_cycle` docstring notes
   that a cycle rejection invalidates only the new adoption: the most
   recently verified successor stays the current origin and cached
@@ -895,7 +895,7 @@ constraint, all behaviorally compatible with rc.16 / rc.17 emitters.
   `wrap_successor_stage9_failure` now emits a JSON string under the new
   key; the rc.15 nested-record shape is gone. Tests assert the new key
   and the absence of the rc.15 key.
-- **Conformance harness — Stage 9 origin-not-after and migration
+- **Conformance harness - Stage 9 origin-not-after and migration
   scenarios.** `tests/conformance/runner.rs` now invokes
   `check_origin_not_after` after carrier origin binding for every
   manifest vector, and adds a migration scenario branch driven by the
@@ -906,7 +906,7 @@ constraint, all behaviorally compatible with rc.16 / rc.17 emitters.
   match). `Verdict::Reject` now carries the full `Diagnostic` so
   details can be compared.
 - **CI conformance corpus pinned to `v1.0-rc.16`**
-  (`.github/workflows/ci.yml`). Total vectors 34 (was 32) — new rc.16
+  (`.github/workflows/ci.yml`). Total vectors 34 (was 32) - new rc.16
   vectors `006-manifest-valid-not-after` and
   `200-migration-successor-origin-expired` exercise the rc.14
   `origin.not_after` schema acceptance and the rc.15
@@ -915,7 +915,7 @@ constraint, all behaviorally compatible with rc.16 / rc.17 emitters.
 
 ### Added (spec v1.0-rc.16 alignment)
 
-- **Cross-session migration history (§10 v1.0-rc.16, N20) — caller-side
+- **Cross-session migration history (§10 v1.0-rc.16, N20) - caller-side
   documentation.** New module-level note in
   `entangled-core/src/validation/migration.rs` describing the rc.16
   SHOULD-level mitigation: clients maintaining per-publisher migration
@@ -970,9 +970,9 @@ constraint, all behaviorally compatible with rc.16 / rc.17 emitters.
   on `Origin` (and therefore on `Manifest.origin` /
   `UnsignedManifest.origin`). Absent in the closed-schema steady state;
   encoded by omission per §04 no-`null` discipline. Stage 5 enforces the
-  two §06 `MUST` constraints — `not_after` strictly later than
+  two §06 `MUST` constraints - `not_after` strictly later than
   `canary.issued_at`, and within a 5-year horizon
-  (`ORIGIN_NOT_AFTER_MAX_HORIZON_SECS = 5 * 365 * 86_400`) — and reports
+  (`ORIGIN_NOT_AFTER_MAX_HORIZON_SECS = 5 * 365 * 86_400`) - and reports
   violations as `E_ORIGIN_INVALID` with `details.reason` in the §11
   vocabulary (`not_after_not_after_issued_at`, `not_after_beyond_5y`).
   Public helper `validation::validate_origin_not_after`.
@@ -1086,7 +1086,7 @@ the shipping API surface, not deltas against a previous release.
   helpers exposed from the `crypto` module. A pubkey failing the strict
   profile during ordinary signature verification is reported as
   `E_SIG_VERIFICATION` with `details.reason: "public_key_rejected"`,
-  per §05 — `E_SIG_INVALID_KEY` is reserved for "expected verification
+  per §05 - `E_SIG_INVALID_KEY` is reserved for "expected verification
   key not available". The same rejection on `canary.runtime_pubkey`
   surfaces as `E_CANARY_INVALID` at Stage 8 with
   `details.field_path: "canary.runtime_pubkey"`; on

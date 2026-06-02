@@ -61,7 +61,7 @@ fn manifest_wire_and_typed_signature_inputs_canonicalize_byte_equal() {
 
     assert_eq!(
         wire_jcs, typed_jcs,
-        "wire-Value JCS must equal reserialize-typed JCS — Serialize/Deserialize \
+        "wire-Value JCS must equal reserialize-typed JCS - Serialize/Deserialize \
          drift would break this and silently break signature verification"
     );
 }
@@ -101,7 +101,7 @@ fn transaction_wire_and_typed_signature_inputs_canonicalize_byte_equal() {
 }
 
 /// `Manifest::canonical_payload_hash` MUST produce the same digest the
-/// verifier hashes — otherwise callers using it to populate
+/// verifier hashes - otherwise callers using it to populate
 /// `RetainedManifestRecord::manifest_payload_hash` will see spurious
 /// `E_CANARY_CONFLICT` events on re-fetches.
 #[test]
@@ -120,7 +120,7 @@ fn manifest_canonical_payload_hash_matches_wire_hash() {
 }
 
 /// `ManifestRead::canonical_payload_hash` must be reachable before
-/// `into_parts()` — Stage-7 trust callers need it at
+/// `into_parts()` - Stage-7 trust callers need it at
 /// `ManifestSigVerified` time to populate retained-manifest records.
 #[test]
 fn manifest_canonical_payload_hash_available_pre_into_parts() {
@@ -140,7 +140,7 @@ fn manifest_canonical_payload_hash_available_pre_into_parts() {
 }
 
 /// Belt-and-braces: rearranged wire input (key order shuffled) still
-/// canonicalizes identically — confirms the JCS comparator handles the
+/// canonicalizes identically - confirms the JCS comparator handles the
 /// member-ordering responsibility on its own, so the H-1 wire-Value
 /// path is not order-sensitive at the parser layer.
 #[test]
@@ -169,6 +169,6 @@ fn manifest_wire_signature_input_invariant_under_key_reordering() {
     assert_eq!(
         canonicalize(&strip_sig(wire_orig)).unwrap(),
         canonicalize(&strip_sig(wire_reordered)).unwrap(),
-        "JCS must canonicalize key order — wire key order at parser layer is irrelevant"
+        "JCS must canonicalize key order - wire key order at parser layer is irrelevant"
     );
 }

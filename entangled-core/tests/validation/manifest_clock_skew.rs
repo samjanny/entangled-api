@@ -171,7 +171,7 @@ fn unsigned_manifest_with_dates(
 fn integration_canary_parse_and_verify_rejects_future_dated_manifest() {
     // Publisher signs at a "moment" that allows the future-dated `updated`
     // through the builder. We then hand the bytes to the parser with a `now`
-    // that exposes the skew, and expect rejection at Stage 5 — *before* the
+    // that exposes the skew, and expect rejection at Stage 5 - *before* the
     // signature is even checked.
     let publisher_key = PublisherSigningKey::from_seed(&[0x77; 32]);
     let publisher_pk = publisher_key.verifying_key();
@@ -275,7 +275,7 @@ fn integration_both_future_resolves_to_field_syntax_by_pipeline_precedence() {
     assert_eq!(
         err.code,
         DiagnosticCode::ESchemaFieldSyntax,
-        "Stage 5 must precede Stage 8 — got {err}",
+        "Stage 5 must precede Stage 8 - got {err}",
     );
     let details = err.details.as_ref().expect("details payload");
     assert_eq!(

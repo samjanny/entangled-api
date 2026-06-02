@@ -9,7 +9,7 @@ treated as security vulnerabilities.
 ## Reporting a vulnerability
 
 Please report security issues **privately** through one of the
-following channels — **do not file a public GitHub issue or
+following channels - **do not file a public GitHub issue or
 discussion**:
 
 1. **GitHub private vulnerability reporting** (preferred): open a
@@ -44,8 +44,8 @@ The maintainers aim to:
   discussion of the issue.
 
 We may ask for additional information, propose a coordinated
-disclosure date, or — for issues that do not affect the published
-crate versions — close the report as out of scope with a written
+disclosure date, or - for issues that do not affect the published
+crate versions - close the report as out of scope with a written
 explanation.
 
 ## Disclosure norms
@@ -78,7 +78,7 @@ In scope:
 Out of scope:
 
 - the upstream protocol specification at
-  [`samjanny/entangled`](https://github.com/samjanny/entangled) —
+  [`samjanny/entangled`](https://github.com/samjanny/entangled) -
   report spec-level issues there;
 - third-party transports, clients, or applications that integrate
   this crate;

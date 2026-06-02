@@ -7,7 +7,7 @@
 //! the corpus expects (`parse_and_verify_*` plus, where context dictates,
 //! Stage 8 canary checks and Stage 9 binding).
 //!
-//! The single integration test below — `corpus_vectors_match_spec` — fails
+//! The single integration test below - `corpus_vectors_match_spec` - fails
 //! on the first divergence with a message naming the vector id.
 //!
 //! The corpus is distributed separately from this crate (see top-level

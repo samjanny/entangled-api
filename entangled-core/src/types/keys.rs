@@ -344,7 +344,7 @@ impl RequestId {
     ///
     /// Retries: §09 explicitly requires a fresh `request_id` per
     /// submit *attempt*, including retries of the same logical
-    /// form — never cache the result.
+    /// form - never cache the result.
     ///
     /// # Panics
     ///
@@ -365,8 +365,8 @@ impl RequestId {
     /// production callers: it draws from the OS CSPRNG and is the
     /// hardest path to misuse. `from_bytes` is appropriate for tests
     /// that need deterministic IDs and for embedders integrating a
-    /// non-OS entropy source (HSM, vetted application-level CSPRNG)
-    /// — never for direct construction from user-controlled or
+    /// non-OS entropy source (HSM, vetted application-level CSPRNG) -
+    /// never for direct construction from user-controlled or
     /// counter-derived bytes. Reuse is a normative MUST violation;
     /// the type cannot detect it because doing so would require
     /// session-wide state.

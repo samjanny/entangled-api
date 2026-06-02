@@ -1,4 +1,4 @@
-//! `E_STATE_TRANSMIT_BUDGET` — runtime client-side soft-fail (§07:466-482).
+//! `E_STATE_TRANSMIT_BUDGET` - runtime client-side soft-fail (§07:466-482).
 //!
 //! The transmit-budget rule rejects an individual request-mode `set`
 //! operation whose commit would make even the *minimal* submit body

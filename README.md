@@ -50,10 +50,10 @@ Those are expected to live in higher-level crates or applications.
 
 Entangled separates four concerns that are usually tangled together on the web:
 
-1. **Publisher identity** — a long-term offline Ed25519 identity key.
-2. **Carrier reachability** — an address such as a Tor v3 onion service.
-3. **Routine publication signing** — a periodically rotated runtime key.
-4. **Document rendering** — a constrained grammar rendered by the client.
+1. **Publisher identity** - a long-term offline Ed25519 identity key.
+2. **Carrier reachability** - an address such as a Tor v3 onion service.
+3. **Routine publication signing** - a periodically rotated runtime key.
+4. **Document rendering** - a constrained grammar rendered by the client.
 
 The goal is to let a reader verify that a document belongs to the same publisher across server compromise, origin rotation, or carrier migration, while avoiding the attack surface of a general-purpose browser runtime.
 

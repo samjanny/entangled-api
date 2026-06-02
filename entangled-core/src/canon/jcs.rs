@@ -1,4 +1,4 @@
-//! JSON Canonicalization Scheme (JCS) — RFC 8785, with verified errata
+//! JSON Canonicalization Scheme (JCS) - RFC 8785, with verified errata
 //! EID 6292 and EID 7920 incorporated.
 //!
 //! Reference revision: the inline-errata version of RFC 8785 published by the
@@ -9,8 +9,8 @@
 //! JSON values according to RFC 8785 with those errata. EID 6292 and EID 7920
 //! are clarifications of the existing rules (member ordering by UTF-16 code
 //! units and number serialization edge cases respectively); for the
-//! Entangled-restricted input space — no `null`, no floats, only 64-bit
-//! integers, only valid Unicode strings — they do not change the output bytes
+//! Entangled-restricted input space - no `null`, no floats, only 64-bit
+//! integers, only valid Unicode strings - they do not change the output bytes
 //! produced by this canonicalizer relative to the original RFC 8785 text. The
 //! canonicalizer is implemented to satisfy both the original text and the
 //! errata.

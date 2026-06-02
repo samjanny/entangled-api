@@ -1,4 +1,4 @@
-//! Stage 2 — input checks (byte cap, BOM, strict UTF-8). §10.
+//! Stage 2 - input checks (byte cap, BOM, strict UTF-8). §10.
 
 use super::diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel};
 use super::limits::{
@@ -7,7 +7,7 @@ use super::limits::{
 
 const UTF8_BOM: [u8; 3] = [0xEF, 0xBB, 0xBF];
 
-/// What kind of input is being checked at Stage 2 — selects the byte cap
+/// What kind of input is being checked at Stage 2 - selects the byte cap
 /// and the diagnostic `document_kind` tag.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InputKind {

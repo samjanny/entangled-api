@@ -9,7 +9,7 @@ use entangled_core::types::state::StateMode;
 
 use crate::helpers::{default_runtime, policy_entry, pub_from_seed, set_op, ts};
 
-/// 16 zero bytes — these tests exercise field/state plumbing, not §09's
+/// 16 zero bytes - these tests exercise field/state plumbing, not §09's
 /// freshness rule for `request_id`.
 fn rid_zero() -> RequestId {
     RequestId::from_bytes([0u8; 16])

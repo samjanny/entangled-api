@@ -166,7 +166,7 @@ pub trait ManifestRead: sealed::HasManifest {
     fn content_root(&self) -> Option<&ContentRoot> {
         self.manifest_ref().content_root.as_ref()
     }
-    /// SHA-256 of the JCS-canonical signed payload — the input to the
+    /// SHA-256 of the JCS-canonical signed payload - the input to the
     /// publisher's Ed25519 signature, suitable for use as
     /// `RetainedManifestRecord::manifest_payload_hash` in the §08
     /// anti-conflict check.
@@ -194,7 +194,7 @@ pub trait ManifestRead: sealed::HasManifest {
 /// `#[must_use]` warns when a wrapper is silently dropped without being
 /// used, catching the trivial "called but ignored" case. It does not
 /// prevent reading fields via `ManifestRead` and then dropping the
-/// wrapper — that flow is permitted by design.
+/// wrapper - that flow is permitted by design.
 ///
 /// ```compile_fail
 /// #![deny(unused_must_use)]
@@ -203,7 +203,7 @@ pub trait ManifestRead: sealed::HasManifest {
 ///
 /// fn callsite_that_forgot_stage_8(bytes: &[u8], now: &EntangledTimestamp) {
 ///     // Unwrapping the `Result` exposes a `ManifestSigVerified` that is
-///     // then dropped without being either advanced or explicitly skipped —
+///     // then dropped without being either advanced or explicitly skipped -
 ///     // a must_use error when the unused_must_use lint is denied.
 ///     parse_and_verify_manifest(bytes, now).unwrap();
 /// }

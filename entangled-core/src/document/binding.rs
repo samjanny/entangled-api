@@ -40,7 +40,7 @@ use crate::validation::diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabe
 /// against the originating submit (§10).
 ///
 /// `submit_path` is the path the client posted the submit to.
-/// `submit_body` is the body the client sent — the helper canonicalizes
+/// `submit_body` is the body the client sent - the helper canonicalizes
 /// it via JCS and SHA-256-hashes those bytes to compare against
 /// `tx.request_hash`. The `request_id` carried by `submit_body` is
 /// compared against `tx.request_id`.
@@ -52,7 +52,7 @@ use crate::validation::diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabe
 /// # Errors
 ///
 /// `E_BIND_RESPONSE_PATH`, `E_BIND_REQUEST_ID`, or `E_BIND_REQUEST_HASH`
-/// per §11 — exactly one is returned, others remain unchecked.
+/// per §11 - exactly one is returned, others remain unchecked.
 pub fn verify_transaction_binding(
     tx: &TransactionDocument,
     submit_path: &EntangledPath,

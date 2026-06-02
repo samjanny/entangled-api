@@ -10,7 +10,7 @@
 //! semantically a canary integrity failure.
 //!
 //! This helper rejects future skew only. Past timestamps are always accepted
-//! here — they may be editorial (`meta.published_at` is historical) or
+//! here - they may be editorial (`meta.published_at` is historical) or
 //! re-fetched (`canary.issued_at` for an unchanged canary). Per-field rules
 //! that further constrain "how far in the past" live with the field's other
 //! validations (e.g. anti-downgrade in [`super::canary`]).
@@ -41,11 +41,11 @@ pub const CANARY_ISSUED_AT_FIELD: &str = "canary.issued_at";
 /// inclusive: exactly `+300` seconds is fine, `+301` seconds is not.
 ///
 /// The diagnostic code depends on `field_name` because §10 does not pick a
-/// single code for "timestamp too far in the future" — it borrows the
+/// single code for "timestamp too far in the future" - it borrows the
 /// closest-fit code for the field being checked:
 ///
-/// * `canary.issued_at` → `E_CANARY_INVALID` (Stage 8 — canary integrity).
-/// * any other field → `E_SCHEMA_FIELD_SYNTAX` (Stage 5 — temporal-domain
+/// * `canary.issued_at` → `E_CANARY_INVALID` (Stage 8 - canary integrity).
+/// * any other field → `E_SCHEMA_FIELD_SYNTAX` (Stage 5 - temporal-domain
 ///   failure). For `manifest.updated` the structured `details` SHOULD carry
 ///   `reason: "future_beyond_skew_tolerance"` plus the offending timestamp,
 ///   to distinguish this temporal-domain rejection from lexical RFC 3339

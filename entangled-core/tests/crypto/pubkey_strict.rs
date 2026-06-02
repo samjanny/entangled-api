@@ -21,7 +21,7 @@ fn canonical_encoding_at_p_minus_one_accepted() {
     bytes[0] -= 1;
     // Point may or may not be on the curve depending on x recovery, but
     // we only need to confirm the canonical-encoding check itself doesn't
-    // reject. Result may still be Err from decompression — what we forbid
+    // reject. Result may still be Err from decompression - what we forbid
     // is a non-canonical-encoding rejection here. Run the call and check
     // the categorical outcome via a second probe at y = p.
     let _ = validate_pubkey_strict(&bytes);
@@ -58,7 +58,7 @@ fn non_canonical_encoding_at_two_pow_255_minus_one_rejected() {
 #[test]
 fn sign_bit_does_not_affect_canonical_check() {
     // Setting the sign bit (top bit of byte 31) on a y >= p value MUST
-    // still reject — the canonical check masks the sign bit before
+    // still reject - the canonical check masks the sign bit before
     // comparing to p, so the underlying y is unchanged.
     let mut bytes = P_LE;
     bytes[31] |= 0x80;
@@ -80,7 +80,7 @@ fn known_canonical_key_accepted() {
 
 #[test]
 fn all_zeros_pubkey_rejected_as_small_order() {
-    // The all-zero encoding is the identity point — small-order. Rejected
+    // The all-zero encoding is the identity point - small-order. Rejected
     // by the second check (is_weak), not the canonical-encoding check.
     let bytes = [0u8; 32];
     assert!(validate_pubkey_strict(&bytes).is_err());

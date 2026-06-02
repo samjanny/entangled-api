@@ -12,12 +12,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {
-    /// Error — document MUST be rejected.
+    /// Error - document MUST be rejected.
     Error,
-    /// Warning — document MAY be processed with caveats; UI surfaces the
+    /// Warning - document MAY be processed with caveats; UI surfaces the
     /// condition.
     Warning,
-    /// Info — informational only; never blocks rendering.
+    /// Info - informational only; never blocks rendering.
     Info,
 }
 
@@ -52,7 +52,7 @@ pub enum DocumentKindLabel {
 #[allow(missing_docs)] // each variant's name is documented by §11; per-variant prose would
                        // duplicate the spec.
 pub enum DiagnosticCode {
-    // Stage 1 — Transport (§11)
+    // Stage 1 - Transport (§11)
     #[serde(rename = "E_TRANSPORT_STATUS")]
     ETransportStatus,
     #[serde(rename = "E_TRANSPORT_REDIRECT")]
@@ -80,7 +80,7 @@ pub enum DiagnosticCode {
     #[serde(rename = "E_TRANSPORT_TRANSFER_ENCODING")]
     ETransportTransferEncoding,
 
-    // Stage 2 — Input
+    // Stage 2 - Input
     #[serde(rename = "E_INPUT_BYTE_CAP")]
     EInputByteCap,
     #[serde(rename = "E_INPUT_UTF8")]
@@ -88,7 +88,7 @@ pub enum DiagnosticCode {
     #[serde(rename = "E_INPUT_BOM")]
     EInputBom,
 
-    // Stage 3 — Parsing
+    // Stage 3 - Parsing
     #[serde(rename = "E_PARSE_JSON")]
     EParseJson,
     #[serde(rename = "E_PARSE_NESTING_DEPTH")]
@@ -102,7 +102,7 @@ pub enum DiagnosticCode {
     #[serde(rename = "E_PARSE_DUPLICATE_KEY")]
     EParseDuplicateKey,
 
-    // Stage 4 — Document kind discrimination
+    // Stage 4 - Document kind discrimination
     #[serde(rename = "E_KIND_MISSING_FIELDS")]
     EKindMissingFields,
     #[serde(rename = "E_KIND_SPEC_VERSION")]
@@ -110,7 +110,7 @@ pub enum DiagnosticCode {
     #[serde(rename = "E_KIND_UNKNOWN")]
     EKindUnknown,
 
-    // Stage 5 — Schema
+    // Stage 5 - Schema
     #[serde(rename = "E_SCHEMA_REQUIRED_FIELD")]
     ESchemaRequiredField,
     #[serde(rename = "E_SCHEMA_UNKNOWN_FIELD")]
@@ -148,7 +148,7 @@ pub enum DiagnosticCode {
     #[serde(rename = "E_SUBMIT_BUDGET")]
     ESubmitBudget,
 
-    // Stage 6 — Signature
+    // Stage 6 - Signature
     #[serde(rename = "E_SIG_VERIFICATION")]
     ESigVerification,
     #[serde(rename = "E_SIG_INVALID_KEY")]
@@ -156,7 +156,7 @@ pub enum DiagnosticCode {
     #[serde(rename = "E_SIG_MALFORMED")]
     ESigMalformed,
 
-    // Stage 7 — Trust state
+    // Stage 7 - Trust state
     #[serde(rename = "E_TRUST_MISMATCH")]
     ETrustMismatch,
     #[serde(rename = "E_TRUST_USER_REJECTED")]
@@ -168,7 +168,7 @@ pub enum DiagnosticCode {
     #[serde(rename = "I_TRUST_VERIFIED")]
     ITrustVerified,
 
-    // Stage 8 — Canary
+    // Stage 8 - Canary
     #[serde(rename = "E_CANARY_INVALID")]
     ECanaryInvalid,
     #[serde(rename = "E_CANARY_DOWNGRADE")]
@@ -193,7 +193,7 @@ pub enum DiagnosticCode {
     #[serde(rename = "W_CANARY_UNAVAILABLE")]
     WCanaryUnavailable,
 
-    // Stage 9 — Binding
+    // Stage 9 - Binding
     #[serde(rename = "E_BIND_PATH")]
     EBindPath,
     #[serde(rename = "E_BIND_RESPONSE_PATH")]
@@ -232,7 +232,7 @@ pub enum DiagnosticCode {
     #[serde(rename = "E_ORIGIN_INVALID")]
     EOriginInvalid,
 
-    // Stage 9 — Content index (§11 rc.19, N49)
+    // Stage 9 - Content index (§11 rc.19, N49)
     /// Manifest declares `content_root` but `/content_index.json` fetch
     /// failed at transport level.
     #[serde(rename = "E_CONTENT_INDEX_FETCH_FAILED")]
@@ -385,7 +385,7 @@ impl DiagnosticCode {
     pub const fn stage(self) -> u8 {
         use DiagnosticCode::*;
         match self {
-            // Stage 1 — Transport.
+            // Stage 1 - Transport.
             ETransportStatus
             | ETransportRedirect
             | ETransportContentType
@@ -400,17 +400,17 @@ impl DiagnosticCode {
             | ETransportContentEncoding
             | ETransportTransferEncoding => 1,
 
-            // Stage 2 — Input.
+            // Stage 2 - Input.
             EInputByteCap | EInputUtf8 | EInputBom => 2,
 
-            // Stage 3 — Parsing.
+            // Stage 3 - Parsing.
             EParseJson | EParseNestingDepth | EParseStringLength | EParseArrayLength
             | EParseObjectKeys | EParseDuplicateKey => 3,
 
-            // Stage 4 — Document kind discrimination.
+            // Stage 4 - Document kind discrimination.
             EKindMissingFields | EKindSpecVersion | EKindUnknown => 4,
 
-            // Stage 5 — Schema. `E_ORIGIN_INVALID` was cataloged under
+            // Stage 5 - Schema. `E_ORIGIN_INVALID` was cataloged under
             // Stage 9 in rc.14 through rc.22 even though §06:171 emits
             // it as a Stage 5 cross-field semantic check on
             // `origin.not_after` and `canary.issued_at`. rc.23 N65
@@ -432,7 +432,7 @@ impl DiagnosticCode {
             | ESubmitBudget
             | EOriginInvalid => 5,
 
-            // Stage 6 — Signature, plus the manifest identity pre-check
+            // Stage 6 - Signature, plus the manifest identity pre-check
             // detected during Stage 6 per §11 (rc.10): `E_TRUST_MISMATCH`
             // takes precedence over `E_SIG_VERIFICATION` and is reported
             // with `stage: 6`. `E_TRUST_USER_REJECTED` accompanies the same
@@ -440,12 +440,12 @@ impl DiagnosticCode {
             ESigVerification | ESigInvalidKey | ESigMalformed | ETrustMismatch
             | ETrustUserRejected => 6,
 
-            // Stage 7 — Trust state transitions only (First contact /
+            // Stage 7 - Trust state transitions only (First contact /
             // TOFU pinning / external verification). The mismatch /
             // user-rejected codes moved to Stage 6 in rc.10.
             ITrustFirstContact | ITrustTofuPinned | ITrustVerified => 7,
 
-            // Stage 8 — Canary. `E_CANARY_EXPIRED` was `W_CANARY_EXPIRED`
+            // Stage 8 - Canary. `E_CANARY_EXPIRED` was `W_CANARY_EXPIRED`
             // at warning severity in rc.10 through rc.22; rc.23 N64
             // (AMB-09) renamed and promoted it to error severity to
             // align with the §08:183 MUST-block.
@@ -458,7 +458,7 @@ impl DiagnosticCode {
             | WCanaryGap
             | WCanaryUnavailable => 8,
 
-            // Stage 9 — Binding (incl. origin-migration codes from rc.13,
+            // Stage 9 - Binding (incl. origin-migration codes from rc.13,
             // origin not-after expiry from rc.14, and content-index codes
             // from rc.19). `E_ORIGIN_INVALID` was cataloged here from
             // rc.14 through rc.22; rc.23 N65 (AMB-05) moved it to the

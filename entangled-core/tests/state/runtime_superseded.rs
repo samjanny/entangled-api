@@ -86,7 +86,7 @@ fn mark_does_not_re_mark_already_superseded_entries() {
 
     assert_eq!(store.mark_runtime_superseded(&pub_a, &rt_new_a), 1);
     // A subsequent rotation against a different `K_runtime` should not
-    // re-flag an entry that is already superseded — there is nothing
+    // re-flag an entry that is already superseded - there is nothing
     // fresher to compare against.
     assert_eq!(store.mark_runtime_superseded(&pub_a, &rt_new_b), 0);
 }

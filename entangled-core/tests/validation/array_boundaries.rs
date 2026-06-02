@@ -42,7 +42,7 @@ fn to_bytes(v: &Value) -> Vec<u8> {
     serde_json::to_vec(v).unwrap()
 }
 
-/// 33 distinct `state_policy` entries — one over the §07 max of 32.
+/// 33 distinct `state_policy` entries - one over the §07 max of 32.
 #[test]
 fn state_policy_with_33_entries_rejected_field_length() {
     let entries: Vec<Value> = (0..33)
@@ -71,7 +71,7 @@ fn state_policy_with_33_entries_rejected_field_length() {
     );
 }
 
-/// 33 navigation entries — one over the §06 max of 32.
+/// 33 navigation entries - one over the §06 max of 32.
 #[test]
 fn navigation_with_33_entries_rejected_field_length() {
     let entries: Vec<Value> = (0..33)
@@ -91,7 +91,7 @@ fn navigation_with_33_entries_rejected_field_length() {
     );
 }
 
-/// 33 transaction `state_updates` — one over the §02 transaction max of 32.
+/// 33 transaction `state_updates` - one over the §02 transaction max of 32.
 #[test]
 fn state_updates_with_33_entries_rejected_field_length() {
     let updates: Vec<Value> = (0..33)
@@ -119,7 +119,7 @@ fn state_updates_with_33_entries_rejected_field_length() {
     );
 }
 
-/// 1025 content `blocks` — one over the §02 content max of 1024.
+/// 1025 content `blocks` - one over the §02 content max of 1024.
 #[test]
 fn content_blocks_with_1025_entries_rejected_field_length() {
     let block = json!({
@@ -143,7 +143,7 @@ fn content_blocks_with_1025_entries_rejected_field_length() {
     );
 }
 
-/// 257 inline elements inside a single block's content — one over the
+/// 257 inline elements inside a single block's content - one over the
 /// §03 inline-array max of 256.
 #[test]
 fn inline_content_with_257_elements_rejected_field_length() {

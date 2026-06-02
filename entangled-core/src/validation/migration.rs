@@ -11,11 +11,11 @@
 //!
 //! rc.14 adds two further Stage 9 concerns handled by this module:
 //!
-//! * [`check_origin_not_after`] — the `origin.not_after` expiry check.
+//! * [`check_origin_not_after`] - the `origin.not_after` expiry check.
 //!   Runs after carrier origin binding succeeds; rejects a manifest whose
 //!   declared `not_after` is at or before the client's clock under §10
 //!   clock-skew tolerance with `E_ORIGIN_EXPIRED`.
-//! * [`check_migration_chain_cycle`] — the per-flow `visited_origins`
+//! * [`check_migration_chain_cycle`] - the per-flow `visited_origins`
 //!   cycle guard. A `migration_pointer.successor_origin.address` that is
 //!   already present in the navigation's `visited_origins` set is
 //!   rejected as `E_MIGRATION_INVALID` with `details.reason =
@@ -73,7 +73,7 @@
 //!
 //! rc.18 closes two gaps in the rc.16 rule:
 //!
-//! * **N30 — Replacement event covers the pre-Adoption current origin.**
+//! * **N30 - Replacement event covers the pre-Adoption current origin.**
 //!   The rc.16 wording recorded a `Replacement` event only when a
 //!   previously adopted successor was itself superseded, which left the
 //!   `A → B → A → B` ping-pong detectable in only one direction (the
@@ -82,7 +82,7 @@
 //!   recorded at every Adoption against the pre-Adoption current origin
 //!   (the announcing origin), so a later announcement of `A` as a
 //!   successor triggers the recall check.
-//! * **N31 — recall-window upper bound.** The recommended 30-day window
+//! * **N31 - recall-window upper bound.** The recommended 30-day window
 //!   gains an explicit SHOULD-NOT-exceed of 365 days. Clients with
 //!   bounded storage MAY enforce a smaller cap, whether by time or by
 //!   event count (e.g. the most recent 100 migration events per
@@ -131,8 +131,8 @@ use crate::validation::limits::CLOCK_SKEW_TOLERANCE_SECS;
 /// performs only the publisher-identity continuity check.
 ///
 /// For wrapping a successor Stage 1-9 failure into a migration-level
-/// rejection — for example, a successor whose own `origin.not_after`
-/// has passed, or whose signature fails verification — see
+/// rejection - for example, a successor whose own `origin.not_after`
+/// has passed, or whose signature fails verification - see
 /// [`wrap_successor_stage9_failure`].
 ///
 /// # Errors
@@ -164,9 +164,9 @@ pub fn verify_migration_announcement(
 /// `underlying_diagnostic_code` per rc.16 clarification).
 ///
 /// When the successor manifest fetched from the announced address fails
-/// any check during its own Stages 1-9 — independently of the
+/// any check during its own Stages 1-9 - independently of the
 /// migration-binding facets (`publisher_pubkey`, `address`,
-/// `origin_pubkey`) — the migration is rejected at the announcement
+/// `origin_pubkey`) - the migration is rejected at the announcement
 /// level as `E_MIGRATION_MISMATCH`. The underlying failure's **code
 /// identifier** (e.g. `"E_ORIGIN_EXPIRED"`, `"E_SIG_VERIFICATION"`) is
 /// preserved in `details.underlying_diagnostic_code` so operators can
@@ -188,7 +188,7 @@ pub fn verify_migration_announcement(
 /// * `announcing_publisher_pubkey`: the announcing manifest's
 ///   `publisher_pubkey`;
 /// * `successor_publisher_pubkey`: the successor manifest's
-///   `publisher_pubkey` — **only when supplied**, per rc.15. Callers
+///   `publisher_pubkey` - **only when supplied**, per rc.15. Callers
 ///   that are wrapping a Stage 1-4 failure (the successor has not yet
 ///   cleared schema validation, so no validated pubkey is available)
 ///   MUST pass `None`; callers wrapping a Stage 5-9 failure pass the
@@ -342,8 +342,8 @@ fn minute_precision_utc(ts: &EntangledTimestamp) -> String {
 /// profile; reset / persistence policy lives with the caller (per §10,
 /// the set is not persisted across sessions).
 ///
-/// The complementary `MUST` from §10 — the automatic chain-depth limit
-/// (at most one hop without user re-confirmation) — is a client-chrome
+/// The complementary `MUST` from §10 - the automatic chain-depth limit
+/// (at most one hop without user re-confirmation) - is a client-chrome
 /// concern (user confirmation cadence, high-threat mode override) and is
 /// not enforced by this crate.
 ///

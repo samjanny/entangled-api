@@ -71,7 +71,7 @@ fn block_extra_field_rejected() {
     assert!(
         parsed.is_err(),
         "content doc with paragraph having extra `style` field should be rejected. \
-         If this fails, deny_unknown_fields on internally-tagged enum is broken — \
+         If this fails, deny_unknown_fields on internally-tagged enum is broken - \
          see Phase 1 prompt §0.2."
     );
 }

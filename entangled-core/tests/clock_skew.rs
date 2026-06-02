@@ -24,7 +24,7 @@ fn within_skew_tolerance_passes() {
 #[test]
 fn at_exact_tolerance_boundary_passes() {
     let now = ts("2026-05-07T00:00:00Z");
-    let later = ts("2026-05-07T00:05:00Z"); // +300s — boundary inclusive
+    let later = ts("2026-05-07T00:05:00Z"); // +300s - boundary inclusive
     check_future_timestamp(
         &later,
         &now,

@@ -130,7 +130,7 @@ fn replacing_with_smaller_value_is_allowed_at_cap() {
         .unwrap();
     assert_eq!(store.bytes_used_for_publisher(&pub_a, &now), 1000 + 3);
 
-    // Replace with a smaller value — net delta negative; must succeed.
+    // Replace with a smaller value - net delta negative; must succeed.
     let v2 = "y".repeat(100);
     store
         .set(

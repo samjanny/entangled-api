@@ -3,8 +3,8 @@
 //! `DocumentError` aggregates failures from the validation pipeline, the
 //! canonicalizer, the high-level signing helpers, and the Ed25519 layer. It
 //! exposes [`DocumentError::into_diagnostic`] so callers that need to propagate
-//! a §11 diagnostic — for example, parser entry points wrapped by the public
-//! Stage 2-6 API — can map any builder failure to the closest matching code.
+//! a §11 diagnostic - for example, parser entry points wrapped by the public
+//! Stage 2-6 API - can map any builder failure to the closest matching code.
 
 use thiserror::Error;
 

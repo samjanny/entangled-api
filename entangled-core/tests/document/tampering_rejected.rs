@@ -9,7 +9,7 @@ use entangled_core::validation::DiagnosticCode;
 use super::fixtures::{unsigned_content, unsigned_manifest_with_publisher};
 use crate::common::fixed_now;
 
-/// Find the first byte that is not part of the JSON literal `"sig":"…"`.
+/// Find the first byte that is not part of the JSON literal `"sig":"..."`.
 /// We want to flip a byte that does NOT live inside the signature string.
 fn first_byte_outside_sig(bytes: &[u8]) -> usize {
     let s = std::str::from_utf8(bytes).expect("utf8");

@@ -1,7 +1,7 @@
 //! Unsigned counterparts to [`crate::types::Manifest`],
 //! [`crate::types::ContentDocument`], and [`crate::types::TransactionDocument`].
 //!
-//! The signed structs carry `sig` as a non-optional field — they represent a
+//! The signed structs carry `sig` as a non-optional field - they represent a
 //! complete envelope. To express the "before signing" state we mirror them as
 //! `Unsigned*` structs that omit `sig`. The builder takes an `Unsigned*`,
 //! signs the canonicalized payload, and produces the corresponding signed
@@ -16,7 +16,7 @@
 //!
 //! `Option::None` serializes as a missing field, which would change the wire
 //! format of partially-built objects in surprising ways. `sig` is also
-//! mandatory in §02 — there is no normative "envelope without sig" shape on
+//! mandatory in §02 - there is no normative "envelope without sig" shape on
 //! the wire.
 //!
 //! ## Why not a dummy sig that the builder overwrites?
@@ -28,8 +28,8 @@
 //! ## The `kind` discriminator
 //!
 //! In the signed types the discriminator (`kind: "manifest"` etc.) lives at
-//! the [`crate::types::Document`] enum tag, so it is added by serde when —
-//! and only when — a value is serialized through the enum. The `Unsigned*`
+//! the [`crate::types::Document`] enum tag, so it is added by serde when -
+//! and only when - a value is serialized through the enum. The `Unsigned*`
 //! structs are not enum variants, so [`UnsignedManifest::to_signed_payload`]
 //! adds the `kind` field manually before returning the `Value`. This keeps
 //! `to_signed_payload` byte-equivalent (after JCS) to

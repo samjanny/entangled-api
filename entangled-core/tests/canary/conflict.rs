@@ -1,4 +1,4 @@
-//! `check_canary_conflict` — equal-`issued_at` reconciliation (§08).
+//! `check_canary_conflict` - equal-`issued_at` reconciliation (§08).
 
 use entangled_core::types::keys::RuntimePubkey;
 use entangled_core::types::timestamp::EntangledTimestamp;
@@ -30,7 +30,7 @@ fn no_history_no_conflict() {
 
 #[test]
 fn different_issued_at_no_conflict() {
-    // Strictly-greater issued_at is not a conflict — anti-downgrade
+    // Strictly-greater issued_at is not a conflict - anti-downgrade
     // (§08) handles that case separately. `check_canary_conflict` only
     // fires on equal issued_at.
     let retained = RetainedManifestRecord {

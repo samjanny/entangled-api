@@ -1,13 +1,13 @@
-//! Content index validation (§02/§09/§10 v1.0-rc.19, N46–N49).
+//! Content index validation (§02/§09/§10 v1.0-rc.19, N46-N49).
 //!
 //! The content index is a non-signed JSON resource at
 //! `/content_index.json`. Its integrity is established by the
 //! `content_root` hash binding in the manifest. This module provides:
 //!
-//! * [`ContentIndex`] — the parsed and validated content index.
-//! * [`ContentIndexEntry`] — a single `(seq, hash)` pair.
-//! * [`validate_content_index`] — structural validation of the raw bytes.
-//! * [`verify_content_against_index`] — per-document `seq`/`hash`
+//! * [`ContentIndex`] - the parsed and validated content index.
+//! * [`ContentIndexEntry`] - a single `(seq, hash)` pair.
+//! * [`validate_content_index`] - structural validation of the raw bytes.
+//! * [`verify_content_against_index`] - per-document `seq`/`hash`
 //!   verification at Stage 9.
 //!
 //! # Caller obligations for the transport fetch
@@ -110,7 +110,7 @@ impl ContentIndex {
 ///
 /// Per §02:208 the content index is hash-bound to a `K_publisher`-signed
 /// commitment and therefore MUST be parsed under the same input
-/// restrictions that apply to Entangled documents — including strict
+/// restrictions that apply to Entangled documents - including strict
 /// duplicate-key rejection (not last-wins) and lexical integer grammar.
 /// Steps 3-4 are routed through [`parse_with_limits`] for that reason;
 /// any deviation between two conforming parsers on the same bytes would
@@ -120,8 +120,8 @@ impl ContentIndex {
 ///
 /// # Errors
 ///
-/// * `E_CONTENT_INDEX_HASH_MISMATCH` — hash does not match `content_root`.
-/// * `E_CONTENT_INDEX_INVALID` — any other failure (size cap, UTF-8, BOM,
+/// * `E_CONTENT_INDEX_HASH_MISMATCH` - hash does not match `content_root`.
+/// * `E_CONTENT_INDEX_INVALID` - any other failure (size cap, UTF-8, BOM,
 ///   parse error, schema violation, path syntax, seq lower bound).
 ///
 /// Transport-layer failures (missing `Content-Length`, wrong
@@ -180,7 +180,7 @@ pub fn validate_content_index(
     // §02:208: parse under the same input restrictions as Entangled
     // documents (no duplicate JSON keys, integer grammar, parser limits).
     // Map any parse diagnostic onto the single content-index code per
-    // §11 — the content index does not surface stage-3 codes directly.
+    // §11 - the content index does not surface stage-3 codes directly.
     let value = parse_with_limits(s).map_err(|d| {
         Diagnostic::new(
             DiagnosticCode::EContentIndexInvalid,
@@ -237,10 +237,10 @@ fn validate_index_path(path: &str) -> Result<(), Diagnostic> {
 ///
 /// # Errors
 ///
-/// * `E_CONTENT_SEQ_MISSING` — index has an entry but document omits `seq`.
-/// * `E_CONTENT_SEQ_ROLLBACK` — `doc_seq < idx_seq`.
-/// * `E_CONTENT_SEQ_UNCOMMITTED` — `doc_seq > idx_seq`.
-/// * `E_CONTENT_HASH_MISMATCH` — `doc_seq == idx_seq` but hash differs.
+/// * `E_CONTENT_SEQ_MISSING` - index has an entry but document omits `seq`.
+/// * `E_CONTENT_SEQ_ROLLBACK` - `doc_seq < idx_seq`.
+/// * `E_CONTENT_SEQ_UNCOMMITTED` - `doc_seq > idx_seq`.
+/// * `E_CONTENT_HASH_MISMATCH` - `doc_seq == idx_seq` but hash differs.
 pub fn verify_content_against_index(
     index: &ContentIndex,
     doc_path: &str,

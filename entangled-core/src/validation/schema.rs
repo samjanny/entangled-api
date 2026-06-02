@@ -1,4 +1,4 @@
-//! Stage 5 dispatch — top-level validators and end-to-end pipelines for
+//! Stage 5 dispatch - top-level validators and end-to-end pipelines for
 //! manifest, content, and transaction documents.
 //!
 //! The serde error message format used by `map_serde_err` is not part of
@@ -31,7 +31,7 @@ use super::strings::{check_nfc, no_control_chars};
 use crate::types::blocks::Block;
 
 // -----------------------------------------------------------------------------
-// Public top-level pipelines (Stages 2–5)
+// Public top-level pipelines (Stages 2-5)
 // -----------------------------------------------------------------------------
 
 /// Run Stages 2-5 on a manifest envelope and return the typed [`Manifest`].
@@ -484,7 +484,7 @@ pub fn validate_migration_pointer(
 
 /// Validate `origin.not_after` against `canary.issued_at` (§06 v1.0-rc.14).
 ///
-/// When `origin.not_after` is absent the helper returns `Ok(())` — declaring
+/// When `origin.not_after` is absent the helper returns `Ok(())` - declaring
 /// no publisher-side expiration is the steady-state shape. When present the
 /// helper enforces the two `MUST` constraints from §06:
 ///
@@ -662,7 +662,7 @@ fn schema_prepass(root: &Value, kind: DocumentKindLabel) -> Result<(), Diagnosti
             // §04 v1.0-rc.5: the protocol's integer grammar is 64-bit
             // signed. Values strictly above i64::MAX (e.g. 2^63 written as
             // a JSON literal) are not representable in the grammar; they
-            // are reported as `E_SCHEMA_NON_INTEGER` at Stage 5 — the
+            // are reported as `E_SCHEMA_NON_INTEGER` at Stage 5 - the
             // rejection precedes serde's per-field range narrowing
             // (`u32::deserialize`) so the diagnostic matches the lexical
             // failure rather than a downstream field-range failure.

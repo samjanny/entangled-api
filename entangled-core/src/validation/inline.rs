@@ -1,4 +1,4 @@
-//! Stage 5 — inline content validators. §03.
+//! Stage 5 - inline content validators. §03.
 
 use std::collections::HashSet;
 
@@ -162,7 +162,7 @@ fn validate_citation_url(url: &str) -> Result<(), Diagnostic> {
 /// Same byte-cap, control-char, and RFC 3986 rules as citation, but the
 /// scheme MUST be `http://` (the carrier provides confidentiality at the
 /// rendezvous layer; cf. §09 on plain HTTP over Tor v3) and the host MUST
-/// be a valid carrier address for the declared `carrier` — for `tor-v3`,
+/// be a valid carrier address for the declared `carrier` - for `tor-v3`,
 /// the 56-character lowercase base32 onion body followed by `.onion`.
 fn validate_carrier_url(carrier: Carrier, url: &str) -> Result<(), Diagnostic> {
     validate_url_common("carrier", url, "http://")?;
@@ -286,7 +286,7 @@ fn extract_authority_host(after_scheme: &str) -> Option<&str> {
 }
 
 /// Returns true if `b` is an unreserved/reserved URI byte per RFC 3986
-/// §2.2 / §2.3 — i.e. anything that may legally appear *unencoded* in a
+/// §2.2 / §2.3 - i.e. anything that may legally appear *unencoded* in a
 /// URI. Percent-encoded triplets `%HH` are validated separately by the
 /// caller and are not handled here.
 fn is_rfc3986_unencoded_byte(b: u8) -> bool {
