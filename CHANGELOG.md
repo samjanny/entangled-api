@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-06-02
+
+SEMVER MINOR in 0.x (breaking; see Breaking below). Spec alignment to
+v1.0-rc.47, covering upstream Lotti 41-47 (closing `samjanny/entangled#23`
+through `#30`, AMB-22 through AMB-29). Three of the seven Lotti change this
+crate's behavior or API; the rest match behavior the crate already implemented
+and pass the bumped corpus pin. `spec_version` stays `"1.0"`.
+
+### Changed (spec v1.0-rc.47 alignment - Lotti 41-47)
+
+- **`SPEC_REVISION` bumped `1.0-rc.40` -> `1.0-rc.47`** and the CI
+  conformance-corpus pin (`.github/workflows/ci.yml`) moved to
+  `ref: v1.0-rc.47`. The crate passes the rc.47 corpus (88 vectors).
+- **AMB-27 (Lotto 43): an out-of-range state set `ttl` above `u32::MAX` is now
+  `E_STATE_TTL`, not the generic `E_SCHEMA_FIELD_RANGE`.** The parsed
+  `StateUpdateOp::Set` `ttl` field is widened from `u32` to `i64` (see Breaking)
+  so the dedicated `300..=7_776_000` hard-range check governs any
+  conforming-integer value rather than the deserializer failing first.
+- **AMB-29 (Lotto 44): a non-conforming numeric token co-occurring with a
+  Stage 3 parser-limit violation now reports the Stage 3 `E_PARSE_*` code, not
+  `E_SCHEMA_NON_INTEGER`.** `parse_with_limits` now runs the structural-limit
+  walk (`walk_limits`) before the numeric-grammar scan (`enforce_integer_grammar`),
+  matching §04:101 (the numeric-grammar stage is implementation-defined and does
+  not preempt a lower-numbered Stage 3 limit). A non-conforming number with no
+  Stage 3 limit still reports `E_SCHEMA_NON_INTEGER`.
+- **AMB-24 (Lotto 47): user-visible strings are validated against a pinned
+  Unicode 15.0 baseline with an assigned-only gate.** `check_nfc` now rejects
+  any code point unassigned in Unicode 15.0 (`E_SCHEMA_FIELD_SYNTAX`, `details`
+  `reason = "unassigned_code_point"`) before the NFC check, so implementations
+  on different Unicode Character Database versions cannot disagree on a newer
+  code point's normalization.
+- **AMB-22, AMB-23, AMB-25, AMB-26, AMB-28 (Lotti 41/42/45/46): no code change.**
+  These match behavior this crate already implemented (link target `url`
+  RFC 3986 character set; a `null` array element is `E_SCHEMA_NULL_VALUE`; the
+  migration reverse-cycle `chain_cycle` is ordered after successor verification;
+  a small-order `canary.runtime_pubkey` is rejected at Stage 8 `E_CANARY_INVALID`;
+  the intra-Stage-5 manifest diagnostic reporting order) or were corrected only
+  in the Java reference. They pass under the bumped corpus pin unchanged.
+
+### Breaking
+
+- `types::state::StateUpdateOp::Set` `ttl` field is now `i64` (was `u32`). A
+  conforming-integer `ttl` above `u32::MAX` therefore deserializes and is
+  rejected by the dedicated `E_STATE_TTL` hard-range check, rather than failing
+  deserialization and reporting `E_SCHEMA_FIELD_RANGE`.
+- `validation::limits::STATE_TTL_HARD_RANGE` is now `RangeInclusive<i64>` (was
+  `RangeInclusive<u32>`).
+
+### Added
+
+- `validation::unicode_assigned` module with `is_assigned(cp: u32) -> bool`, the
+  Unicode 15.0 assigned-code-point predicate backing the §04 assigned-only gate.
+  Generated from `Character.isDefined` so it matches the Java reference's
+  baseline; no external dependency is added.
+
 ## [0.6.1] - 2026-06-02
 
 SEMVER PATCH in 0.x. Spec alignment to v1.0-rc.40 (upstream Lotti 38-40,
