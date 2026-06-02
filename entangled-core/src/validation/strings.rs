@@ -44,6 +44,29 @@ pub fn check_nfc(
     field_path: &'static str,
     document_kind: DocumentKindLabel,
 ) -> Result<(), Diagnostic> {
+    // §04 (AMB-24, rc.47): a user-visible string MUST contain only code points
+    // assigned in the pinned Unicode version (15.0). Reject any unassigned code
+    // point before the NFC check, so two implementations on different Unicode
+    // Character Database versions cannot disagree on a newer code point's
+    // normalization. Normalization stability guarantees NFC is fixed for an
+    // assigned code point across all later versions, so the NFC check below is
+    // then deterministic across versions.
+    for ch in s.chars() {
+        if !crate::validation::unicode_assigned::is_assigned(ch as u32) {
+            return Err(Diagnostic::new(
+                DiagnosticCode::ESchemaFieldSyntax,
+                document_kind,
+                format!(
+                    "{field_path} contains code point U+{:04X} unassigned in Unicode 15.0",
+                    ch as u32
+                ),
+            )
+            .with_details(serde_json::json!({
+                "field_path": field_path,
+                "reason": "unassigned_code_point",
+            })));
+        }
+    }
     let is_nfc = match is_nfc_quick(s.chars()) {
         IsNormalized::Yes => true,
         IsNormalized::No => false,

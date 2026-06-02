@@ -24,6 +24,7 @@ pub mod schema;
 pub mod state;
 pub mod strings;
 pub mod submit;
+pub mod unicode_assigned;
 
 pub use clock::{check_future_timestamp, check_manifest_clock_skew};
 pub use content_index::{
