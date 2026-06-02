@@ -73,7 +73,7 @@ fn check_op<'a>(
                     ),
                 ));
             }
-            if *ttl > entry.max_lifetime {
+            if *ttl > i64::from(entry.max_lifetime) {
                 return Err(Diagnostic::new(
                     DiagnosticCode::EStateTtl,
                     DocumentKindLabel::Transaction,

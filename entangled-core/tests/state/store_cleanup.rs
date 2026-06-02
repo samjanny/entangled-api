@@ -17,7 +17,7 @@ fn cleanup_expired_removes_expired_entries() {
     let now = ts("2026-05-07T00:00:00Z");
     let mut store = StateStore::new();
 
-    for (i, ttl) in [300u32, 600, 900, 1200, 1500].iter().enumerate() {
+    for (i, ttl) in [300i64, 600, 900, 1200, 1500].iter().enumerate() {
         store
             .set(
                 &pub_a,

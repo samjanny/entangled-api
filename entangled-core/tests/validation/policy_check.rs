@@ -21,7 +21,7 @@ fn policy(max_size: u32, max_lifetime: u32) -> Vec<StatePolicyEntry> {
     }]
 }
 
-fn set_op(namespace: &str, key: &str, value_len: usize, ttl: u32) -> StateUpdateOp {
+fn set_op(namespace: &str, key: &str, value_len: usize, ttl: i64) -> StateUpdateOp {
     StateUpdateOp::Set {
         namespace: slug(namespace),
         key: slug(key),

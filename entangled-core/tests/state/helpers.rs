@@ -32,7 +32,7 @@ pub fn ts(s: &str) -> EntangledTimestamp {
     EntangledTimestamp::try_from(s).unwrap()
 }
 
-pub fn set_op(namespace: &str, key: &str, value: &str, ttl: u32) -> StateUpdateOp {
+pub fn set_op(namespace: &str, key: &str, value: &str, ttl: i64) -> StateUpdateOp {
     StateUpdateOp::Set {
         namespace: slug(namespace),
         key: slug(key),

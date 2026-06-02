@@ -289,7 +289,7 @@ impl StateStore {
             }
         }
 
-        let expires_at = *now + Duration::seconds(i64::from(ttl));
+        let expires_at = *now + Duration::seconds(ttl);
         let entry = StateEntry {
             value: value.clone(),
             mode,

@@ -51,7 +51,12 @@ pub enum StateUpdateOp {
         /// New value (must satisfy the policy `max_size`).
         value: String,
         /// Time-to-live in seconds (must satisfy the policy `max_lifetime`).
-        ttl: u32,
+        ///
+        /// Typed `i64` (the §04 integer domain) rather than `u32` so that a
+        /// conforming integer above `u32::MAX` does not fail deserialization
+        /// with a generic width error before the dedicated `E_STATE_TTL` hard-
+        /// range check runs (`300..=7_776_000`); see `validate_state_updates`.
+        ttl: i64,
     },
     /// Delete any existing value at `(namespace, key)`.
     Delete {

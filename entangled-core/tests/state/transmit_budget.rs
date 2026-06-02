@@ -23,7 +23,7 @@ fn big_set(
     namespace: &str,
     key: &str,
     value_len: usize,
-    ttl: u32,
+    ttl: i64,
 ) -> entangled_core::types::state::StateUpdateOp {
     let value = "a".repeat(value_len);
     set_op(namespace, key, &value, ttl)

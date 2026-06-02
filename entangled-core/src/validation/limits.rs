@@ -245,7 +245,7 @@ pub const STATE_MAX_LIFETIME_RANGE: RangeInclusive<u32> = 300..=7_776_000;
 ///
 /// The check vs the manifest-declared `max_lifetime` is separate and requires
 /// the current manifest at evaluation time.
-pub const STATE_TTL_HARD_RANGE: RangeInclusive<u32> = 300..=7_776_000;
+pub const STATE_TTL_HARD_RANGE: RangeInclusive<i64> = 300..=7_776_000;
 
 // -----------------------------------------------------------------------------
 // Canary interval (§08; included here for coherence with later phases)
