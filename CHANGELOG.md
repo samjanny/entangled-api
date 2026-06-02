@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-06-02
+
+SEMVER PATCH in 0.x. Spec alignment to v1.0-rc.40 (upstream Lotti 38-40,
+closing `samjanny/entangled#19`, `#20`, `#21`, `#22`), plus a Stage 5
+diagnostic-classification fix for malformed `sha-256:` fields. `spec_version`
+stays `"1.0"`. No public API change.
+
+### Changed (spec v1.0-rc.40 alignment - Lotti 38-40)
+
+- **`SPEC_REVISION` bumped `1.0-rc.37` -> `1.0-rc.40`** and the CI
+  conformance-corpus pin (`.github/workflows/ci.yml`) moved to
+  `ref: v1.0-rc.40`. The crate passes the rc.40 corpus (77 vectors), including
+  the three new vectors `163-state-op-unknown`, `164-state-op-missing-field`,
+  and `203-migration-self-pointer-precedence`.
+- **AMB-18 (Lotto 38): no code change.** An unknown state-update `op` is a
+  closed-enum violation (`E_SCHEMA_ENUM_VIOLATION`) and a missing
+  operation-form field is `E_SCHEMA_REQUIRED_FIELD`, both at Stage 5;
+  `E_STATE_OP` is reserved for later state-operation processing. The crate
+  already emitted these codes (`validation/state.rs`).
+- **AMB-19 (Lotto 38): no code change.** The four announcement-internal
+  `migration_pointer` semantic checks (`self_pointer`, `carrier_mismatch`,
+  `announced_at_after_updated`, `successor_key_mismatch`) are Stage 5
+  closed-schema checks; only `chain_cycle` is Stage 9. The crate already
+  evaluated them at Stage 5 (`validation/schema.rs`,
+  `validate_migration_pointer`).
+- **AMB-20 (Lotto 39) and AMB-21 (Lotto 40): out of scope for this crate.**
+  Both are client-runtime spec clarifications (canary cached-manifest-expired
+  precedence over Unavailable; remembered-consent value-change disclosure for
+  request-mode state) that this validation library does not model.
+
+### Fixed
+
+- **A malformed `sha-256:<base64url>` field (`content_root`, `image.sha256`,
+  `request_hash`) is now classified as `E_SCHEMA_FIELD_SYNTAX` at Stage 5.**
+  Previously a wrong exact length mapped to `E_SCHEMA_FIELD_LENGTH` and a
+  missing prefix or wrong decoded byte length fell through to
+  `E_SCHEMA_FIELD_TYPE`. Per section 04:180-183 a fixed-form field whose value
+  violates its declared syntax, including a wrong exact length, is
+  `E_SCHEMA_FIELD_SYNTAX`, matching the Java reference (`sha256Field`). No
+  corpus vector exercised this case, so conformance verdicts are unchanged.
+
 ## [0.6.0] - 2026-05-29
 
 SEMVER MINOR in 0.x (breaking; see Breaking below). Spec alignment to
