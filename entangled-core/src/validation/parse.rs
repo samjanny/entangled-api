@@ -56,8 +56,15 @@ pub fn parse_with_limits(s: &str) -> Result<Value, Diagnostic> {
     let value: Value = serde_json::from_str::<DedupedValue>(s)
         .map(|d| d.0)
         .map_err(classify_serde_error)?;
-    enforce_integer_grammar(s)?;
+    // AMB-29: the structural Stage 3 parser limits (nesting depth, array
+    // length, object key count, per-string length) take precedence over the
+    // numeric-grammar check. When a non-conforming numeric token co-occurs with
+    // a Stage 3 limit violation, the lower-numbered Stage 3 limit code wins
+    // (§11:15 first-failing-stage; the numeric-grammar stage is
+    // implementation-defined per §04:101). `walk_limits` therefore runs before
+    // `enforce_integer_grammar`.
     walk_limits(&value)?;
+    enforce_integer_grammar(s)?;
     Ok(value)
 }
 
