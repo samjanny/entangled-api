@@ -215,6 +215,16 @@ pub struct PublisherSigningKey(SigningKey);
 /// not interconvertible with it at the public API level.
 pub struct RuntimeSigningKey(SigningKey);
 
+/// Origin key. Binds the manifest to a Tor v3 carrier address.
+///
+/// `K_origin` (§05, §06) is never used to sign Entangled documents in v1.0:
+/// it exists only so the onion address derives from it and the manifest's
+/// `origin.origin_pubkey` can be checked against the address. This newtype
+/// therefore exposes seed-based construction and public-key derivation but,
+/// unlike [`PublisherSigningKey`] and [`RuntimeSigningKey`], no signing
+/// method. A publisher holds the origin seed to derive its onion address.
+pub struct OriginSigningKey(SigningKey);
+
 impl PublisherSigningKey {
     /// Generate a fresh publisher keypair from OS entropy.
     ///
@@ -273,6 +283,29 @@ impl RuntimeSigningKey {
     /// [`crate::crypto::sign_transaction_payload`] helpers.
     pub(crate) fn sign(&self, input: &[u8]) -> Signature {
         self.0.sign(input)
+    }
+}
+
+impl OriginSigningKey {
+    /// Generate a fresh origin keypair from OS entropy.
+    ///
+    /// Test-only: gated behind `#[cfg(test)]` and the `test-utils` feature.
+    #[cfg(any(test, feature = "test-utils"))]
+    pub fn generate() -> Self {
+        Self(SigningKey::generate())
+    }
+
+    /// Build an [`OriginSigningKey`] from a 32-byte seed
+    /// (the RFC 8032 secret key).
+    pub fn from_seed(seed: &[u8; 32]) -> Self {
+        Self(SigningKey::from_seed(seed))
+    }
+
+    /// Return the [`OriginPubkey`] derived from this key. Combine with
+    /// [`crate::types::manifest::OnionAddress::from_origin_pubkey`] to obtain
+    /// the carrier address.
+    pub fn verifying_key(&self) -> OriginPubkey {
+        self.0.verifying_key().to_origin_pubkey()
     }
 }
 
