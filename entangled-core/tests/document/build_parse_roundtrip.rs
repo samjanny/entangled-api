@@ -49,8 +49,8 @@ fn transaction_round_trip() {
     let unsigned = unsigned_transaction();
 
     let (tx, bytes) = build_transaction(&unsigned, &runtime_key).expect("build_transaction");
-    let parsed =
-        parse_and_verify_transaction(&bytes, &runtime_pk).expect("parse_and_verify_transaction");
+    let parsed = parse_and_verify_transaction(&bytes, &runtime_pk, None)
+        .expect("parse_and_verify_transaction");
 
     assert_eq!(parsed, tx);
 }

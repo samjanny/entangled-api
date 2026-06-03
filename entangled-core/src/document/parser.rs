@@ -113,7 +113,9 @@ use crate::canon::{
 use crate::crypto::{CryptoError, VerifyingKey};
 use crate::types::document::{ContentDocument, TransactionDocument};
 use crate::types::keys::RuntimePubkey;
+use crate::types::state::StatePolicyEntry;
 use crate::types::timestamp::EntangledTimestamp;
+use crate::validation::policy_check::validate_state_updates_against_policy;
 use crate::validation::schema::{
     parse_and_validate_content_with_value, parse_and_validate_manifest_with_value,
     parse_and_validate_transaction_with_value,
@@ -223,9 +225,21 @@ pub fn parse_and_verify_content(
 /// public key failing the §05 strict profile is rejected here as
 /// `E_SIG_VERIFICATION`; `E_SIG_INVALID_KEY` is emitted only by callers
 /// that detect "no verifying key is available" before reaching this stage.
+///
+/// `state_policy` carries the declared `state_policy` of the manifest under
+/// which this transaction is being verified. When `Some`, each
+/// `state_updates` entry is cross-checked against the declared policy after
+/// signature verification, which can additionally produce
+/// `E_STATE_UNDECLARED`, `E_STATE_VALUE_SIZE`, or `E_STATE_TTL` (the
+/// policy-relative checks, §07, §11). Pass `None` to verify a transaction in
+/// isolation, where no manifest policy is available; the absolute hard-range
+/// state checks are still applied during Stage 5 schema validation. A caller
+/// that has the manifest SHOULD pass `Some` so the undeclared-reference check
+/// is not silently skipped.
 pub fn parse_and_verify_transaction(
     raw: &[u8],
     runtime_pubkey: &RuntimePubkey,
+    state_policy: Option<&[StatePolicyEntry]>,
 ) -> Result<TransactionDocument, Diagnostic> {
     let (tx, mut value) = parse_and_validate_transaction_with_value(raw)?;
     // See `parse_and_verify_manifest` for the rationale on canonicalizing
@@ -242,6 +256,11 @@ pub fn parse_and_verify_transaction(
         .map_err(|e| crypto_to_diagnostic(e, DocumentKindLabel::Transaction))?;
     vk.verify(&input, &sig)
         .map_err(|e| crypto_to_diagnostic(e, DocumentKindLabel::Transaction))?;
+    // Stage 5 (policy-aware): when the manifest's state_policy is available,
+    // every state_updates entry must reference a declared (namespace, key).
+    if let Some(policy) = state_policy {
+        validate_state_updates_against_policy(&tx.state_updates, policy)?;
+    }
     Ok(tx)
 }
 

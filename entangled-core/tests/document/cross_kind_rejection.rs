@@ -45,7 +45,7 @@ fn content_bytes_parsed_as_transaction_rejected() {
     let unsigned = unsigned_content();
     let (_content, bytes) = build_content(&unsigned, &runtime_key).expect("build content");
 
-    let err = parse_and_verify_transaction(&bytes, &runtime_pk)
+    let err = parse_and_verify_transaction(&bytes, &runtime_pk, None)
         .expect_err("transaction parse must reject content body");
     assert_eq!(err.code, DiagnosticCode::EKindUnknown);
 }

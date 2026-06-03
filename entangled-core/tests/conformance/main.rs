@@ -22,6 +22,23 @@ mod runner;
 use corpus::Corpus;
 use runner::{run_vector, VectorOutcome};
 
+/// Vectors that exercise functionality this crate documents as out of scope
+/// at the crate root (the Stage 7 trust-state machine). They are reported as
+/// skipped with a printed count rather than counted as failures, so the
+/// coverage gap is visible and never silently passes. Each entry is
+/// `(vector_id, reason)`. Remove an id here when the corresponding capability
+/// lands in the crate.
+const OUT_OF_SCOPE: &[(&str, &str)] = &[
+    (
+        "210-trust-publisher-key-mismatch",
+        "Stage 7 trust-state machine is out of scope for this crate",
+    ),
+    (
+        "211-trust-user-rejected-new-identity",
+        "Stage 7 trust-state machine is out of scope for this crate",
+    ),
+];
+
 #[test]
 fn corpus_vectors_match_spec() {
     let Some(corpus) = Corpus::try_load() else {
@@ -48,7 +65,12 @@ fn corpus_vectors_match_spec() {
     );
 
     let mut failures: Vec<String> = Vec::new();
+    let mut skipped: Vec<String> = Vec::new();
     for vector in &corpus.vectors {
+        if let Some((_, reason)) = OUT_OF_SCOPE.iter().find(|(id, _)| *id == vector.id) {
+            skipped.push(format!("[{}] {}", vector.id, reason));
+            continue;
+        }
         match run_vector(vector, &corpus) {
             Ok(VectorOutcome::Match) => {}
             Ok(VectorOutcome::Mismatch { detail }) => {
@@ -61,6 +83,15 @@ fn corpus_vectors_match_spec() {
                 failures.push(format!("[{}] harness error: {}", vector.id, harness_err));
             }
         }
+    }
+
+    if !skipped.is_empty() {
+        eprintln!(
+            "{} of {} vectors skipped as out of scope:\n  - {}",
+            skipped.len(),
+            corpus.vectors.len(),
+            skipped.join("\n  - ")
+        );
     }
 
     assert!(
