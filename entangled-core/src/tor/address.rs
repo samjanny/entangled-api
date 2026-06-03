@@ -110,6 +110,35 @@ impl OnionAddress {
         })
     }
 
+    /// Derive the canonical Tor v3 onion address from an origin public key.
+    ///
+    /// This is the inverse of [`OnionAddress::verify_strict`]: it computes the
+    /// `SHA3-256(".onion checksum" || pubkey || version)[:2]` checksum, encodes
+    /// `pubkey || checksum || version` as lowercase base32 per `rend-spec-v3.txt`,
+    /// and appends `.onion`. The result round-trips: `verify_strict` on the
+    /// returned address yields back `pubkey`, an unchanged checksum, and version
+    /// `0x03`. A publisher building a manifest origin derives the address this
+    /// way from its origin key.
+    pub fn from_origin_pubkey(pubkey: &OriginPubkey) -> Self {
+        let mut hasher = Sha3_256::new();
+        hasher.update(CHECKSUM_PREFIX);
+        hasher.update(pubkey.as_bytes());
+        hasher.update([TOR_V3_VERSION]);
+        let digest = hasher.finalize();
+
+        let mut body = [0u8; 35];
+        body[..32].copy_from_slice(pubkey.as_bytes());
+        body[32] = digest[0];
+        body[33] = digest[1];
+        body[34] = TOR_V3_VERSION;
+
+        let address = BASE32.encode(&body).to_ascii_lowercase() + ".onion";
+        // The encoding is canonical by construction (lowercase base32, 56-char
+        // body, .onion suffix), so the syntactic TryFrom cannot fail; the
+        // expect documents that invariant rather than guarding a real path.
+        OnionAddress::try_from(address).expect("derived onion address is canonical")
+    }
+
     /// Strict verification per §05: decode, then check `version == 0x03` and
     /// recompute the SHA3-256 checksum, comparing byte-exact against the
     /// embedded prefix. Returns a [`DecodedOnionAddress`] whose `pubkey` is
