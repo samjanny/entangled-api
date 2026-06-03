@@ -166,7 +166,10 @@ fn origin_seed_to_onion_corpus_fixture() {
     let seed: [u8; 32] = *b"ENTANGLED-v1.0-origin-test00001\0";
     let origin_key = OriginSigningKey::from_seed(&seed);
     let pubkey = origin_key.verifying_key();
-    assert_eq!(pubkey.to_string(), "Gp8y4JM7Qlkn8JXkJAOW8s3MSkkQNGHGC1c7-AK6Wpo");
+    assert_eq!(
+        pubkey.to_string(),
+        "Gp8y4JM7Qlkn8JXkJAOW8s3MSkkQNGHGC1c7-AK6Wpo"
+    );
     let addr = OnionAddress::from_origin_pubkey(&pubkey);
     assert_eq!(
         addr.as_str(),
