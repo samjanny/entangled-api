@@ -1,7 +1,7 @@
 //! `OnionAddress::decode` and `verify_strict` exercises.
 
 use data_encoding::BASE32;
-use entangled_core::crypto::PublisherSigningKey;
+use entangled_core::crypto::{OriginSigningKey, PublisherSigningKey};
 use entangled_core::tor::TorError;
 use entangled_core::types::keys::OriginPubkey;
 use entangled_core::types::manifest::OnionAddress;
@@ -150,6 +150,23 @@ fn from_origin_pubkey_round_trip() {
 fn from_origin_pubkey_corpus_fixture() {
     let pubkey = OriginPubkey::try_from("Gp8y4JM7Qlkn8JXkJAOW8s3MSkkQNGHGC1c7-AK6Wpo")
         .expect("valid base64url pubkey");
+    let addr = OnionAddress::from_origin_pubkey(&pubkey);
+    assert_eq!(
+        addr.as_str(),
+        "dkptfyethnbfsj7qsxscia4w6lg4yssjca2gdrqlk457qav2lkna4xqd.onion"
+    );
+}
+
+/// End-to-end origin ceremony against the corpus fixture: the origin seed
+/// `ENTANGLED-v1.0-origin-test00001\0` derives, through
+/// `OriginSigningKey -> OriginPubkey -> from_origin_pubkey`, to the same
+/// public key and onion address the corpus records.
+#[test]
+fn origin_seed_to_onion_corpus_fixture() {
+    let seed: [u8; 32] = *b"ENTANGLED-v1.0-origin-test00001\0";
+    let origin_key = OriginSigningKey::from_seed(&seed);
+    let pubkey = origin_key.verifying_key();
+    assert_eq!(pubkey.to_string(), "Gp8y4JM7Qlkn8JXkJAOW8s3MSkkQNGHGC1c7-AK6Wpo");
     let addr = OnionAddress::from_origin_pubkey(&pubkey);
     assert_eq!(
         addr.as_str(),
