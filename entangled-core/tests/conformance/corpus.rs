@@ -86,6 +86,18 @@ pub struct Context {
     /// `wrap_successor_stage9_failure`.
     #[serde(default)]
     pub successor_manifest_path: Option<String>,
+    /// Content-index vectors: corpus-relative path of the
+    /// `content_index.json` served from the manifest's carrier origin.
+    /// Present on both the manifest-level vectors (230-231) and the
+    /// per-document seq vectors (232-235).
+    #[serde(default)]
+    pub content_index_path: Option<String>,
+    /// Per-document content-index vectors (232-235): the manifest's
+    /// declared `content_root`, the SHA-256 of the served index bytes.
+    /// Lets the runner verify the index and resolve the document's seq
+    /// without loading a separate manifest fixture.
+    #[serde(default)]
+    pub content_root: Option<String>,
 }
 
 impl Corpus {

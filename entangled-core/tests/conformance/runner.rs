@@ -18,12 +18,17 @@ use entangled_core::document::{
 };
 use entangled_core::state::SubmitBody;
 use entangled_core::types::keys::RuntimePubkey;
+use entangled_core::types::keys::{ContentHash, ContentRoot};
 use entangled_core::types::manifest::{Manifest, OnionAddress};
 use entangled_core::types::path::EntangledPath;
+use entangled_core::types::state::StatePolicyEntry;
 use entangled_core::types::timestamp::EntangledTimestamp;
 use entangled_core::validation::canary::{
     check_anti_downgrade, check_canary_conflict, check_runtime_pubkey_rotation,
     RetainedManifestRecord,
+};
+use entangled_core::validation::content_index::{
+    validate_content_index, verify_content_against_index,
 };
 use entangled_core::validation::{
     check_migration_chain_cycle, check_origin_not_after, verify_migration_announcement,
@@ -49,8 +54,8 @@ pub fn run_vector(vector: &Vector, corpus: &Corpus) -> Result<VectorOutcome, Str
 
     let actual = match vector.kind.as_str() {
         "manifest" => run_manifest(vector, corpus, &raw, &now),
-        "content" => run_content(vector, &raw),
-        "transaction" => run_transaction(vector, corpus, &raw),
+        "content" => run_content(vector, corpus, &raw),
+        "transaction" => run_transaction(vector, corpus, &raw, &now),
         other => return Err(format!("unknown vector kind {other}")),
     }?;
 
@@ -251,12 +256,22 @@ fn run_manifest_pipeline(
         let onion = OnionAddress::try_from(addr)
             .map_err(|e| format!("context.fetched_origin_address invalid: {e}"))?;
         match canary_checked.verify_origin(&onion, now) {
-            // Stage 9b (content-index verification) is exercised in a
-            // separate code path against the standalone helper; the
-            // main pipeline runner skips it here to keep the harness
-            // contract per-stage and avoid coupling to a content_index
-            // corpus payload at every vector.
-            Ok(b) => b.skip_content_index_check(),
+            // Stage 9b (content-index verification). Vectors that declare
+            // content_root carry the served index at context.content_index_path;
+            // run the real check for them. Vectors with no content index keep
+            // skipping Stage 9b, which is correct for a manifest that declares
+            // no content_root.
+            Ok(b) => {
+                if let Some(index_rel) = vector.context.content_index_path.as_deref() {
+                    let index_bytes = read_input(corpus, index_rel)?;
+                    match b.verify_content_index(Some(&index_bytes)) {
+                        Ok(verified) => verified.into_parts().0,
+                        Err(d) => return Ok(Err(d)),
+                    }
+                } else {
+                    b.skip_content_index_check()
+                }
+            }
             Err(d) => return Ok(Err(d)),
         }
     } else {
@@ -356,7 +371,7 @@ fn canary_checked_publisher_pubkey(
     read_successor_pubkey_unchecked(raw)
 }
 
-fn run_content(vector: &Vector, raw: &[u8]) -> Result<Verdict, String> {
+fn run_content(vector: &Vector, corpus: &Corpus, raw: &[u8]) -> Result<Verdict, String> {
     // Parse-stage rejections (Stages 2-5) never reach signature
     // verification, so vectors that fail early may legitimately omit
     // `expected_runtime_pubkey` from their context. Fall back to a
@@ -407,17 +422,58 @@ fn run_content(vector: &Vector, raw: &[u8]) -> Result<Verdict, String> {
         }
     }
 
+    // Stage 9b: content-index sequencing. Vectors that carry a verified
+    // content index supply the manifest's content_root in context and the
+    // served index bytes at context.content_index_path. Verify the index
+    // against content_root, then compare this document's seq and body hash
+    // against the committed entry for its path.
+    if let Some(content_root_str) = vector.context.content_root.as_deref() {
+        let index_rel = vector
+            .context
+            .content_index_path
+            .as_deref()
+            .ok_or_else(|| {
+                "content vector sets context.content_root but not content_index_path".to_owned()
+            })?;
+        let index_bytes = read_input(corpus, index_rel)?;
+        let content_root = ContentRoot::try_from(content_root_str)
+            .map_err(|e| format!("context.content_root invalid: {e}"))?;
+        let index = match validate_content_index(&index_bytes, &content_root) {
+            Ok(i) => i,
+            Err(d) => return Ok(Verdict::Reject(d)),
+        };
+        let body_hash = ContentHash::from_bytes(sha256(raw));
+        if let Err(d) =
+            verify_content_against_index(&index, content.path.as_str(), content.seq, &body_hash)
+        {
+            return Ok(Verdict::Reject(d));
+        }
+    }
+
     Ok(Verdict::Accept)
 }
 
-fn run_transaction(vector: &Vector, corpus: &Corpus, raw: &[u8]) -> Result<Verdict, String> {
+fn run_transaction(
+    vector: &Vector,
+    corpus: &Corpus,
+    raw: &[u8],
+    now: &EntangledTimestamp,
+) -> Result<Verdict, String> {
     let runtime_pk = match vector.context.expected_runtime_pubkey.as_deref() {
         Some(b64) => RuntimePubkey::try_from(b64)
             .map_err(|e| format!("context.expected_runtime_pubkey invalid: {e}"))?,
         None => RuntimePubkey::from_bytes([0u8; 32]),
     };
 
-    let tx = match parse_and_verify_transaction(raw, &runtime_pk) {
+    // When the vector references the manifest under which this transaction is
+    // verified, load its state_policy so parse_and_verify_transaction can
+    // cross-check state_updates against the declared (namespace, key) set.
+    let state_policy = match vector.context.previously_verified.as_deref() {
+        Some(prev_rel) => Some(load_state_policy(corpus, prev_rel, now)?),
+        None => None,
+    };
+
+    let tx = match parse_and_verify_transaction(raw, &runtime_pk, state_policy.as_deref()) {
         Ok(t) => t,
         Err(d) => return Ok(Verdict::Reject(d)),
     };
@@ -550,6 +606,26 @@ fn manifest_payload_hash(raw: &[u8]) -> Result<[u8; 32], String> {
     }
     let canonical = canonicalize(&value).map_err(|e| format!("JCS failed: {e}"))?;
     Ok(sha256(&canonical))
+}
+
+/// Load and verify the manifest referenced by `context.previously_verified`
+/// and return its declared `state_policy`. Used to give transaction vectors
+/// the manifest policy that `parse_and_verify_transaction` cross-checks
+/// `state_updates` against (E_STATE_UNDECLARED and the policy-relative state
+/// checks).
+fn load_state_policy(
+    corpus: &Corpus,
+    prev_rel: &str,
+    now: &EntangledTimestamp,
+) -> Result<Vec<StatePolicyEntry>, String> {
+    let raw = read_input(corpus, prev_rel)?;
+    let sig_verified = parse_and_verify_manifest(&raw, now)
+        .map_err(|d: Diagnostic| format!("previously_verified {prev_rel} failed parse: {d}"))?;
+    let canary_checked = sig_verified
+        .verify_canary(now)
+        .map_err(|d: Diagnostic| format!("previously_verified {prev_rel} failed canary: {d}"))?;
+    let manifest = canary_checked.skip_origin_check();
+    Ok(manifest.state_policy.clone())
 }
 
 fn build_retained_record(
