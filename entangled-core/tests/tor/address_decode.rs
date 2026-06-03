@@ -3,6 +3,7 @@
 use data_encoding::BASE32;
 use entangled_core::crypto::PublisherSigningKey;
 use entangled_core::tor::TorError;
+use entangled_core::types::keys::OriginPubkey;
 use entangled_core::types::manifest::OnionAddress;
 use sha3::{Digest, Sha3_256};
 
@@ -127,6 +128,33 @@ fn rejects_wrong_length() {
     let too_long = "a".repeat(57) + ".onion";
     let err = OnionAddress::try_from(too_long.as_str()).expect_err("must reject");
     assert!(format!("{err}").contains("characters"));
+}
+
+/// `from_origin_pubkey` is the inverse of `verify_strict`: encoding a pubkey
+/// and decoding the result yields back the same pubkey, a valid checksum, and
+/// version 0x03.
+#[test]
+fn from_origin_pubkey_round_trip() {
+    let pubkey = OriginPubkey::from_bytes(pubkey_from_seed(0x5A));
+    let addr = OnionAddress::from_origin_pubkey(&pubkey);
+    let decoded = addr.verify_strict().expect("derived address must verify");
+    assert_eq!(decoded.pubkey, pubkey);
+    assert_eq!(decoded.version, 0x03);
+}
+
+/// `from_origin_pubkey` matches the canonical address an independent encoder
+/// (the corpus generator) produces for the same origin key. The corpus origin
+/// fixture key `Gp8y4JM7Qlkn8JXkJAOW8s3MSkkQNGHGC1c7-AK6Wpo` derives to
+/// `dkptfyethnbfsj7qsxscia4w6lg4yssjca2gdrqlk457qav2lkna4xqd.onion`.
+#[test]
+fn from_origin_pubkey_corpus_fixture() {
+    let pubkey = OriginPubkey::try_from("Gp8y4JM7Qlkn8JXkJAOW8s3MSkkQNGHGC1c7-AK6Wpo")
+        .expect("valid base64url pubkey");
+    let addr = OnionAddress::from_origin_pubkey(&pubkey);
+    assert_eq!(
+        addr.as_str(),
+        "dkptfyethnbfsj7qsxscia4w6lg4yssjca2gdrqlk457qav2lkna4xqd.onion"
+    );
 }
 
 /// Public test vector: DuckDuckGo's onion service v3 address. We can't verify
