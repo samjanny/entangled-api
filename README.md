@@ -86,7 +86,7 @@ Add the core crate to a Rust project:
 
 ```toml
 [dependencies]
-entangled-core = "0.1"
+entangled-core = "0.10"
 ```
 
 Or, while developing against this repository:
