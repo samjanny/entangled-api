@@ -6,7 +6,7 @@ The full protocol specification is at [github.com/samjanny/entangled](https://gi
 
 ## Status
 
-Version 0.1.0. The library covers the static API surface of Entangled v1.0:
+Version 0.10.0. The library covers the static API surface of Entangled v1.0:
 
 - Document types (Manifest, Content, Transaction)
 - Block types (11 kinds, closed schema)
@@ -19,7 +19,7 @@ Version 0.1.0. The library covers the static API surface of Entangled v1.0:
 - State management with consent model
 - Submit body construction and validation
 
-Out of scope for this crate (will be in `entangled-client` and `entangled-transport`):
+Out of scope for this crate (expected to live in higher-level crates or applications):
 
 - HTTP/onion transport
 - Trust state machine (Stage 7)
