@@ -119,16 +119,37 @@ use crate::types::EntangledTimestamp;
 use crate::validation::diagnostic::{Diagnostic, DiagnosticCode, DocumentKindLabel};
 use crate::validation::limits::CLOCK_SKEW_TOLERANCE_SECS;
 
-/// Verify a migration announcement: the successor manifest's
-/// `publisher_pubkey` MUST equal the announcing manifest's
-/// `publisher_pubkey`.
+/// Verify a migration announcement against the publisher-committed origin
+/// binding (§10:412): the successor manifest's `publisher_pubkey`,
+/// `origin.address`, and `origin.origin_pubkey` MUST each byte-equal the
+/// values the announcing manifest's `migration_pointer.successor_origin`
+/// committed to.
 ///
-/// Returns `E_MIGRATION_MISMATCH` (§11 rc.13; `details` schema updated
-/// in rc.15) on divergence, with `details` carrying the announced
-/// successor address, the two publisher pubkeys, and
-/// `mismatch_field: "publisher_pubkey"`. Both manifests are expected
-/// to have already cleared their own Stages 1-9 pipelines; this helper
-/// performs only the publisher-identity continuity check.
+/// §10:412 has three checks; this helper performs all three:
+///
+/// 1. `successor.publisher_pubkey == announcing.publisher_pubkey`
+///    (publisher-identity continuity);
+/// 2. `successor.origin.address == announcing.migration_pointer
+///    .successor_origin.address` (the successor was fetched from the
+///    address the publisher announced, not a different same-publisher
+///    origin);
+/// 3. `successor.origin.origin_pubkey == announcing.migration_pointer
+///    .successor_origin.origin_pubkey` (the origin key the publisher
+///    committed to).
+///
+/// On first divergence, returns `E_MIGRATION_MISMATCH` (§11 rc.13;
+/// `details` schema updated in rc.15) with `mismatch_field` set to
+/// `"publisher_pubkey"`, `"address"`, or `"origin_pubkey"` respectively
+/// (§11:241/§11:265). Both manifests are expected to have already cleared
+/// their own Stages 1-9 pipelines; this helper performs only the
+/// migration-binding checks.
+///
+/// When the announcing manifest carries no `migration_pointer` there is
+/// nothing the publisher committed to bind the successor's origin
+/// against, so only check 1 (publisher continuity) is performed. A caller
+/// driving a migration always supplies an announcing manifest whose
+/// `migration_pointer` is present (it is what triggered the successor
+/// fetch); the `None` arm exists only for defensive completeness.
 ///
 /// For wrapping a successor Stage 1-9 failure into a migration-level
 /// rejection - for example, a successor whose own `origin.not_after`
@@ -137,8 +158,8 @@ use crate::validation::limits::CLOCK_SKEW_TOLERANCE_SECS;
 ///
 /// # Errors
 ///
-/// `E_MIGRATION_MISMATCH` when the successor's `publisher_pubkey` does
-/// not byte-equal the announcing manifest's `publisher_pubkey`.
+/// `E_MIGRATION_MISMATCH` when any of the three §10:412 bindings does not
+/// byte-equal the announced commitment.
 pub fn verify_migration_announcement(
     announcing: &Manifest,
     successor: &Manifest,
@@ -156,6 +177,46 @@ pub fn verify_migration_announcement(
             "successor_publisher_pubkey": successor.publisher_pubkey.to_string(),
         })));
     }
+
+    // The §10:412 origin binding: the successor's actual origin MUST match the
+    // address and origin key the announcing publisher signed into
+    // `migration_pointer.successor_origin`. Without this, a same-publisher but
+    // non-announced origin (multi-origin operation is allowed by §06) could be
+    // substituted as long as it shares the publisher key.
+    let Some(mp) = announcing.migration_pointer.as_ref() else {
+        return Ok(());
+    };
+    let announced = &mp.successor_origin;
+
+    if successor.origin.address != announced.address {
+        return Err(Diagnostic::new(
+            DiagnosticCode::EMigrationMismatch,
+            DocumentKindLabel::Manifest,
+            "successor manifest origin.address does not match the announced successor_origin.address",
+        )
+        .with_details(serde_json::json!({
+            "mismatch_field": "address",
+            "announced_successor_address": announced.address.as_str(),
+            "successor_origin_address": successor.origin.address.as_str(),
+            "announcing_publisher_pubkey": announcing.publisher_pubkey.to_string(),
+        })));
+    }
+
+    if successor.origin.origin_pubkey != announced.origin_pubkey {
+        return Err(Diagnostic::new(
+            DiagnosticCode::EMigrationMismatch,
+            DocumentKindLabel::Manifest,
+            "successor manifest origin.origin_pubkey does not match the announced successor_origin.origin_pubkey",
+        )
+        .with_details(serde_json::json!({
+            "mismatch_field": "origin_pubkey",
+            "announced_successor_address": announced.address.as_str(),
+            "announced_origin_pubkey": announced.origin_pubkey.to_string(),
+            "successor_origin_pubkey": successor.origin.origin_pubkey.to_string(),
+            "announcing_publisher_pubkey": announcing.publisher_pubkey.to_string(),
+        })));
+    }
+
     Ok(())
 }
 

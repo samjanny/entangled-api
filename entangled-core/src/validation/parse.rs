@@ -209,11 +209,33 @@ fn classify_serde_error(e: serde_json::Error) -> Diagnostic {
             format!("malformed Unicode escape: {msg}"),
         );
     }
+    if is_recursion_limit_error(&msg) {
+        // serde_json aborts parsing at its own hard recursion guard (depth 128)
+        // before `walk_limits` - the §11 nesting-depth emitter - can run. Given
+        // the protocol cap is MAX_JSON_NESTING_DEPTH (16), any input deep enough
+        // to trip serde's guard necessarily violates the depth limit, so report
+        // the specific code the violation maps to (§11:126), not the generic
+        // E_PARSE_JSON. This mirrors the surrogate post-classification above.
+        return Diagnostic::new(
+            DiagnosticCode::EParseNestingDepth,
+            DocumentKindLabel::None,
+            format!(
+                "JSON nesting exceeds the parser recursion limit, beyond the depth limit of {MAX_JSON_NESTING_DEPTH}: {msg}"
+            ),
+        );
+    }
     Diagnostic::new(
         DiagnosticCode::EParseJson,
         DocumentKindLabel::None,
         format!("body is not parseable as JSON: {msg}"),
     )
+}
+
+fn is_recursion_limit_error(msg: &str) -> bool {
+    // serde_json's depth guard reports "recursion limit exceeded" when nesting
+    // passes its internal 128-deep ceiling. The protocol depth cap (16) is far
+    // below that, so this phrase always means a depth-limit violation.
+    msg.contains("recursion limit exceeded")
 }
 
 fn is_surrogate_error(msg: &str) -> bool {

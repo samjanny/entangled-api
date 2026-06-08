@@ -4,13 +4,13 @@
 //! `E_MIGRATION_MISMATCH` (§10 v1.0-rc.13; details schema in v1.0-rc.15).
 
 use entangled_core::crypto::PublisherSigningKey;
-use entangled_core::types::manifest::{Carrier, Manifest, OnionAddress, Origin};
+use entangled_core::types::manifest::{Carrier, Manifest, MigrationPointer, OnionAddress, Origin};
 use entangled_core::validation::{
     verify_migration_announcement, wrap_successor_stage9_failure, Diagnostic, DiagnosticCode,
     DocumentKindLabel,
 };
 
-use super::common::{minimal_manifest, ts};
+use super::common::{minimal_manifest, origin_key_real, ts};
 
 fn manifest_with_publisher_seed(seed: u8) -> Manifest {
     let publisher_pk = PublisherSigningKey::from_seed(&[seed; 32]).verifying_key();
@@ -29,6 +29,25 @@ fn alt_origin() -> Origin {
         origin_pubkey: minimal_manifest().origin.origin_pubkey,
         not_after: None,
     }
+}
+
+/// An announcing manifest that commits (via its `migration_pointer`) to a
+/// successor at `announced_origin`, signed by publisher seed `seed`.
+fn announcing_with_pointer(seed: u8, announced_origin: Origin) -> Manifest {
+    let mut m = manifest_with_publisher_seed(seed);
+    m.migration_pointer = Some(MigrationPointer {
+        successor_origin: announced_origin,
+        announced_at: ts("2026-05-01T00:00:00Z"),
+    });
+    m
+}
+
+/// A successor manifest signed by publisher seed `seed`, fetched from `origin`.
+fn successor_at(seed: u8, origin: Origin) -> Manifest {
+    let mut m = manifest_with_publisher_seed(seed);
+    m.origin = origin;
+    m.updated = ts("2026-06-01T00:00:00Z");
+    m
 }
 
 #[test]
@@ -173,4 +192,75 @@ fn wrap_successor_stage9_failure_omits_successor_pubkey_for_pre_schema_failure()
         details["underlying_diagnostic_code"].as_str(),
         Some("E_PARSE_JSON")
     );
+}
+
+// --- §10:412 successor origin binding (address + origin_pubkey) ---
+
+#[test]
+fn successor_matching_announced_origin_accepted() {
+    // The successor is fetched from exactly the address and origin key the
+    // announcing publisher committed to: all three §10:412 checks pass.
+    let announced = alt_origin();
+    let announcing = announcing_with_pointer(0xA1, announced.clone());
+    let successor = successor_at(0xA1, announced);
+    verify_migration_announcement(&announcing, &successor)
+        .expect("successor matching the announced origin must accept");
+}
+
+#[test]
+fn successor_address_not_announced_rejected() {
+    // Same publisher key, but the successor is fetched from a DIFFERENT origin
+    // than the one the publisher announced - the §10:412 substitution this
+    // binding exists to stop. Rejected with mismatch_field = "address".
+    let announced = alt_origin();
+    let announcing = announcing_with_pointer(0xA1, announced);
+    // The successor's actual origin is the default `onion()`, not the announced
+    // `alt_origin()` address.
+    let successor = successor_at(0xA1, minimal_manifest().origin);
+    let err = verify_migration_announcement(&announcing, &successor)
+        .expect_err("a non-announced successor address must reject");
+    assert_eq!(err.code, DiagnosticCode::EMigrationMismatch);
+    let details = err.details.as_ref().expect("details payload");
+    assert_eq!(details["mismatch_field"].as_str(), Some("address"));
+    assert_eq!(
+        details["announced_successor_address"].as_str(),
+        Some(announced_address_str().as_str())
+    );
+    assert_eq!(
+        details["successor_origin_address"].as_str(),
+        Some(successor.origin.address.as_str())
+    );
+}
+
+#[test]
+fn successor_origin_pubkey_not_announced_rejected() {
+    // The address matches the announcement, but the successor's origin_pubkey
+    // differs from the committed one. Rejected with mismatch_field =
+    // "origin_pubkey".
+    let announced = alt_origin();
+    let announcing = announcing_with_pointer(0xA1, announced.clone());
+    // Same announced address, but a different origin key than committed.
+    let mut tampered = announced;
+    tampered.origin_pubkey = origin_key_real();
+    let successor = successor_at(0xA1, tampered);
+    let err = verify_migration_announcement(&announcing, &successor)
+        .expect_err("a successor origin_pubkey that was not announced must reject");
+    assert_eq!(err.code, DiagnosticCode::EMigrationMismatch);
+    let details = err.details.as_ref().expect("details payload");
+    assert_eq!(details["mismatch_field"].as_str(), Some("origin_pubkey"));
+}
+
+#[test]
+fn announcing_without_pointer_skips_origin_binding() {
+    // Defensive arm: with no migration_pointer there is no announced origin to
+    // bind against, so only the publisher-pubkey continuity check runs. A
+    // matching publisher key accepts regardless of the successor's origin.
+    let announcing = manifest_with_publisher_seed(0xA1); // migration_pointer: None
+    let successor = successor_at(0xA1, alt_origin());
+    verify_migration_announcement(&announcing, &successor)
+        .expect("with no announced origin, only publisher continuity is checked");
+}
+
+fn announced_address_str() -> String {
+    alt_origin().address.as_str().to_owned()
 }

@@ -16,6 +16,24 @@ fn nesting_depth_17_rejected() {
 }
 
 #[test]
+fn nesting_depth_beyond_serde_guard_still_reports_nesting_depth() {
+    // 200 nested arrays trip serde_json's own recursion guard (depth 128)
+    // during parsing, before `walk_limits` runs. The depth-limit violation
+    // (cap 16) must still be reported as E_PARSE_NESTING_DEPTH, not the generic
+    // E_PARSE_JSON the raw serde error would otherwise classify to.
+    let mut s = String::new();
+    for _ in 0..200 {
+        s.push('[');
+    }
+    s.push('1');
+    for _ in 0..200 {
+        s.push(']');
+    }
+    let err = parse_with_limits(&s).unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::EParseNestingDepth);
+}
+
+#[test]
 fn nesting_depth_16_accepted() {
     // 16 nested arrays - innermost element at depth 16, allowed.
     let mut s = String::new();
