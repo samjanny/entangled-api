@@ -23,14 +23,18 @@ use corpus::Corpus;
 use runner::{run_vector, VectorOutcome};
 
 /// Vectors that exercise functionality this crate documents as out of scope
-/// at the crate root: the Stage 7 trust-state machine, and the section 03
+/// at the crate root: the Stage 7 trust-state machine, the section 03
 /// image resource layer (fetching, decoding, and the per-image W_IMAGE_*
-/// outcomes), which belongs to a client built on top of this verifier. They
-/// are reported as skipped with a printed count rather than counted as
-/// failures, so the coverage gap is visible and never silently passes. Each
-/// entry is `(vector_id, reason)`. Remove an id here when the corresponding
-/// capability lands in the crate. The image vectors are exercised by the
-/// entangled-client corpus harness.
+/// outcomes), and the Stage 1 transport layer (the rc.54 family 250-269,
+/// whose vectors carry HTTP response metadata in
+/// `context.transport_response` / `context.content_index_response` and are
+/// exercised by mock-response harnesses in implementations that own a
+/// fetch surface). All of these belong to a client built on top of this
+/// verifier. They are reported as skipped with a printed count rather than
+/// counted as failures, so the coverage gap is visible and never silently
+/// passes. Each entry is `(vector_id, reason)`. Remove an id here when the
+/// corresponding capability lands in the crate. The image vectors are
+/// exercised by the entangled-client corpus harness.
 const OUT_OF_SCOPE: &[(&str, &str)] = &[
     (
         "210-trust-publisher-key-mismatch",
@@ -66,6 +70,86 @@ const OUT_OF_SCOPE: &[(&str, &str)] = &[
     ),
     (
         "245-image-decode-failed",
+        "section 03 image resource layer is out of scope for this crate",
+    ),
+    (
+        "250-transport-accept-ignored-headers",
+        "Stage 1 transport layer is out of scope for this crate",
+    ),
+    (
+        "251-transport-status-unlisted",
+        "Stage 1 transport layer is out of scope for this crate",
+    ),
+    (
+        "252-transport-status-unlisted-2xx",
+        "Stage 1 transport layer is out of scope for this crate",
+    ),
+    (
+        "253-transport-redirect",
+        "Stage 1 transport layer is out of scope for this crate",
+    ),
+    (
+        "254-transport-content-type-missing",
+        "Stage 1 transport layer is out of scope for this crate",
+    ),
+    (
+        "255-transport-content-type-parameter",
+        "Stage 1 transport layer is out of scope for this crate",
+    ),
+    (
+        "256-transport-content-length-missing",
+        "Stage 1 transport layer is out of scope for this crate",
+    ),
+    (
+        "257-transport-content-length-inconsistent",
+        "Stage 1 transport layer is out of scope for this crate",
+    ),
+    (
+        "258-transport-body-failure",
+        "Stage 1 transport layer is out of scope for this crate",
+    ),
+    (
+        "259-transport-rate-limited",
+        "Stage 1 transport layer is out of scope for this crate",
+    ),
+    (
+        "260-transport-not-found",
+        "Stage 1 transport layer is out of scope for this crate",
+    ),
+    (
+        "261-transport-method-not-allowed",
+        "Stage 1 transport layer is out of scope for this crate",
+    ),
+    (
+        "262-transport-unavailable",
+        "Stage 1 transport layer is out of scope for this crate",
+    ),
+    (
+        "263-transport-content-encoding",
+        "Stage 1 transport layer is out of scope for this crate",
+    ),
+    (
+        "264-transport-transfer-encoding",
+        "Stage 1 transport layer is out of scope for this crate",
+    ),
+    (
+        "265-transport-submit-payload-too-large",
+        "Stage 1 transport layer is out of scope for this crate",
+    ),
+    (
+        "266-transport-submit-bad-request",
+        "Stage 1 transport layer is out of scope for this crate",
+    ),
+    (
+        "267-content-index-fetch-encoding",
+        "Stage 1 transport layer is out of scope for this crate",
+    ),
+    (
+        "268-content-index-fetch-status",
+        "Stage 1 transport layer is out of scope for this crate",
+    ),
+    (
+        "269-image-fetch-failed",
         "section 03 image resource layer is out of scope for this crate",
     ),
 ];
