@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-06-10
+
+SEMVER PATCH. Spec alignment to v1.0-rc.49. The upstream rc.49 change is a
+section 10 client-behavior clarification (abandonment suspends transmission of
+retained request-mode state, plus a re-establishment rule) and a section 00
+limitation note; it does not change the wire format, schema, signature input,
+JCS, byte caps, or the diagnostic catalog, and it falls in the Stage 7 trust-
+state / state-store area that this verifier crate leaves out of scope. No
+behavioral change to validation Stages 2 through 9. The rc.49 corpus is
+byte-identical to rc.48 except for `rc_target` and section 10 line references in
+vector descriptions; the crate passes it unchanged (108 vectors).
+
+### Changed (spec v1.0-rc.49 alignment)
+
+- **`SPEC_REVISION` bumped `1.0-rc.48` -> `1.0-rc.49`** and the CI
+  conformance-corpus pin (`.github/workflows/ci.yml`) moved to `ref: v1.0-rc.49`,
+  keeping the harness assertion `corpus.rc_target == SPEC_REVISION` satisfied.
+
 ## [0.7.0] - 2026-06-02
 
 SEMVER MINOR in 0.x (breaking; see Breaking below). Spec alignment to
