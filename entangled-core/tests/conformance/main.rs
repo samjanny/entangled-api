@@ -41,6 +41,10 @@ const OUT_OF_SCOPE: &[(&str, &str)] = &[
         "Stage 7 trust-state machine is out of scope for this crate",
     ),
     (
+        "215-trust-observed-mismatch",
+        "Stage 7 trust-state machine is out of scope for this crate",
+    ),
+    (
         "240-image-valid-png",
         "section 03 image resource layer is out of scope for this crate",
     ),
