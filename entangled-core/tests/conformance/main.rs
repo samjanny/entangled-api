@@ -25,7 +25,7 @@ use runner::{run_vector, VectorOutcome};
 /// Vectors that exercise functionality this crate documents as out of scope
 /// at the crate root: the Stage 7 trust-state machine, the section 03
 /// image resource layer (fetching, decoding, and the per-image W_IMAGE_*
-/// outcomes), and the Stage 1 transport layer (the rc.54 family 250-269,
+/// outcomes), and the Stage 1 transport layer (the rc.54/rc.55 family 250-271,
 /// whose vectors carry HTTP response metadata in
 /// `context.transport_response` / `context.content_index_response` and are
 /// exercised by mock-response harnesses in implementations that own a
@@ -146,6 +146,14 @@ const OUT_OF_SCOPE: &[(&str, &str)] = &[
     ),
     (
         "268-content-index-fetch-status",
+        "Stage 1 transport layer is out of scope for this crate",
+    ),
+    (
+        "270-transport-status-bad-request-on-get",
+        "Stage 1 transport layer is out of scope for this crate",
+    ),
+    (
+        "271-transport-status-payload-too-large-on-get",
         "Stage 1 transport layer is out of scope for this crate",
     ),
     (
