@@ -23,11 +23,14 @@ use corpus::Corpus;
 use runner::{run_vector, VectorOutcome};
 
 /// Vectors that exercise functionality this crate documents as out of scope
-/// at the crate root (the Stage 7 trust-state machine). They are reported as
-/// skipped with a printed count rather than counted as failures, so the
-/// coverage gap is visible and never silently passes. Each entry is
-/// `(vector_id, reason)`. Remove an id here when the corresponding capability
-/// lands in the crate.
+/// at the crate root: the Stage 7 trust-state machine, and the section 03
+/// image resource layer (fetching, decoding, and the per-image W_IMAGE_*
+/// outcomes), which belongs to a client built on top of this verifier. They
+/// are reported as skipped with a printed count rather than counted as
+/// failures, so the coverage gap is visible and never silently passes. Each
+/// entry is `(vector_id, reason)`. Remove an id here when the corresponding
+/// capability lands in the crate. The image vectors are exercised by the
+/// entangled-client corpus harness.
 const OUT_OF_SCOPE: &[(&str, &str)] = &[
     (
         "210-trust-publisher-key-mismatch",
@@ -36,6 +39,30 @@ const OUT_OF_SCOPE: &[(&str, &str)] = &[
     (
         "211-trust-user-rejected-new-identity",
         "Stage 7 trust-state machine is out of scope for this crate",
+    ),
+    (
+        "240-image-valid-png",
+        "section 03 image resource layer is out of scope for this crate",
+    ),
+    (
+        "241-image-apng-animated",
+        "section 03 image resource layer is out of scope for this crate",
+    ),
+    (
+        "242-image-dimension-mismatch",
+        "section 03 image resource layer is out of scope for this crate",
+    ),
+    (
+        "243-image-hash-mismatch",
+        "section 03 image resource layer is out of scope for this crate",
+    ),
+    (
+        "244-image-content-type-mismatch",
+        "section 03 image resource layer is out of scope for this crate",
+    ),
+    (
+        "245-image-decode-failed",
+        "section 03 image resource layer is out of scope for this crate",
     ),
 ];
 
