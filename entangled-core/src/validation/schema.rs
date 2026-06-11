@@ -641,6 +641,18 @@ pub(crate) fn validate_transaction_fields(
 /// document. §04 v1.0-rc.5: floats and integers outside the 64-bit signed
 /// range are rejected lexically with `E_SCHEMA_NON_INTEGER` before any
 /// schema-level type/range check fires.
+/// Name of a JSON value's type, for diagnostic messages.
+fn json_type_name(v: &Value) -> &'static str {
+    match v {
+        Value::Null => "null",
+        Value::Bool(_) => "boolean",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
+    }
+}
+
 fn schema_prepass(root: &Value, kind: DocumentKindLabel) -> Result<(), Diagnostic> {
     let mut stack: Vec<&Value> = vec![root];
     while let Some(node) = stack.pop() {
@@ -679,6 +691,30 @@ fn schema_prepass(root: &Value, kind: DocumentKindLabel) -> Result<(), Diagnosti
                 }
             }
             Value::Object(map) => {
+                // A `kind` or `op` member is only ever the discriminator tag of
+                // a closed internally-tagged enum (block / inline / link / form
+                // `kind`, state-operation `op`). serde's internally-tagged
+                // deserialization would otherwise interpret a non-string tag,
+                // such as the integer `0`, as a variant *index* rather than
+                // rejecting it, silently admitting a document the wire schema
+                // forbids (the tag is a string). Reject a non-string tag here as
+                // a type error, before `from_value` runs, matching the Java
+                // reference and the closed schema. (The top-level document
+                // `kind` is already constrained to a string at Stage 4.)
+                for tag in ["kind", "op"] {
+                    if let Some(v) = map.get(tag) {
+                        if !v.is_string() {
+                            return Err(Diagnostic::new(
+                                DiagnosticCode::ESchemaFieldType,
+                                kind,
+                                format!(
+                                    "`{tag}` enum discriminator must be a string, not {}",
+                                    json_type_name(v)
+                                ),
+                            ));
+                        }
+                    }
+                }
                 for v in map.values() {
                     stack.push(v);
                 }
