@@ -1,0 +1,50 @@
+# Standalone fuzz crate (its own workspace, nightly + libFuzzer only). It is
+# deliberately NOT a member of the entangled-api workspace, so the main
+# `cargo build/test --workspace --locked` is unaffected and this crate keeps its
+# own lockfile.
+[package]
+name = "entangled-core-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+# Detach from the parent workspace.
+[workspace]
+
+[dependencies]
+libfuzzer-sys = "0.4"
+serde_json = "1"
+
+[dependencies.entangled-core]
+path = ".."
+
+[[bin]]
+name = "differential"
+path = "fuzz_targets/differential.rs"
+test = false
+doc = false
+bench = false
+
+# The deterministic differential replay over the corpus: the pre-fuzz gate and
+# the regression check. A normal binary (no libFuzzer), runnable as
+# `cargo +nightly run --bin replay`.
+[[bin]]
+name = "replay"
+path = "src/bin/replay.rs"
+test = false
+doc = false
+bench = false
+
+# Triage helper: print both verdicts for one input file.
+[[bin]]
+name = "inspect"
+path = "src/bin/inspect.rs"
+test = false
+doc = false
+bench = false
+
+[profile.release]
+debug = 1
