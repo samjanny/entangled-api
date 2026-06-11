@@ -14,9 +14,11 @@
 //!
 //! Both sides pin an identical fixed context (the corpus's canonical origin,
 //! runtime key, paths, and clock). The harness compares Rust against Java, not
-//! against the corpus's recorded verdict: a document for which both reject with
-//! the same code is agreement, regardless of whether that code is what a fully
-//! contextualized client would report.
+//! against the corpus's recorded verdict. Conformance follows the §11
+//! within-stage rule ([`verdicts_conform`]): the accept/reject decision MUST
+//! match and a reject MUST agree on the pipeline stage (first-failing-stage),
+//! but the exact diagnostic code within a stage is implementation-defined and
+//! may differ.
 
 use std::env;
 use std::fs;
@@ -34,7 +36,8 @@ use entangled_core::types::manifest::OnionAddress;
 use entangled_core::types::path::EntangledPath;
 use entangled_core::types::timestamp::EntangledTimestamp;
 use entangled_core::validation::{
-    check_input, discriminate_kind, parse_with_limits, DocumentKind, InputKind,
+    check_input, discriminate_kind, parse_with_limits, Diagnostic, DiagnosticCode, DocumentKind,
+    DocumentKindLabel, InputKind,
 };
 
 // Canonical corpus context. These MUST stay byte-identical to the constants the
@@ -96,7 +99,10 @@ impl RustEval {
     ///
     /// Mirrors `DiffEval.evaluate`: probe-discriminate the kind at the most
     /// permissive cap, then run the discriminated kind's full pipeline under its
-    /// own cap with the fixed context.
+    /// own cap with the fixed context. A reject carries both the diagnostic code
+    /// and its pipeline stage (`R:<CODE>:<STAGE>`), so the conformance check can
+    /// distinguish a cross-stage divergence (a first-failing-stage violation)
+    /// from a within-stage one (implementation-defined per §11).
     pub fn verify(&self, body: &[u8]) -> String {
         match self.probe_kind(body) {
             Ok(DocumentKind::Manifest) => self.run_manifest(body),
@@ -104,31 +110,31 @@ impl RustEval {
             Ok(DocumentKind::Transaction) => self.run_transaction(body),
             // A probe-stage rejection (Stage 2 byte/UTF-8/BOM, Stage 3 parse,
             // Stage 4 kind) is itself the verdict.
-            Err(code) => format!("R:{code}"),
+            Err(d) => reject(&d),
         }
     }
 
     /// Stage 2-4 probe purely to learn the kind, at the 1 MiB content cap so it
     /// never caps a manifest early; the per-kind pipeline below re-validates
     /// under the correct cap.
-    fn probe_kind(&self, body: &[u8]) -> Result<DocumentKind, String> {
-        let s = check_input(body, InputKind::ContentDocument).map_err(|d| d.code.to_string())?;
-        let value = parse_with_limits(s).map_err(|d| d.code.to_string())?;
-        discriminate_kind(&value).map_err(|d| d.code.to_string())
+    fn probe_kind(&self, body: &[u8]) -> Result<DocumentKind, Diagnostic> {
+        let s = check_input(body, InputKind::ContentDocument)?;
+        let value = parse_with_limits(s)?;
+        discriminate_kind(&value)
     }
 
     fn run_manifest(&self, body: &[u8]) -> String {
         let sig = match parse_and_verify_manifest(body, &self.now) {
             Ok(v) => v,
-            Err(d) => return reject(&d.code.to_string()),
+            Err(d) => return reject(&d),
         };
         let canary = match sig.verify_canary(&self.now) {
             Ok(c) => c,
-            Err(d) => return reject(&d.code.to_string()),
+            Err(d) => return reject(&d),
         };
         let bound = match canary.verify_origin(&self.origin, &self.now) {
             Ok(b) => b,
-            Err(d) => return reject(&d.code.to_string()),
+            Err(d) => return reject(&d),
         };
         // Stage 9b: the fixed context supplies no content-index bytes, mirroring
         // the Java side's `verifyManifestIndex(doc, null)`. A manifest that
@@ -136,18 +142,22 @@ impl RustEval {
         // both sides; one with no content_root succeeds.
         match bound.verify_content_index(None) {
             Ok(_) => "A".to_owned(),
-            Err(d) => reject(&d.code.to_string()),
+            Err(d) => reject(&d),
         }
     }
 
     fn run_content(&self, body: &[u8]) -> String {
         let content = match parse_and_verify_content(body, &self.runtime_pubkey) {
             Ok(c) => c,
-            Err(d) => return reject(&d.code.to_string()),
+            Err(d) => return reject(&d),
         };
         // Stage 9 path binding against the fixed fetched path.
         if content.path != self.content_path {
-            return reject("E_BIND_PATH");
+            return reject(&Diagnostic::new(
+                DiagnosticCode::EBindPath,
+                DocumentKindLabel::Content,
+                "content.path does not match the fixed fetched path",
+            ));
         }
         // Stage 9b: no content_root in the fixed context, so it is a no-op
         // (mirrors Java's `verifyContentSeq` with a null contentRoot).
@@ -159,17 +169,95 @@ impl RustEval {
         // is available: pass `None` (mirrors Java's null pinnedStatePolicy).
         let tx = match parse_and_verify_transaction(body, &self.runtime_pubkey, None) {
             Ok(t) => t,
-            Err(d) => return reject(&d.code.to_string()),
+            Err(d) => return reject(&d),
         };
         match verify_transaction_binding(&tx, &self.submit_path, &self.submit_body) {
             Ok(()) => "A".to_owned(),
-            Err(d) => reject(&d.code.to_string()),
+            Err(d) => reject(&d),
         }
     }
 }
 
-fn reject(code: &str) -> String {
-    format!("R:{code}")
+/// Encode a rejection as `R:<CODE>:<STAGE>`; the stage lets the conformance
+/// check separate within-stage code latitude (allowed, §11) from a cross-stage
+/// first-failing-stage violation (a real bug).
+fn reject(d: &Diagnostic) -> String {
+    format!("R:{}:{}", d.code, d.stage)
+}
+
+/// Conformance check between the two implementations' verdicts under the §11
+/// within-stage rule: the accept/reject decision MUST match, and a reject MUST
+/// agree on the pipeline stage (first-failing-stage), but the exact code within
+/// a stage is implementation-defined and may differ. The §04 implementation-
+/// defined-stage codes (`E_SCHEMA_NON_INTEGER`, `E_SCHEMA_MALFORMED_UNICODE`)
+/// are exempt from the stage check, since §04 lets them be detected at different
+/// stages.
+pub fn verdicts_conform(rust: &str, java: &str) -> bool {
+    if rust == java {
+        return true;
+    }
+    let (Some(r), Some(j)) = (parse_verdict(rust), parse_verdict(java)) else {
+        // Unparseable (e.g. a Java `X:<Type>` crash marker): not conforming.
+        return false;
+    };
+    match (r, j) {
+        // Accept/reject decision must match.
+        (Verdict::Accept, Verdict::Accept) => true,
+        (Verdict::Accept, _) | (_, Verdict::Accept) => false,
+        (Verdict::Reject(rc, rs), Verdict::Reject(jc, js)) => {
+            if rc == jc {
+                return true;
+            }
+            // §04 grants these an implementation-defined detection stage, so they
+            // may legitimately be reported at a different stage than a
+            // co-occurring violation. Conform whenever either side reports one.
+            if is_stage_defined_by_impl(rc) || is_stage_defined_by_impl(jc) {
+                return true;
+            }
+            // Same (effective) stage: the within-stage code choice is
+            // implementation-defined (§11). Different stage: a first-failing-stage
+            // violation, a real divergence.
+            effective_stage(rc, rs) == effective_stage(jc, js)
+        }
+    }
+}
+
+enum Verdict<'a> {
+    Accept,
+    Reject(&'a str, &'a str), // (code, stage)
+}
+
+fn parse_verdict(s: &str) -> Option<Verdict<'_>> {
+    if s == "A" {
+        return Some(Verdict::Accept);
+    }
+    let rest = s.strip_prefix("R:")?;
+    let (code, stage) = rest.rsplit_once(':')?;
+    Some(Verdict::Reject(code, stage))
+}
+
+/// `E_SCHEMA_NON_INTEGER` and `E_SCHEMA_MALFORMED_UNICODE` may be detected at
+/// the parse level or as a Stage 5 pre-pass; §04 makes that stage
+/// implementation-defined, so they never count as a cross-stage divergence.
+fn is_stage_defined_by_impl(code: &str) -> bool {
+    matches!(code, "E_SCHEMA_NON_INTEGER" | "E_SCHEMA_MALFORMED_UNICODE")
+}
+
+/// The stage at which a code is *detected* in this verifier surface, which is
+/// what the first-failing-stage comparison needs. Several Stage 5 closed-schema
+/// codes carry a catalog `stage` that reflects a different primary use: the
+/// state-range codes are catalogued off-pipeline (stage 0) because they also
+/// apply to runtime state operations, and `E_MIGRATION_INVALID` is catalogued
+/// at Stage 9 for its `chain_cycle` reason. In the schema-validation context
+/// these all fire at Stage 5 (§11: budget, origin-invalid, the announcement-
+/// internal migration reasons, and the manifest state_policy range checks are
+/// all Stage 5 closed-schema checks), so normalize them to `5` before comparing.
+fn effective_stage<'a>(code: &str, catalog_stage: &'a str) -> &'a str {
+    match code {
+        "E_STATE_TTL" | "E_STATE_VALUE_SIZE" | "E_ORIGIN_INVALID" | "E_MIGRATION_INVALID"
+        | "E_SUBMIT_BUDGET" => "5",
+        _ => catalog_stage,
+    }
 }
 
 /// A warm JVM subprocess running `org.entangled.fuzz.DiffServer`, queried over a

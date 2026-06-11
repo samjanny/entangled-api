@@ -9,7 +9,7 @@ use std::env;
 use std::fs;
 use std::process::ExitCode;
 
-use entangled_core_fuzz::{JavaDiffServer, RustEval};
+use entangled_core_fuzz::{verdicts_conform, JavaDiffServer, RustEval};
 
 fn main() -> ExitCode {
     let path = match env::args().nth(1) {
@@ -40,11 +40,11 @@ fn main() -> ExitCode {
     );
     println!("rust : {rust}");
     println!("java : {java_verdict}");
-    if rust == java_verdict {
-        println!("=> agree");
+    if verdicts_conform(&rust, &java_verdict) {
+        println!("=> conform");
         ExitCode::SUCCESS
     } else {
-        println!("=> DIVERGE");
+        println!("=> DIVERGE (non-conforming under the section 11 within-stage rule)");
         ExitCode::from(1)
     }
 }

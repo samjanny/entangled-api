@@ -30,7 +30,7 @@ use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 
-use entangled_core_fuzz::{JavaDiffServer, RustEval};
+use entangled_core_fuzz::{verdicts_conform, JavaDiffServer, RustEval};
 use libfuzzer_sys::fuzz_target;
 
 struct Harness {
@@ -77,7 +77,7 @@ fuzz_target!(|data: &[u8]| {
             .ask(data)
             .unwrap_or_else(|e| panic!("java diff-server communication failed: {e}"));
 
-        if rust == java {
+        if verdicts_conform(&rust, &java) {
             return;
         }
 

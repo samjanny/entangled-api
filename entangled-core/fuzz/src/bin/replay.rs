@@ -26,7 +26,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use entangled_core_fuzz::{JavaDiffServer, RustEval};
+use entangled_core_fuzz::{verdicts_conform, JavaDiffServer, RustEval};
 use serde_json::Value;
 
 fn main() -> ExitCode {
@@ -71,7 +71,7 @@ fn run() -> Result<bool, String> {
         let rust = eval.verify(&body);
         let java_verdict = java.ask(&body)?;
         checked += 1;
-        if rust != java_verdict {
+        if !verdicts_conform(&rust, &java_verdict) {
             divergences.push(format!("[{id}] rust={rust} java={java_verdict}"));
         }
     }
