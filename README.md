@@ -73,12 +73,21 @@ Entangled is not an anonymity layer, a web replacement, a distributed storage sy
     ├── Cargo.toml
     ├── README.md
     ├── src/
-    └── tests/
+    ├── tests/                   # incl. the conformance harness (docs-spec/corpus)
+    └── fuzz/                    # differential fuzz harness vs the Java reference
 ```
 
 The protocol specification itself lives in a separate repository,
 [github.com/samjanny/entangled](https://github.com/samjanny/entangled),
 referenced from the [Specification](#specification) section below.
+
+`entangled-core/fuzz` is a standalone nightly + libFuzzer crate that runs each
+input through both this crate and the independent
+[entangled-api-java](https://github.com/samjanny/entangled-api-java) reference and
+flags any divergence in the accept/reject decision or the pipeline stage of a
+rejection. It is the pre-audit cross-implementation check; see its
+[README](entangled-core/fuzz/README.md). The integer-discriminator type fix and
+corpus vector 129 (rc.57) came from it.
 
 ## Install
 
