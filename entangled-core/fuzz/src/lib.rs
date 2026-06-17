@@ -26,6 +26,8 @@ use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
+pub mod oracles;
+
 use entangled_core::document::{
     parse_and_verify_content, parse_and_verify_manifest, parse_and_verify_transaction,
     verify_transaction_binding,

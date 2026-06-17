@@ -28,6 +28,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "oracles"
+path = "fuzz_targets/oracles.rs"
+test = false
+doc = false
+bench = false
+
 # The deterministic differential replay over the corpus: the pre-fuzz gate and
 # the regression check. A normal binary (no libFuzzer), runnable as
 # `cargo +nightly run --bin replay`.
@@ -42,6 +49,14 @@ bench = false
 [[bin]]
 name = "inspect"
 path = "src/bin/inspect.rs"
+test = false
+doc = false
+bench = false
+
+# Deterministic oracle check over the corpus (no Java required).
+[[bin]]
+name = "check_oracles"
+path = "src/bin/check_oracles.rs"
 test = false
 doc = false
 bench = false
