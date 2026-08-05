@@ -354,7 +354,7 @@ impl RequestId {
     /// submits; aborting is the only safe option.
     pub fn generate() -> Self {
         let mut bytes = [0u8; REQUEST_ID_BYTES];
-        getrandom::getrandom(&mut bytes).expect("OS RNG unavailable for RequestId::generate");
+        getrandom::fill(&mut bytes).expect("OS RNG unavailable for RequestId::generate");
         Self(bytes)
     }
 
