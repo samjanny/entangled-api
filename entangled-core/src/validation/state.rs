@@ -210,14 +210,16 @@ fn aggregate_request_state_bytes(policy: &[StatePolicyEntry]) -> usize {
 /// Standalone validation of a transaction's `state_updates` array (no
 /// policy lookup).
 ///
-/// Enforces the array cap and the absolute hard ranges on `value` length and
-/// `ttl`. Cross-checks against the manifest's declared `state_policy` happen
-/// in [`crate::validation::policy_check`].
+/// Enforces the array cap, per-array `(namespace, key)` uniqueness, and the
+/// absolute hard ranges on `value` length and `ttl`. Cross-checks against the
+/// manifest's declared `state_policy` happen in
+/// [`crate::validation::policy_check`].
 ///
 /// # Errors
 ///
 /// Returns the first applicable diagnostic
-/// (`E_SCHEMA_FIELD_LENGTH`, `E_STATE_VALUE_SIZE`, or `E_STATE_TTL`).
+/// (`E_SCHEMA_FIELD_LENGTH`, `E_STATE_DUPLICATE`, `E_STATE_VALUE_SIZE`, or
+/// `E_STATE_TTL`).
 pub fn validate_state_updates_standalone(updates: &[StateUpdateOp]) -> Result<(), Diagnostic> {
     if updates.len() > MAX_STATE_UPDATES {
         return Err(Diagnostic::new(
@@ -229,7 +231,27 @@ pub fn validate_state_updates_standalone(updates: &[StateUpdateOp]) -> Result<()
             ),
         ));
     }
+    let mut seen: HashSet<(&Slug, &Slug)> = HashSet::with_capacity(updates.len());
     for op in updates {
+        let (namespace, key) = match op {
+            StateUpdateOp::Set { namespace, key, .. }
+            | StateUpdateOp::Delete { namespace, key } => (namespace, key),
+        };
+        if !seen.insert((namespace, key)) {
+            return Err(Diagnostic::new(
+                DiagnosticCode::EStateDuplicate,
+                DocumentKindLabel::Transaction,
+                format!(
+                    "duplicate state_updates entry for ({}, {})",
+                    namespace.as_str(),
+                    key.as_str()
+                ),
+            )
+            .with_details(serde_json::json!({
+                "duplicate_namespace": namespace.as_str(),
+                "duplicate_key": key.as_str(),
+            })));
+        }
         match op {
             StateUpdateOp::Set { value, ttl, .. } => {
                 if value.len() > STATE_VALUE_MAX_BYTES {

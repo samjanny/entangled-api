@@ -119,6 +119,40 @@ fn state_updates_with_33_entries_rejected_field_length() {
     );
 }
 
+/// Two otherwise-valid operations target the same composite key. The operation
+/// form does not matter to the per-array uniqueness rule (§07/§11 rc.61).
+#[test]
+fn duplicate_state_update_pair_rejected() {
+    let updates = json!([
+        {
+            "op": "set",
+            "namespace": "session",
+            "key": "data",
+            "value": "ok",
+            "ttl": 600
+        },
+        {
+            "op": "delete",
+            "namespace": "session",
+            "key": "data"
+        }
+    ]);
+    let mut v = transaction_value();
+    v.as_object_mut()
+        .unwrap()
+        .insert("state_updates".to_owned(), updates);
+
+    let err = parse_and_validate_transaction(&to_bytes(&v)).expect_err("must reject");
+    assert_eq!(err.code, DiagnosticCode::EStateDuplicate);
+    assert_eq!(
+        err.details,
+        Some(json!({
+            "duplicate_namespace": "session",
+            "duplicate_key": "data"
+        }))
+    );
+}
+
 /// 1025 content `blocks` - one over the §02 content max of 1024.
 #[test]
 fn content_blocks_with_1025_entries_rejected_field_length() {
