@@ -154,7 +154,8 @@ pub fn validate_link_target(target: &LinkTarget) -> Result<(), Diagnostic> {
 }
 
 fn validate_citation_url(url: &str) -> Result<(), Diagnostic> {
-    validate_url_common("citation", url, "https://")
+    validate_url_common("citation", url, "https://")?;
+    extract_authority_host(&url["https://".len()..], "citation").map(|_| ())
 }
 
 /// Validate a `kind: "carrier"` link target URL (§03).
@@ -167,13 +168,7 @@ fn validate_citation_url(url: &str) -> Result<(), Diagnostic> {
 fn validate_carrier_url(carrier: Carrier, url: &str) -> Result<(), Diagnostic> {
     validate_url_common("carrier", url, "http://")?;
     let after_scheme = &url["http://".len()..];
-    let host = extract_authority_host(after_scheme).ok_or_else(|| {
-        Diagnostic::new(
-            DiagnosticCode::ESchemaFieldSyntax,
-            DocumentKindLabel::None,
-            "carrier url has no host component",
-        )
-    })?;
+    let host = extract_authority_host(after_scheme, "carrier")?;
     match carrier {
         Carrier::TorV3 => {
             OnionAddress::try_from(host).map_err(|e| {
@@ -261,28 +256,89 @@ fn validate_url_common(
 
 /// Extract the host component from the authority part of a URI.
 ///
-/// Given the URL slice **after** the `scheme://` prefix, finds the end of
-/// the authority (first `/`, `?`, or `#`), strips optional userinfo
-/// (anything before `@`), and strips an optional port (anything after the
-/// last `:`). Returns `None` if the result is empty.
-fn extract_authority_host(after_scheme: &str) -> Option<&str> {
+/// Given the URL slice **after** the `scheme://` prefix, validate the rc.59
+/// external-target authority profile and return its host. Userinfo is rejected
+/// before host extraction; an optional decimal port in 1..=65535 is accepted.
+fn extract_authority_host<'a>(
+    after_scheme: &'a str,
+    kind_label: &'static str,
+) -> Result<&'a str, Diagnostic> {
     let end = after_scheme
         .find(['/', '?', '#'])
         .unwrap_or(after_scheme.len());
     let authority = &after_scheme[..end];
-    let host_port = match authority.rfind('@') {
-        Some(at) => &authority[at + 1..],
-        None => authority,
-    };
-    let host = match host_port.rfind(':') {
-        Some(colon) => &host_port[..colon],
-        None => host_port,
-    };
-    if host.is_empty() {
-        None
-    } else {
-        Some(host)
+    if authority.is_empty() {
+        return Err(url_syntax(kind_label, "url has no authority host"));
     }
+    if authority.contains('@') {
+        return Err(url_syntax(
+            kind_label,
+            "url authority contains prohibited userinfo",
+        ));
+    }
+
+    let (host, port) = if authority.starts_with('[') {
+        let close = authority
+            .find(']')
+            .ok_or_else(|| url_syntax(kind_label, "url has an unterminated IP-literal host"))?;
+        let host = &authority[..=close];
+        if close == 1 || host[1..close].contains(['[', ']']) {
+            return Err(url_syntax(kind_label, "url has an invalid IP-literal host"));
+        }
+        let tail = &authority[close + 1..];
+        if tail.is_empty() {
+            (host, None)
+        } else if let Some(port) = tail.strip_prefix(':') {
+            (host, Some(port))
+        } else {
+            return Err(url_syntax(
+                kind_label,
+                "url authority has data after the host without a port delimiter",
+            ));
+        }
+    } else {
+        if authority.contains(['[', ']']) {
+            return Err(url_syntax(kind_label, "url has malformed host brackets"));
+        }
+        match authority.rsplit_once(':') {
+            Some((host, port)) => {
+                if host.contains(':') {
+                    return Err(url_syntax(
+                        kind_label,
+                        "url IP-literal host must use brackets",
+                    ));
+                }
+                (host, Some(port))
+            }
+            None => (authority, None),
+        }
+    };
+
+    if host.is_empty() {
+        return Err(url_syntax(kind_label, "url has no authority host"));
+    }
+    if let Some(port) = port {
+        let valid = !port.is_empty()
+            && port.bytes().all(|b| b.is_ascii_digit())
+            && port
+                .parse::<u32>()
+                .is_ok_and(|number| (1..=65_535).contains(&number));
+        if !valid {
+            return Err(url_syntax(
+                kind_label,
+                "url port must be a decimal integer in 1..=65535",
+            ));
+        }
+    }
+    Ok(host)
+}
+
+fn url_syntax(kind_label: &'static str, message: &'static str) -> Diagnostic {
+    Diagnostic::new(
+        DiagnosticCode::ESchemaFieldSyntax,
+        DocumentKindLabel::None,
+        format!("{kind_label} {message}"),
+    )
 }
 
 /// Returns true if `b` is an unreserved/reserved URI byte per RFC 3986

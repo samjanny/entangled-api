@@ -404,6 +404,42 @@ fn t20_citation_url_with_ftp_scheme_rejected() {
     assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
 }
 
+#[test]
+fn t20b_citation_url_with_userinfo_rejected() {
+    let mut v = content_value();
+    let blocks = v.as_object_mut().unwrap().get_mut("blocks").unwrap();
+    *blocks = json!([
+        {
+            "kind": "link",
+            "label": [{ "kind": "text", "value": "src", "marks": [] }],
+            "target": {
+                "kind": "citation",
+                "url": "https://trusted.example@evil.example/reference"
+            }
+        }
+    ]);
+    let err = parse_and_validate_content(&manifest_bytes(&v)).unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
+}
+
+#[test]
+fn t20c_citation_url_explicit_profile_features_accepted() {
+    let mut v = content_value();
+    let blocks = v.as_object_mut().unwrap().get_mut("blocks").unwrap();
+    *blocks = json!([
+        {
+            "kind": "link",
+            "label": [{ "kind": "text", "value": "src", "marks": [] }],
+            "target": {
+                "kind": "citation",
+                "url": "https://example.org:8443/a%2Fb?x=%7e#part%2Fone"
+            }
+        }
+    ]);
+    parse_and_validate_content(&manifest_bytes(&v))
+        .expect("non-default port, query, fragment, and percent encoding are permitted");
+}
+
 // -- §03 carrier link target -------------------------------------------------
 
 const CARRIER_ONION: &str = "abcdefghijklmnopqrstuvwxyz234567abcdefghijklmnopqrstuvwx.onion";
@@ -453,7 +489,26 @@ fn t27a_carrier_link_with_https_scheme_rejected() {
 }
 
 #[test]
-fn t27b_carrier_link_with_clearnet_host_rejected() {
+fn t27b_carrier_link_with_userinfo_rejected_before_host_validation() {
+    let mut v = content_value();
+    let blocks = v.as_object_mut().unwrap().get_mut("blocks").unwrap();
+    *blocks = json!([
+        {
+            "kind": "link",
+            "label": [{ "kind": "text", "value": "src", "marks": [] }],
+            "target": {
+                "kind": "carrier",
+                "carrier": "tor-v3",
+                "url": format!("http://trusted.example@{CARRIER_ONION}/wiki")
+            }
+        }
+    ]);
+    let err = parse_and_validate_content(&manifest_bytes(&v)).unwrap_err();
+    assert_eq!(err.code, DiagnosticCode::ESchemaFieldSyntax);
+}
+
+#[test]
+fn t27c_carrier_link_with_clearnet_host_rejected() {
     // §03: a tor-v3 carrier link MUST point at a 62-char onion host.
     // A clearnet host fails the host-validation step.
     let mut v = content_value();
