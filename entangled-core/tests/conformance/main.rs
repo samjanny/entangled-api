@@ -25,8 +25,8 @@ use runner::{run_vector, VectorOutcome};
 /// Vectors that exercise functionality this crate documents as out of scope
 /// at the crate root: the Stage 7 trust-state machine, the section 03
 /// image resource layer (fetching, decoding, and the per-image W_IMAGE_*
-/// outcomes), and the Stage 1 transport layer (the rc.54/rc.55 family 250-271,
-/// whose vectors carry HTTP response metadata in
+/// outcomes), and the Stage 1 transport layer (017 and the rc.54/rc.55 family
+/// 250-271, whose vectors carry HTTP response metadata in
 /// `context.transport_response` / `context.content_index_response` and are
 /// exercised by mock-response harnesses in implementations that own a
 /// fetch surface). All of these belong to a client built on top of this
@@ -36,6 +36,10 @@ use runner::{run_vector, VectorOutcome};
 /// corresponding capability lands in the crate. The image vectors are
 /// exercised by the entangled-client corpus harness.
 const OUT_OF_SCOPE: &[(&str, &str)] = &[
+    (
+        "017-transport-content-type-case-insensitive",
+        "Stage 1 transport layer is out of scope for this crate",
+    ),
     (
         "210-trust-publisher-key-mismatch",
         "Stage 7 trust-state machine is out of scope for this crate",

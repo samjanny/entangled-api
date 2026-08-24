@@ -20,7 +20,7 @@
 //! transport codes that apply to Entangled signed documents:
 //!
 //! 1. `Content-Type` MUST be `application/json`. The content index is
-//!    not an Entangled signed document, so `application/entangled+json`
+//!    not an Entangled signed document, so `application/vnd.entangled+json`
 //!    is not an acceptable value here.
 //! 2. `Content-Length` MUST be present and exact. A response without
 //!    `Content-Length` is `E_CONTENT_INDEX_FETCH_FAILED` (not
